@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 
 /**
@@ -11,6 +12,7 @@ import { useAppStore } from '@/stores/app'
  */
 
 const store = useAppStore()
+const router = useRouter()
 
 // 党徽图标路径
 // 用途：顶部导航栏左侧品牌标识
@@ -21,10 +23,9 @@ const emblemUrl = computed(() => {
 
 function handleNavClick(key) {
   store.setActiveNav(key)
-  // 当前仅首页有实际路由，其他菜单点击仅切换高亮状态
-  // 后续接入路由后可取消注释：
-  // const item = store.navItems.find(n => n.key === key)
-  // if (item) router.push(item.path)
+  // 根据导航 key 跳转到对应路由
+  const item = store.navItems.find(n => n.key === key)
+  if (item) router.push(item.path)
 }
 
 function handleLogout() {
