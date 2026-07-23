@@ -3,24 +3,24 @@
  * 主色调：党建红 #C12C1F
  * 设计风格：简洁大气、庄重规范
  * ============================================ */
-
+@import "tailwindcss";
 /* CSS 变量定义 */
 :root {
-  --party-red: #C12C1F;
-  --party-red-dark: #A01E1A;
-  --party-red-light: #E84646;
+  --party-red: #c12c1f;
+  --party-red-dark: #a01e1a;
+  --party-red-light: #e84646;
   --party-red-bg: rgba(193, 44, 31, 0.08);
   --party-red-hover: rgba(193, 44, 31, 0.15);
 
-  --text-primary: #2C3E50;
+  --text-primary: #2c3e50;
   --text-regular: #606266;
   --text-secondary: #909399;
-  --text-placeholder: #C0C4CC;
+  --text-placeholder: #c0c4cc;
 
-  --bg-page: #F5F6FA;
-  --bg-white: #FFFFFF;
-  --border-color: #EBEEF5;
-  --border-light: #F2F6FC;
+  --bg-page: #f5f6fa;
+  --bg-white: #ffffff;
+  --border-color: #ebeef5;
+  --border-light: #f2f6fc;
 
   --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
   --shadow-hover: 0 4px 20px rgba(0, 0, 0, 0.12);
@@ -29,8 +29,9 @@
   --radius-base: 8px;
   --radius-lg: 12px;
 
-  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial,
+  --font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
     sans-serif;
 }
 
@@ -63,7 +64,8 @@ a {
   text-decoration: none;
 }
 
-ul, ol {
+ul,
+ol {
   list-style: none;
 }
 
@@ -83,7 +85,7 @@ img {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #C0C4CC;
+  background: #c0c4cc;
   border-radius: 3px;
 
   &:hover {
@@ -111,7 +113,7 @@ img {
   gap: 10px;
 
   &::before {
-    content: '';
+    content: "";
     display: inline-block;
     width: 4px;
     height: 22px;
