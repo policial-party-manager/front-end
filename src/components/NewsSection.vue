@@ -1,0 +1,127 @@
+<script setup>
+import { useAppStore } from '@/stores/app'
+
+/**
+ * NewsSection - 双栏内容区组件
+ *
+ * 左侧：党建新闻列表
+ * 右侧：通知公告列表
+ * 每条列表项支持鼠标悬停变色效果
+ * 右下角"更多>>"链接
+ */
+
+const store = useAppStore()
+</script>
+
+<template>
+  <div class="news-section">
+    <!-- 左侧：党建新闻 -->
+    <div class="content-card news-panel">
+      <h3 class="section-title">党建新闻</h3>
+      <ul class="news-list">
+        <li
+          v-for="item in store.newsList"
+          :key="item.id"
+          class="news-item"
+        >
+          <span class="news-title" :title="item.title">{{ item.title }}</span>
+          <span class="news-date">{{ item.date }}</span>
+        </li>
+      </ul>
+      <div class="panel-footer">
+        <a href="javascript:void(0)" class="more-link">更多 &raquo;</a>
+      </div>
+    </div>
+
+    <!-- 右侧：通知公告 -->
+    <div class="content-card news-panel">
+      <h3 class="section-title">通知公告</h3>
+      <ul class="news-list">
+        <li
+          v-for="item in store.noticeList"
+          :key="item.id"
+          class="news-item"
+        >
+          <span class="news-title" :title="item.title">{{ item.title }}</span>
+          <span class="news-date">{{ item.date }}</span>
+        </li>
+      </ul>
+      <div class="panel-footer">
+        <a href="javascript:void(0)" class="more-link">更多 &raquo;</a>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style lang="scss" scoped>
+.news-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.news-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.news-list {
+  flex: 1;
+}
+
+.news-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  /* 悬停变色效果 */
+  &:hover {
+    padding-left: 8px;
+    padding-right: 4px;
+
+    .news-title {
+      color: var(--party-red);
+    }
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.news-title {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: color 0.2s;
+  padding-right: 16px;
+}
+
+.news-date {
+  font-size: 13px;
+  color: var(--text-placeholder);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.panel-footer {
+  text-align: right;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+  margin-top: auto;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .news-section {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

@@ -1,0 +1,152 @@
+/* ============================================
+ * 党建云平台 - 全局样式
+ * 主色调：党建红 #C12C1F
+ * 设计风格：简洁大气、庄重规范
+ * ============================================ */
+
+/* CSS 变量定义 */
+:root {
+  --party-red: #C12C1F;
+  --party-red-dark: #A01E1A;
+  --party-red-light: #E84646;
+  --party-red-bg: rgba(193, 44, 31, 0.08);
+  --party-red-hover: rgba(193, 44, 31, 0.15);
+
+  --text-primary: #2C3E50;
+  --text-regular: #606266;
+  --text-secondary: #909399;
+  --text-placeholder: #C0C4CC;
+
+  --bg-page: #F5F6FA;
+  --bg-white: #FFFFFF;
+  --border-color: #EBEEF5;
+  --border-light: #F2F6FC;
+
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 4px 20px rgba(0, 0, 0, 0.12);
+  --shadow-nav: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+  --radius-base: 8px;
+  --radius-lg: 12px;
+
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial,
+    sans-serif;
+}
+
+/* 全局重置 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background-color: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul, ol {
+  list-style: none;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C0C4CC;
+  border-radius: 3px;
+
+  &:hover {
+    background: #909399;
+  }
+}
+
+/* 页面容器 */
+.page-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* 板块标题 */
+.section-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--party-red);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  &::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 22px;
+    background: var(--party-red);
+    border-radius: 2px;
+  }
+}
+
+/* 卡片容器 */
+.content-card {
+  background: var(--bg-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+}
+
+/* 更多链接 */
+.more-link {
+  color: var(--party-red);
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.2s;
+
+  &:hover {
+    color: var(--party-red-light);
+  }
+}
+
+/* 过渡动画工具类 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
