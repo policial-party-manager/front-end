@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * FooterBar - 底部版权信息组件
  *

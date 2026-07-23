@@ -1,12 +1,11 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 
 /**
  * 路由配置
  * 首页路径为 /
- * 其他页面路由预留，后续扩展时取消注释即可
  */
-const routes = [
+const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'Home',
@@ -63,12 +62,12 @@ const router = createRouter({
 })
 
 // 路由守卫：设置页面标题 + 同步导航高亮状态
-router.beforeEach((to, from, next) => {
-  document.title = to.meta.title || '党建云平台'
+router.beforeEach((to, _from, next) => {
+  document.title = (to.meta.title as string) || '党建云平台'
 
   // 同步 TopNav 导航高亮：根据当前路径设置 activeNav
   const store = useAppStore()
-  const pathKeyMap = {
+  const pathKeyMap: Record<string, string> = {
     '/': 'home',
     '/members': 'members',
     '/development': 'development',

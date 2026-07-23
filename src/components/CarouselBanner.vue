@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 
@@ -20,24 +20,24 @@ const banners = store.banners
 
 const currentIndex = ref(0)
 const isHovering = ref(false)
-let autoPlayTimer = null
+let autoPlayTimer: ReturnType<typeof setInterval> | null = null
 
 // 自动播放间隔（毫秒）
 const AUTO_PLAY_INTERVAL = 5000
 
-function next() {
+function next(): void {
   currentIndex.value = (currentIndex.value + 1) % banners.length
 }
 
-function prev() {
+function prev(): void {
   currentIndex.value = (currentIndex.value - 1 + banners.length) % banners.length
 }
 
-function goTo(index) {
+function goTo(index: number): void {
   currentIndex.value = index
 }
 
-function startAutoPlay() {
+function startAutoPlay(): void {
   stopAutoPlay()
   autoPlayTimer = setInterval(() => {
     if (!isHovering.value) {
@@ -46,18 +46,18 @@ function startAutoPlay() {
   }, AUTO_PLAY_INTERVAL)
 }
 
-function stopAutoPlay() {
+function stopAutoPlay(): void {
   if (autoPlayTimer) {
     clearInterval(autoPlayTimer)
     autoPlayTimer = null
   }
 }
 
-function handleMouseEnter() {
+function handleMouseEnter(): void {
   isHovering.value = true
 }
 
-function handleMouseLeave() {
+function handleMouseLeave(): void {
   isHovering.value = false
 }
 

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
@@ -21,14 +21,14 @@ const emblemUrl = computed(() => {
   return new URL('@/assets/images/Party/党徽黄色1024X1024.png', import.meta.url).href
 })
 
-function handleNavClick(key) {
+function handleNavClick(key: string): void {
   store.setActiveNav(key)
   // 根据导航 key 跳转到对应路由
   const item = store.navItems.find(n => n.key === key)
   if (item) router.push(item.path)
 }
 
-function handleLogout() {
+function handleLogout(): void {
   // 退出登录逻辑（待实现）
   console.log('退出登录')
 }

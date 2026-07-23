@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * AdjustIdentityDialog.vue - 调整身份弹窗组件
  *
@@ -16,32 +16,53 @@
 
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance } from 'element-plus'
+
+// ============================================================
+// Types
+// ============================================================
+export interface MemberInfo {
+  id: number | null
+  name: string
+  studentNo: string
+  currentIdentity: string
+}
+
+interface TeacherItem {
+  id: number
+  name: string
+  title: string
+  department: string
+}
+
+interface IdentityOption {
+  value: string
+  label: string
+}
+
+interface FormData {
+  targetIdentity: string
+  reason: string
+  contactPersons: number[]
+}
 
 // ============================================================
 // Props & Emits
 // ============================================================
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false,
-  },
-  memberInfo: {
-    type: Object,
-    default: () => ({
-      id: null,
-      name: '',
-      studentNo: '',
-      currentIdentity: '',
-    }),
-  },
-})
+const props = defineProps<{
+  visible: boolean
+  memberInfo: MemberInfo
+}>()
 
-const emit = defineEmits(['update:visible', 'success'])
+const emit = defineEmits<{
+  (e: 'update:visible', value: boolean): void
+  (e: 'success'): void
+}>()
 
 // ============================================================
 // 身份列表（所有可选身份）
 // ============================================================
-const identityOptions = [
+const identityOptions: IdentityOption[] = [
   { value: '入党申请人', label: '入党申请人' },
   { value: '积极分子',   label: '积极分子' },
   { value: '发展对象',   label: '发展对象' },
@@ -52,7 +73,7 @@ const identityOptions = [
 // ============================================================
 // 身份标签颜色映射（用于当前身份展示）
 // ============================================================
-const identityTagMap = {
+const identityTagMap: Record<string, string> = {
   '入党申请人': 'info',
   '积极分子': 'warning',
   '发展对象': 'primary',
@@ -67,7 +88,7 @@ const identityTagMap = {
 // const res = await api.getPartyTeachers(partyBranchId)
 // teacherList.value = res.data
 // ============================================================
-const teacherList = ref([
+const teacherList = ref<TeacherItem[]>([
   { id: 1, name: '李老师', title: '党支部书记', department: '计算机学院' },
   { id: 2, name: '赵老师', title: '组织委员', department: '计算机学院' },
   { id: 3, name: '陈老师', title: '宣传委员', department: '计算机学院' },
@@ -79,10 +100,10 @@ const teacherList = ref([
 // ============================================================
 // 表单相关
 // ============================================================
-const formRef = ref(null)
+const formRef = ref<FormInstance | null>(null)
 
 // 表单数据
-const formData = ref({
+const formData = ref<FormData>({
   targetIdentity: '',     // 目标身份
   reason: '',             // 调整原因
   contactPersons: [],     // 培养联系人（多选，最多 2 人）
@@ -112,7 +133,7 @@ const contactMaxReached = computed(() => {
 // ============================================================
 // 监听弹窗打开，重置表单
 // ============================================================
-watch(() => props.visible, (newVal) => {
+watch(() => props.visible, (newVal: boolean) => {
   if (newVal) {
     resetForm()
   }
@@ -121,7 +142,7 @@ watch(() => props.visible, (newVal) => {
 // ============================================================
 // 重置表单
 // ============================================================
-function resetForm() {
+function resetForm(): void {
   formData.value = {
     targetIdentity: '',
     reason: '',
@@ -136,14 +157,14 @@ function resetForm() {
 // ============================================================
 // 关闭弹窗
 // ============================================================
-function handleClose() {
+function handleClose(): void {
   emit('update:visible', false)
 }
 
 // ============================================================
 // 确认调整
 // ============================================================
-async function handleConfirm() {
+async function handleConfirm(): Promise<void> {
   // 1. 表单校验
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
@@ -173,7 +194,7 @@ async function handleConfirm() {
     ElMessage.success('身份调整成功')
     emit('success')
     emit('update:visible', false)
-  } catch (error) {
+  } catch {
     ElMessage.error('身份调整失败，请重试')
   } finally {
     submitting.value = false
@@ -183,11 +204,11 @@ async function handleConfirm() {
 // ============================================================
 // 二次确认弹窗
 // ============================================================
-async function confirmAdjust() {
+async function confirmAdjust(): Promise<void> {
   const targetLabel = identityOptions.find(i => i.value === formData.value.targetIdentity)?.label || formData.value.targetIdentity
   const currentIdentity = props.memberInfo.currentIdentity || '未知'
   const contactNames = formData.value.contactPersons.length > 0
-    ? formData.value.contactPersons.map(id => {
+    ? formData.value.contactPersons.map((id: number) => {
         const t = teacherList.value.find(item => item.id === id)
         return t ? t.name : ''
       }).filter(Boolean).join('、')

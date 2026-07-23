@@ -1,6 +1,54 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
+/** 角色类型 */
+export type Role = 'super_admin' | 'party_secretary' | 'party_member' | 'activist'
+
+/** 导航菜单项 */
+export interface NavItem {
+  key: string
+  label: string
+  path: string
+}
+
+/** 新闻/通知条目 */
+export interface NewsItem {
+  id: number
+  title: string
+  date: string
+}
+
+/** 轮播图条目 */
+export interface BannerItem {
+  id: number
+  image: string
+  title: string
+  subtitle: string
+}
+
+/** 快捷入口 */
+export interface QuickEntry {
+  key: string
+  label: string
+  icon: string
+  color: string
+}
+
+/** 统计数据 */
+export interface StatData {
+  totalMembers: number
+  activists: number
+  developmentCandidates: number
+  weeklyActivities: number
+}
+
+/** 用户信息 */
+export interface UserInfo {
+  name: string
+  avatar: string
+  role: Role
+}
+
 /**
  * 全局应用状态管理
  *
@@ -10,14 +58,14 @@ import { ref, computed } from 'vue'
  * - party_member: 普通党员，仅查看个人相关数据
  * - activist: 积极分子，受限视图
  *
- * 角色切换入口在 TopNav 组件右上角用户下拉菜单中（仅UI预留，功能待实现）
+ * 角色切换入口在 TopNav 组件右上角用户下拉菜单中
  */
 export const useAppStore = defineStore('app', () => {
   // ============ 当前角色 ============
-  const currentRole = ref('super_admin')
+  const currentRole = ref<Role>('super_admin')
 
   // 角色名称映射
-  const roleLabels = {
+  const roleLabels: Record<Role, string> = {
     super_admin: '超级管理员',
     party_secretary: '党支部书记',
     party_member: '普通党员',
@@ -27,15 +75,11 @@ export const useAppStore = defineStore('app', () => {
   const currentRoleLabel = computed(() => roleLabels[currentRole.value] || '未知角色')
 
   // ============ 当前激活的导航菜单 ============
-  const activeNav = ref('home')
+  const activeNav = ref<string>('home')
 
   // ============ Mock 统计数据 ============
-  // 不同角色看到不同数据：
-  // - 超级管理员：全平台数据
-  // - 党支部书记：本支部数据（约为全平台的 1/3 ~ 1/2）
-  // - 普通党员：个人相关数据（更少）
-  const statData = computed(() => {
-    const roleMap = {
+  const statData = computed<StatData>(() => {
+    const roleMap: Record<Role, StatData> = {
       super_admin: {
         totalMembers: 156,
         activists: 48,
@@ -65,7 +109,7 @@ export const useAppStore = defineStore('app', () => {
   })
 
   // ============ 导航菜单项 ============
-  const navItems = [
+  const navItems: NavItem[] = [
     { key: 'home', label: '首页', path: '/' },
     { key: 'members', label: '成员管理', path: '/members' },
     { key: 'development', label: '党员发展', path: '/development' },
@@ -75,7 +119,7 @@ export const useAppStore = defineStore('app', () => {
   ]
 
   // ============ Mock 新闻数据 ============
-  const newsList = ref([
+  const newsList = ref<NewsItem[]>([
     {
       id: 1,
       title: '习近平：在庆祝中国共产党成立105周年大会上的讲话',
@@ -109,7 +153,7 @@ export const useAppStore = defineStore('app', () => {
   ])
 
   // ============ Mock 通知公告 ============
-  const noticeList = ref([
+  const noticeList = ref<NewsItem[]>([
     {
       id: 1,
       title: '关于开展2026年第三季度思想汇报提交工作的通知',
@@ -143,24 +187,21 @@ export const useAppStore = defineStore('app', () => {
   ])
 
   // ============ 轮播图数据 ============
-  const banners = ref([
+  const banners = ref<BannerItem[]>([
     {
       id: 1,
-      // 轮播图1：使用项目已有图片，替换建议：替换为党建宣传图
       image: new URL('@/assets/images/Carousel Images/1.jpg', import.meta.url).href,
       title: '不忘初心 牢记使命',
       subtitle: '深入学习贯彻习近平新时代中国特色社会主义思想',
     },
     {
       id: 2,
-      // 轮播图2：使用项目已有图片，替换建议：替换为党建活动图
       image: new URL('@/assets/images/Carousel Images/2.jpg', import.meta.url).href,
       title: '党建引领 砥砺前行',
       subtitle: '全面推进党员发展全过程管理体系建设',
     },
     {
       id: 3,
-      // 轮播图3：使用项目已有图片，替换建议：替换为学习教育图
       image: new URL('@/assets/images/Carousel Images/3.jpeg', import.meta.url).href,
       title: '凝心聚力 筑梦远航',
       subtitle: '加强高校基层党组织标准化规范化建设',
@@ -168,7 +209,7 @@ export const useAppStore = defineStore('app', () => {
   ])
 
   // ============ 快捷入口 ============
-  const quickEntries = [
+  const quickEntries: QuickEntry[] = [
     { key: 'report', label: '思想汇报', icon: 'EditPen', color: '#C12C1F' },
     { key: 'download', label: '下载专区', icon: 'Download', color: '#E84646' },
     { key: 'school', label: '党校学习', icon: 'Reading', color: '#D4513A' },
@@ -176,18 +217,18 @@ export const useAppStore = defineStore('app', () => {
   ]
 
   // ============ 用户信息（Mock） ============
-  const userInfo = ref({
+  const userInfo = ref<UserInfo>({
     name: '张书记',
     avatar: '',
     role: 'super_admin',
   })
 
   // ============ Actions ============
-  function setActiveNav(key) {
+  function setActiveNav(key: string): void {
     activeNav.value = key
   }
 
-  function switchRole(role) {
+  function switchRole(role: Role): void {
     currentRole.value = role
     userInfo.value.role = role
   }

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * development.vue - 党员发展模块首页
  *
@@ -11,7 +11,7 @@
  *     【Mock 模拟】支委所属支部硬编码为"计算机学院学生第一党支部"
  *     TODO: 接入真实接口后，由后端根据当前登录用户的支部进行数据过滤
  */
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 
@@ -186,7 +186,7 @@ watch([appliedBranch, appliedIdentity, appliedKeyword], () => {
 // ============================================================
 // 点击搜索：应用当前筛选条件（模拟接口延迟）
 // ============================================================
-async function handleSearch() {
+async function handleSearch(): Promise<void> {
   loading.value = true
   try {
     // TODO: 替换为真实 API 调用
@@ -218,7 +218,7 @@ async function handleSearch() {
 // ============================================================
 // 点击重置：清空所有筛选条件并立即刷新
 // ============================================================
-function handleReset() {
+function handleReset(): void {
   filterBranch.value = ''
   filterIdentity.value = ''
   filterKeyword.value = ''
@@ -230,11 +230,11 @@ function handleReset() {
 // ============================================================
 // 分页变更
 // ============================================================
-function handlePageChange(page) {
+function handlePageChange(page: number): void {
   currentPage.value = page
 }
 
-function handleSizeChange(size) {
+function handleSizeChange(size: number): void {
   pageSize.value = size
   currentPage.value = 1
 }
@@ -242,7 +242,7 @@ function handleSizeChange(size) {
 // ============================================================
 // 跳转详情
 // ============================================================
-function goDetail(id) {
+function goDetail(id: number): void {
   router.push(`/development/member/${id}`)
 }
 </script>

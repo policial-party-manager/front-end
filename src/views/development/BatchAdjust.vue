@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * BatchAdjust.vue - 批量身份调整页面
  *
@@ -14,7 +14,7 @@
  *   第二步：设置目标身份 + 调整原因 + 培养联系人
  *   第三步：确认执行 → 二次确认 → 跳转回列表
  */
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -131,7 +131,7 @@ const identityOptions = [
 ]
 
 // 身份标签颜色
-const identityTagMap = {
+const identityTagMap: Record<string, string> = {
   '入党申请人': 'info',
   '积极分子':   'warning',
   '发展对象':   'primary',
@@ -155,48 +155,12 @@ const teacherList = ref([
 // ============================================================
 // 表格选中相关
 // ============================================================
-const selectedIds = ref([])  // 已选成员 ID 列表
-
-// 当前页所有成员的 ID（用于全选判断）
-const currentPageIds = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const pageData = filteredMembers.value.slice(start, start + pageSize.value)
-  return pageData.map(m => m.id)
-})
-
-// 是否已全选当前页
-const isCurrentPageAllSelected = computed(() => {
-  return currentPageIds.value.length > 0 &&
-    currentPageIds.value.every(id => selectedIds.value.includes(id))
-})
-
-// 是否半选（跨页有选中）
-const isIndeterminate = computed(() => {
-  const hasSelected = currentPageIds.value.some(id => selectedIds.value.includes(id))
-  return hasSelected && !isCurrentPageAllSelected.value
-})
+const selectedIds = ref<number[]>([])  // 已选成员 ID 列表
 
 // 已选成员对象列表
 const selectedMembers = computed(() => {
   return allMembers.value.filter(m => selectedIds.value.includes(m.id))
 })
-
-// 全选切换
-function handleSelectAll(val) {
-  if (val) {
-    // 全选当前页：合并去重
-    const set = new Set(selectedIds.value)
-    currentPageIds.value.forEach(id => set.add(id))
-    selectedIds.value = [...set]
-  } else {
-    // 取消全选当前页
-    const pageSet = new Set(currentPageIds.value)
-    selectedIds.value = selectedIds.value.filter(id => !pageSet.has(id))
-  }
-}
-
-// 翻页时不清空已选（跨页保留选中）
-// 注意：el-table 的 reserve-selection 需要 row-key，此处使用自定义逻辑
 
 // ============================================================
 // 分页
@@ -211,7 +175,7 @@ const pageSize = ref(10)
 // ============================================================
 const targetIdentity = ref('')       // 目标身份
 const adjustReason = ref('')          // 调整原因
-const contactPersonIds = ref([])     // 培养联系人 ID 列表
+const contactPersonIds = ref<number[]>([])     // 培养联系人 ID 列表
 
 const contactMaxReached = computed(() => contactPersonIds.value.length >= 2)
 
@@ -230,7 +194,7 @@ const canConfirm = computed(() => {
 // ============================================================
 // 重置筛选
 // ============================================================
-function handleResetFilter() {
+function handleResetFilter(): void {
   filterBranch.value = ''
   filterIdentity.value = ''
   filterKeyword.value = ''
@@ -240,14 +204,14 @@ function handleResetFilter() {
 // ============================================================
 // 筛选条件变更时回到第一页
 // ============================================================
-function onFilterChange() {
+function onFilterChange(): void {
   currentPage.value = 1
 }
 
 // ============================================================
 // 确认调整
 // ============================================================
-async function handleConfirm() {
+async function handleConfirm(): Promise<void> {
   if (!canConfirm.value) return
 
   // 二次确认
@@ -283,7 +247,7 @@ async function handleConfirm() {
 // ============================================================
 // 二次确认弹窗
 // ============================================================
-async function confirmBatchAdjust() {
+async function confirmBatchAdjust(): Promise<void> {
   const count = selectedIds.value.length
   const names = selectedMembers.value.map(m => m.name).join('、')
   const contactNames = contactPersonIds.value.length > 0
@@ -316,7 +280,7 @@ async function confirmBatchAdjust() {
 // ============================================================
 // 取消：返回列表
 // ============================================================
-function handleCancel() {
+function handleCancel(): void {
   router.push('/development')
 }
 
@@ -405,7 +369,7 @@ onMounted(() => {
           style="width: 100%"
           stripe
           row-key="id"
-          @selection-change="(rows) => { /* 保留手动勾选 */ }"
+          @selection-change="(_rows: any) => { /* 保留手动勾选 */ }"
         >
           <el-table-column type="selection" width="50" :reserve-selection="false" />
 

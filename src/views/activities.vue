@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * activities.vue - 活动中心模块（占位页面）
  * TODO: 实现完整的活动管理功能

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * index.vue - 首页主文件
  *

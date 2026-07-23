@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * downloads.vue - 下载专区模块（占位页面）
  * TODO: 实现完整的下载专区功能

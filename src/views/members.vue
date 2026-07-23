@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * members.vue - 成员管理模块（占位页面）
  * TODO: 实现完整的成员管理功能

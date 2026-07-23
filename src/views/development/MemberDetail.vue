@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * MemberDetail.vue - 党员发展模块 - 成员培养主页
  *
@@ -241,7 +241,7 @@ const activeTab = ref('training')
 // ============================================================
 // 方法：获取成员详情（当前使用 Mock 数据）
 // ============================================================
-async function fetchMemberDetail() {
+async function fetchMemberDetail(): Promise<void> {
   const memberId = route.params.id
   loading.value = true
   try {
@@ -262,14 +262,14 @@ async function fetchMemberDetail() {
 // ============================================================
 // 方法：调整身份
 // ============================================================
-function handleAdjustIdentity() {
+function handleAdjustIdentity(): void {
   adjustDialogVisible.value = true
 }
 
 // ============================================================
 // 方法：调整身份成功后的回调（刷新数据）
 // ============================================================
-function handleAdjustSuccess() {
+function handleAdjustSuccess(): void {
   // TODO: 替换为真实的刷新逻辑
   // 重新获取成员详情
   fetchMemberDetail()
@@ -278,14 +278,14 @@ function handleAdjustSuccess() {
 // ============================================================
 // 方法：批量调整 → 跳转到批量调整页面
 // ============================================================
-function handleBatchAdjust() {
+function handleBatchAdjust(): void {
   router.push('/development/batch')
 }
 
 // ============================================================
 // 方法：上传材料（预留，本次仅弹窗占位）
 // ============================================================
-function handleUploadMaterial() {
+function handleUploadMaterial(): void {
   // TODO: 实现上传材料逻辑
   ElMessage.info('上传材料功能开发中')
   uploadDialogVisible.value = true

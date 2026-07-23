@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * App.vue - 根组件
  *

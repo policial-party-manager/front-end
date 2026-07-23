@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * SmartAssistant - 智能助手悬浮按钮（加分项）
  *
@@ -7,7 +7,7 @@
  * 点击提示"功能开发中"
  */
 
-function handleClick() {
+function handleClick(): void {
   // 功能预留，后续可接入AI对话能力
   console.log('智能助手功能开发中...')
 }

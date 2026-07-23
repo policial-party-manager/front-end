@@ -1,40 +1,40 @@
-<script setup>
+<script setup lang="ts">
 /**
  * IdentityTimeline.vue - 身份历史时间线组件
  *
  * 在成员培养主页的"身份历史"标签页中展示身份变化轨迹。
  * 使用 el-timeline 按时间倒序排列，不同身份对应不同节点颜色，
  * 支持点击展开查看详情。
- *
- * Props:
- *   historyList - 身份历史记录数组
- *     每条数据格式：
- *     {
- *       id: number,
- *       date: string,           // 时间（如 "2025-09-01"）
- *       identity: string,       // 身份名称
- *       reason: string,         // 操作原因
- *       operator: string,       // 操作人
- *       contact: string,        // 培养联系人（可选）
- *       previousIdentity: string, // 调整前身份（可选，用于详情）
- *       approver: string,       // 审批人（可选，用于详情）
- *       notes: string,          // 备注（可选，用于详情）
- *     }
  */
 
-defineProps({
-  historyList: {
-    type: Array,
-    default: () => [],
-  },
-})
+// ============================================================
+// Types
+// ============================================================
+export interface HistoryItem {
+  id: number
+  date: string            // 时间（如 "2025-09-01"）
+  identity: string        // 身份名称
+  reason: string          // 操作原因
+  operator: string        // 操作人
+  contact?: string        // 培养联系人（可选）
+  previousIdentity?: string // 调整前身份（可选，用于详情）
+  approver?: string       // 审批人（可选，用于详情）
+  notes?: string          // 备注（可选，用于详情）
+}
+
+// ============================================================
+// Props
+// ============================================================
+defineProps<{
+  historyList: HistoryItem[]
+}>()
 
 // ============================================================
 // 身份 → 颜色映射
 // 普通学生: 灰色    入党申请人: 蓝色    积极分子: 橙色
 // 发展对象: 紫色    预备党员:   金色    正式党员:   红色
 // ============================================================
-const identityColorMap = {
+const identityColorMap: Record<string, string> = {
   '普通学生': '#909399',
   '共青团员': '#909399',
   '入党申请人': '#409EFF',
@@ -45,7 +45,7 @@ const identityColorMap = {
 }
 
 // 身份标签类型映射（用于 el-tag）
-const identityTagMap = {
+const identityTagMap: Record<string, string> = {
   '普通学生': 'info',
   '共青团员': 'info',
   '入党申请人': '',       // 默认蓝色
@@ -58,34 +58,34 @@ const identityTagMap = {
 // ============================================================
 // 获取身份颜色
 // ============================================================
-function getIdentityColor(identity) {
+function getIdentityColor(identity: string): string {
   return identityColorMap[identity] || '#409EFF'
 }
 
 // ============================================================
 // 获取标签类型
 // ============================================================
-function getTagType(identity) {
+function getTagType(identity: string): string {
   return identityTagMap[identity] || 'info'
 }
 
 // ============================================================
 // 是否为最后一个节点（最新记录，当前身份）
 // ============================================================
-function isLatest(index) {
+function isLatest(index: number): boolean {
   return index === 0
 }
 
 // ============================================================
 // 展开/收起状态管理
 // ============================================================
-const expandedIds = new Set()
+const expandedIds = new Set<number>()
 
-function isExpanded(id) {
+function isExpanded(id: number): boolean {
   return expandedIds.has(id)
 }
 
-function toggleExpand(id) {
+function toggleExpand(id: number): void {
   if (expandedIds.has(id)) {
     expandedIds.delete(id)
   } else {

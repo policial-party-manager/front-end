@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 /**
  * statistics.vue - 数据统计模块（占位页面）
  * TODO: 实现完整的数据统计与可视化功能
