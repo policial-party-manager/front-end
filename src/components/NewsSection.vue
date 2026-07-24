@@ -1,16 +1,28 @@
 <script setup lang="ts">
-import { useAppStore } from "@/stores/app";
+import { useRouter } from 'vue-router'
+import { useAppStore } from '@/stores/app'
 
 /**
  * NewsSection - 双栏内容区组件
  *
  * 左侧：党建新闻列表
  * 右侧：通知公告列表
- * 每条列表项支持鼠标悬停变色效果
+ * 每条列表项支持鼠标悬停变色效果，点击跳转详情页
  * 右下角"更多>>"链接
  */
 
-const store = useAppStore();
+const router = useRouter()
+const store = useAppStore()
+
+/** 点击新闻标题，跳转到新闻详情页 */
+function goToNewsDetail(id: number): void {
+  router.push(`/news/${id}`)
+}
+
+/** 点击公告标题，跳转到公告详情页 */
+function goToNoticeDetail(id: number): void {
+  router.push(`/notice/${id}`)
+}
 </script>
 
 <template>
@@ -19,7 +31,12 @@ const store = useAppStore();
     <div class="content-card news-panel">
       <h3 class="section-title">党建新闻</h3>
       <ul class="news-list">
-        <li v-for="item in store.newsList" :key="item.id" class="news-item">
+        <li
+          v-for="item in store.newsList"
+          :key="item.id"
+          class="news-item"
+          @click="goToNewsDetail(item.id)"
+        >
           <span class="news-title" :title="item.title">{{ item.title }}</span>
           <span class="news-date">{{ item.date }}</span>
         </li>
@@ -33,7 +50,12 @@ const store = useAppStore();
     <div class="content-card news-panel">
       <h3 class="section-title">通知公告</h3>
       <ul class="news-list">
-        <li v-for="item in store.noticeList" :key="item.id" class="news-item">
+        <li
+          v-for="item in store.noticeList"
+          :key="item.id"
+          class="news-item"
+          @click="goToNoticeDetail(item.id)"
+        >
           <span class="news-title" :title="item.title">{{ item.title }}</span>
           <span class="news-date">{{ item.date }}</span>
         </li>
