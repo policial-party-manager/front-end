@@ -290,7 +290,7 @@ const allMembers = ref([
 // ============================================================
 // 身份标签颜色映射
 // ============================================================
-const identityTagMap = {
+const identityTagMap: Record<string, string> = {
   入党申请人: "info",
   积极分子: "warning",
   发展对象: "primary",

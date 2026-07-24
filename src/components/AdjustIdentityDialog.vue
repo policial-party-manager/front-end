@@ -22,7 +22,7 @@ import type { FormInstance } from "element-plus";
 // Types
 // ============================================================
 export interface MemberInfo {
-  id: number | null;
+  id: string | number | null;
   name: string;
   studentNo: string;
   currentIdentity: string;

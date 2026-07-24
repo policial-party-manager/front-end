@@ -47,7 +47,7 @@ const memberInfo = ref({
 
 // 身份标签颜色映射
 const identityTagType = computed(() => {
-  const map = {
+  const map: Record<string, string> = {
     入党申请人: "info",
     积极分子: "warning",
     发展对象: "primary",
@@ -105,7 +105,7 @@ const thoughtReports = ref([
 ]);
 
 // 思想汇报状态映射
-const reportStatusMap = {
+const reportStatusMap: Record<string, { label: string; type: string }> = {
   pending: { label: "待审核", type: "warning" },
   approved: { label: "已通过", type: "success" },
   rejected: { label: "已驳回", type: "danger" },

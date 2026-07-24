@@ -8,6 +8,7 @@ import { ref, reactive, computed, watch } from "vue";
 import { useAppStore } from "@/stores/app";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
+import { Plus, Upload, Download } from "@element-plus/icons-vue";
 
 const store = useAppStore();
 
