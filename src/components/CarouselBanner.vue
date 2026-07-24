@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 
 /**
@@ -7,6 +8,7 @@ import { useAppStore } from '@/stores/app'
  *
  * 3-4张轮播图，自动播放（间隔5秒），支持手动左右切换
  * 底部指示点，鼠标悬停暂停自动播放
+ * 点击轮播图可跳转到对应的详情页
  *
  * 轮播图图片说明：
  * - banner-1.jpg：党建宣传主图，建议尺寸 1400x400px
@@ -15,6 +17,7 @@ import { useAppStore } from '@/stores/app'
  * 当前使用项目已有图片占位，请替换为实际党建宣传图片
  */
 
+const router = useRouter()
 const store = useAppStore()
 const banners = store.banners
 
@@ -61,6 +64,13 @@ function handleMouseLeave(): void {
   isHovering.value = false
 }
 
+/** 点击轮播图跳转到对应详情页 */
+function handleBannerClick(banner: typeof banners[number]): void {
+  if (banner.linkTo) {
+    router.push(banner.linkTo)
+  }
+}
+
 onMounted(() => {
   startAutoPlay()
 })
@@ -86,6 +96,7 @@ onUnmounted(() => {
           v-for="banner in banners"
           :key="banner.id"
           class="carousel-slide"
+          @click="handleBannerClick(banner)"
         >
           <img
             :src="banner.image"
@@ -148,6 +159,7 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 360px;
+  cursor: pointer;
 }
 
 .slide-image {
