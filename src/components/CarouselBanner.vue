@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAppStore } from '@/stores/app'
+import { ref, onMounted, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
+import { useAppStore } from "@/stores/app";
 
 /**
  * CarouselBanner - 轮播图组件
@@ -17,9 +17,9 @@ import { useAppStore } from '@/stores/app'
  * 当前使用项目已有图片占位，请替换为实际党建宣传图片
  */
 
-const router = useRouter()
-const store = useAppStore()
-const banners = store.banners
+const router = useRouter();
+const store = useAppStore();
+const banners = store.banners;
 
 const currentIndex = ref(0);
 const isHovering = ref(false);
@@ -65,9 +65,9 @@ function handleMouseLeave(): void {
 }
 
 /** 点击轮播图跳转到对应详情页 */
-function handleBannerClick(banner: typeof banners[number]): void {
+function handleBannerClick(banner: (typeof banners)[number]): void {
   if (banner.linkTo) {
-    router.push(banner.linkTo)
+    router.push(banner.linkTo);
   }
 }
 
@@ -84,21 +84,9 @@ onUnmounted(() => {
   <div class="carousel-container" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
     <!-- 轮播图轨道 -->
     <div class="carousel-track">
-      <div
-        class="carousel-slides"
-        :style="{ transform: `translateX(-${currentIndex * 100}%)` }"
-      >
-        <div
-          v-for="banner in banners"
-          :key="banner.id"
-          class="carousel-slide"
-          @click="handleBannerClick(banner)"
-        >
-          <img
-            :src="banner.image"
-            :alt="banner.title"
-            class="slide-image"
-          />
+      <div class="carousel-slides" :style="{ transform: `translateX(-${currentIndex * 100}%)` }">
+        <div v-for="banner in banners" :key="banner.id" class="carousel-slide" @click="handleBannerClick(banner)">
+          <img :src="banner.image" :alt="banner.title" class="slide-image" />
           <div class="slide-overlay">
             <h3 class="slide-title">{{ banner.title }}</h3>
             <p class="slide-subtitle">{{ banner.subtitle }}</p>

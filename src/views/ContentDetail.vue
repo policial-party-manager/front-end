@@ -12,47 +12,47 @@
  * 路由：/news/:id   /notice/:id
  */
 
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElEmpty } from 'element-plus'
-import { ArrowLeft, View, Clock, OfficeBuilding } from '@element-plus/icons-vue'
+import { ref, computed, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { ElEmpty } from "element-plus";
+import { ArrowLeft, View, Clock, OfficeBuilding } from "@element-plus/icons-vue";
 
 // 封面图资源（与轮播图共用）
-const coverImage1 = new URL('@/assets/images/Carousel Images/1.jpg', import.meta.url).href
-const coverImage2 = new URL('@/assets/images/Carousel Images/2.jpg', import.meta.url).href
-const coverImage3 = new URL('@/assets/images/Carousel Images/3.jpeg', import.meta.url).href
+const coverImage1 = new URL("@/assets/images/Carousel Images/1.jpg", import.meta.url).href;
+const coverImage2 = new URL("@/assets/images/Carousel Images/2.jpg", import.meta.url).href;
+const coverImage3 = new URL("@/assets/images/Carousel Images/3.jpeg", import.meta.url).href;
 
-const route = useRoute()
-const router = useRouter()
+const route = useRoute();
+const router = useRouter();
 
 // ============================================================
 // 类型定义
 // ============================================================
 interface ContentDetail {
-  id: number
-  title: string
-  coverImage?: string // 封面图（可选）
-  content: string // 富文本 HTML
-  publishTime: string
-  source: string
-  attachments?: Array<{ name: string; url: string }>
-  viewCount?: number
+  id: number;
+  title: string;
+  coverImage?: string; // 封面图（可选）
+  content: string; // 富文本 HTML
+  publishTime: string;
+  source: string;
+  attachments?: Array<{ name: string; url: string }>;
+  viewCount?: number;
 }
 
 // ============================================================
 // 根据路由路径判断类型
 // ============================================================
-const contentType = computed<'news' | 'notice'>(() => {
-  return route.path.includes('/notice') ? 'notice' : 'news'
-})
+const contentType = computed<"news" | "notice">(() => {
+  return route.path.includes("/notice") ? "notice" : "news";
+});
 
-const typeLabel = computed(() => (contentType.value === 'news' ? '党建新闻' : '通知公告'))
+const typeLabel = computed(() => (contentType.value === "news" ? "党建新闻" : "通知公告"));
 
 // ============================================================
 // 状态
 // ============================================================
-const loading = ref(true)
-const detail = ref<ContentDetail | null>(null)
+const loading = ref(true);
+const detail = ref<ContentDetail | null>(null);
 
 // ============================================================
 // Mock 详情数据
@@ -61,7 +61,7 @@ const detail = ref<ContentDetail | null>(null)
 const mockNewsDetailMap: Record<number, ContentDetail> = {
   1: {
     id: 1,
-    title: '习近平：在庆祝中国共产党成立105周年大会上的讲话',
+    title: "习近平：在庆祝中国共产党成立105周年大会上的讲话",
     coverImage: coverImage1,
     content: `
       <p>同志们，朋友们：</p>
@@ -81,17 +81,17 @@ const mockNewsDetailMap: Record<number, ContentDetail> = {
       <p>党的二十大擘画了全面建设社会主义现代化国家、以中国式现代化全面推进中华民族伟大复兴的宏伟蓝图。中国式现代化是人口规模巨大的现代化，是全体人民共同富裕的现代化，是物质文明和精神文明相协调的现代化，是人与自然和谐共生的现代化，是走和平发展道路的现代化。</p>
       <p>让我们更加紧密地团结在以习近平同志为核心的党中央周围，不忘初心、牢记使命，为实现中华民族伟大复兴的中国梦而不懈奋斗！</p>
     `,
-    publishTime: '2026-07-01 09:00:00',
-    source: '新华社',
+    publishTime: "2026-07-01 09:00:00",
+    source: "新华社",
     viewCount: 15230,
     attachments: [
-      { name: '讲话全文.pdf', url: '#' },
-      { name: '学习要点摘编.docx', url: '#' },
+      { name: "讲话全文.pdf", url: "#" },
+      { name: "学习要点摘编.docx", url: "#" },
     ],
   },
   2: {
     id: 2,
-    title: '学校召开2026年党建工作会议 部署下半年重点工作',
+    title: "学校召开2026年党建工作会议 部署下半年重点工作",
     coverImage: coverImage2,
     content: `
       <p>7月18日上午，学校在行政楼第一会议室召开2026年党建工作会议，全面总结上半年党建工作成效，研究部署下半年重点任务。</p>
@@ -110,12 +110,10 @@ const mockNewsDetailMap: Record<number, ContentDetail> = {
       <p><strong>四是</strong>深化"党建+"融合模式。推动党建工作与人才培养、科学研究、社会服务深度融合，以高质量党建引领高质量发展。</p>
       <p>会议号召，全校各级党组织和全体党员要以更加昂扬的斗志、更加务实的作风，不断开创学校党建工作新局面。</p>
     `,
-    publishTime: '2026-07-18 14:30:00',
-    source: '党委组织部',
+    publishTime: "2026-07-18 14:30:00",
+    source: "党委组织部",
     viewCount: 3256,
-    attachments: [
-      { name: '2026年下半年党建工作要点.pdf', url: '#' },
-    ],
+    attachments: [{ name: "2026年下半年党建工作要点.pdf", url: "#" }],
   },
   3: {
     id: 3,
@@ -136,14 +134,14 @@ const mockNewsDetailMap: Record<number, ContentDetail> = {
       <p>支部还组织了"我为群众办实事"实践活动，全体党员到学院楼公共区域开展志愿服务，以实际行动践行为人民服务的宗旨。</p>
       <p>此次主题党日活动内容丰富、形式多样，进一步深化了支部党员对二十大精神的理解和把握，增强了支部的凝聚力和战斗力。</p>
     `,
-    publishTime: '2026-07-15 16:00:00',
-    source: '计算机学院学生第一党支部',
+    publishTime: "2026-07-15 16:00:00",
+    source: "计算机学院学生第一党支部",
     viewCount: 1892,
     attachments: [],
   },
   4: {
     id: 4,
-    title: '关于做好2026年度党员发展工作的通知',
+    title: "关于做好2026年度党员发展工作的通知",
     content: `
       <p>各党支部：</p>
       <p>为做好2026年度党员发展工作，根据《中国共产党发展党员工作细则》和上级有关要求，现将有关事项通知如下：</p>
@@ -169,18 +167,18 @@ const mockNewsDetailMap: Record<number, ContentDetail> = {
       <p>3. 规范材料。发展党员相关材料要齐全、规范，必须经党支部书记审核签字。</p>
       <p>4. 按时报送。各支部请于规定时间内将相关材料报送党委组织部。</p>
     `,
-    publishTime: '2026-07-10 10:00:00',
-    source: '党委组织部',
+    publishTime: "2026-07-10 10:00:00",
+    source: "党委组织部",
     viewCount: 8921,
     attachments: [
-      { name: '党员发展工作细则.pdf', url: '#' },
-      { name: '2026年度党员发展计划表.xlsx', url: '#' },
-      { name: '发展对象培训方案.docx', url: '#' },
+      { name: "党员发展工作细则.pdf", url: "#" },
+      { name: "2026年度党员发展计划表.xlsx", url: "#" },
+      { name: "发展对象培训方案.docx", url: "#" },
     ],
   },
   5: {
     id: 5,
-    title: '党支部标准化规范化建设经验交流会在京召开',
+    title: "党支部标准化规范化建设经验交流会在京召开",
     coverImage: coverImage3,
     content: `
       <p>7月5日，全国高校党支部标准化规范化建设经验交流会在北京召开。教育部有关负责同志出席会议并讲话。</p>
@@ -199,16 +197,14 @@ const mockNewsDetailMap: Record<number, ContentDetail> = {
       <p><strong>会议指出</strong>，高校党支部建设要以提升组织力为重点，突出政治功能，教育引导党员深刻领悟"两个确立"的决定性意义，增强"四个意识"、坚定"四个自信"、做到"两个维护"。</p>
       <p>会议号召，各高校要以此次交流会为契机，认真学习借鉴先进经验，不断提升党支部建设质量。</p>
     `,
-    publishTime: '2026-07-05 15:00:00',
-    source: '教育部',
+    publishTime: "2026-07-05 15:00:00",
+    source: "教育部",
     viewCount: 12450,
-    attachments: [
-      { name: '经验交流材料汇编.pdf', url: '#' },
-    ],
+    attachments: [{ name: "经验交流材料汇编.pdf", url: "#" }],
   },
   6: {
     id: 6,
-    title: '2026年暑期大学生党员社会实践出征仪式举行',
+    title: "2026年暑期大学生党员社会实践出征仪式举行",
     content: `
       <p>7月3日上午，2026年暑期大学生党员社会实践出征仪式在图书馆广场隆重举行。校党委领导、相关部门负责人及全体实践队成员参加仪式。</p>
       <p><strong>实践主题</strong></p>
@@ -224,17 +220,17 @@ const mockNewsDetailMap: Record<number, ContentDetail> = {
       <p>本次共组建实践队20支，参与学生党员和入党积极分子共计300余人，覆盖全校12个学院。</p>
       <p>党委领导为各实践队授旗，并勉励同学们在社会实践中深入了解国情民情，锤炼党性修养，增强服务意识和责任担当。</p>
     `,
-    publishTime: '2026-07-03 11:00:00',
-    source: '校团委',
+    publishTime: "2026-07-03 11:00:00",
+    source: "校团委",
     viewCount: 5621,
     attachments: [],
   },
-}
+};
 
 const mockNoticeDetailMap: Record<number, ContentDetail> = {
   1: {
     id: 1,
-    title: '关于开展2026年第三季度思想汇报提交工作的通知',
+    title: "关于开展2026年第三季度思想汇报提交工作的通知",
     content: `
       <p>各党支部、全体入党积极分子、预备党员：</p>
       <p>根据《中国共产党发展党员工作细则》和《入党积极分子培养教育考察登记表》要求，现将2026年第三季度思想汇报提交工作安排通知如下：</p>
@@ -260,17 +256,17 @@ const mockNoticeDetailMap: Record<number, ContentDetail> = {
       <p><strong>五、提交方式</strong></p>
       <p>提交至所在党支部书记处，由支部统一汇总后报送党委组织部。</p>
     `,
-    publishTime: '2026-07-20 08:30:00',
-    source: '党委组织部',
+    publishTime: "2026-07-20 08:30:00",
+    source: "党委组织部",
     viewCount: 7845,
     attachments: [
-      { name: '思想汇报模板.docx', url: '#' },
-      { name: '提交要求说明.pdf', url: '#' },
+      { name: "思想汇报模板.docx", url: "#" },
+      { name: "提交要求说明.pdf", url: "#" },
     ],
   },
   2: {
     id: 2,
-    title: '关于组织观看党风廉政教育专题片的通知',
+    title: "关于组织观看党风廉政教育专题片的通知",
     content: `
       <p>各党支部：</p>
       <p>为深入推进党风廉政建设，增强党员干部廉洁自律意识，根据学校纪委工作安排，决定组织全体党员观看党风廉政教育专题片。现将有关事项通知如下：</p>
@@ -286,16 +282,14 @@ const mockNoticeDetailMap: Record<number, ContentDetail> = {
       <p>3. 心得体会不少于800字，于8月1日前以支部为单位提交至党委组织部</p>
       <p>4. 观看情况纳入年度党建考核</p>
     `,
-    publishTime: '2026-07-17 16:00:00',
-    source: '纪委办公室',
+    publishTime: "2026-07-17 16:00:00",
+    source: "纪委办公室",
     viewCount: 6230,
-    attachments: [
-      { name: '观看指南.pdf', url: '#' },
-    ],
+    attachments: [{ name: "观看指南.pdf", url: "#" }],
   },
   3: {
     id: 3,
-    title: '本周三下午党员活动室召开支部委员会会议',
+    title: "本周三下午党员活动室召开支部委员会会议",
     content: `
       <p>各位支部委员：</p>
       <p>定于本周三（7月16日）下午14:30在党员活动室（学院楼B座201）召开支部委员会会议，现将有关事项通知如下：</p>
@@ -314,14 +308,14 @@ const mockNoticeDetailMap: Record<number, ContentDetail> = {
       <p>2. 如因故不能参会，须提前向支部书记请假</p>
       <p>3. 会议期间请将手机调至静音或关闭状态</p>
     `,
-    publishTime: '2026-07-16 09:00:00',
-    source: '计算机学院学生第一党支部',
+    publishTime: "2026-07-16 09:00:00",
+    source: "计算机学院学生第一党支部",
     viewCount: 1567,
     attachments: [],
   },
   4: {
     id: 4,
-    title: '关于2026年上半年党费收缴情况的公示',
+    title: "关于2026年上半年党费收缴情况的公示",
     content: `
       <p>各党支部、全体党员：</p>
       <p>根据《中国共产党党费收缴、使用和管理规定》，现将2026年上半年（1月-6月）党费收缴情况进行公示如下：</p>
@@ -343,16 +337,14 @@ const mockNoticeDetailMap: Record<number, ContentDetail> = {
       <p>3. 联系电话：010-XXXX-XXXX</p>
       <p>4. 电子邮箱：zzb@example.edu.cn</p>
     `,
-    publishTime: '2026-07-12 11:00:00',
-    source: '党委组织部',
+    publishTime: "2026-07-12 11:00:00",
+    source: "党委组织部",
     viewCount: 4500,
-    attachments: [
-      { name: '2026年上半年党费收缴明细表.xlsx', url: '#' },
-    ],
+    attachments: [{ name: "2026年上半年党费收缴明细表.xlsx", url: "#" }],
   },
   5: {
     id: 5,
-    title: '转发：关于进一步加强高校基层党组织建设的意见',
+    title: "转发：关于进一步加强高校基层党组织建设的意见",
     content: `
       <p>各党支部：</p>
       <p>现将中共教育部党组印发的《关于进一步加强高校基层党组织建设的意见》转发给你们，请认真组织学习，结合实际抓好贯彻落实。</p>
@@ -372,16 +364,14 @@ const mockNoticeDetailMap: Record<number, ContentDetail> = {
       <p>2. 加大经费投入。按规定落实基层党建工作经费保障</p>
       <p>3. 加强阵地建设。推进党员活动室标准化建设</p>
     `,
-    publishTime: '2026-07-08 14:00:00',
-    source: '教育部',
+    publishTime: "2026-07-08 14:00:00",
+    source: "教育部",
     viewCount: 9100,
-    attachments: [
-      { name: '关于进一步加强高校基层党组织建设的意见.pdf', url: '#' },
-    ],
+    attachments: [{ name: "关于进一步加强高校基层党组织建设的意见.pdf", url: "#" }],
   },
   6: {
     id: 6,
-    title: '暑期社会实践优秀党员志愿者表彰名单公示',
+    title: "暑期社会实践优秀党员志愿者表彰名单公示",
     content: `
       <p>根据《关于开展2026年暑期社会实践优秀党员志愿者评选工作的通知》，经个人申报、支部推荐、学院评审，现将拟表彰名单公示如下：</p>
       <p><strong>暑期社会实践优秀党员志愿者（共20名）</strong></p>
@@ -397,38 +387,38 @@ const mockNoticeDetailMap: Record<number, ContentDetail> = {
       <p>4. 电子邮箱：tw@example.edu.cn</p>
       <p>希望受到表彰的同学珍惜荣誉、再接再厉，在今后的志愿服务中继续发挥先锋模范作用。</p>
     `,
-    publishTime: '2026-07-04 10:00:00',
-    source: '校团委',
+    publishTime: "2026-07-04 10:00:00",
+    source: "校团委",
     viewCount: 6780,
     attachments: [
-      { name: '完整表彰名单.pdf', url: '#' },
-      { name: '事迹材料汇编.pdf', url: '#' },
+      { name: "完整表彰名单.pdf", url: "#" },
+      { name: "事迹材料汇编.pdf", url: "#" },
     ],
   },
-}
+};
 
 // ============================================================
 // 数据加载
 // ============================================================
-const detailId = computed(() => Number(route.params.id))
+const detailId = computed(() => Number(route.params.id));
 
 function getMockDetail(): ContentDetail | null {
-  const map = contentType.value === 'news' ? mockNewsDetailMap : mockNoticeDetailMap
-  return map[detailId.value] || null
+  const map = contentType.value === "news" ? mockNewsDetailMap : mockNoticeDetailMap;
+  return map[detailId.value] || null;
 }
 
 async function loadDetail(): Promise<void> {
-  loading.value = true
+  loading.value = true;
   try {
     // TODO: 替换为真实 API 调用
     // const res = contentType.value === 'news'
     //   ? await api.getNewsDetail(detailId.value)
     //   : await api.getNoticeDetail(detailId.value)
-    await new Promise(resolve => setTimeout(resolve, 300))
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
-    detail.value = getMockDetail()
+    detail.value = getMockDetail();
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
@@ -438,9 +428,9 @@ async function loadDetail(): Promise<void> {
 function goBack(): void {
   // 优先尝试返回上一页，若无法返回则跳转到首页
   if (window.history.length > 1) {
-    router.back()
+    router.back();
   } else {
-    router.push('/')
+    router.push("/");
   }
 }
 
@@ -448,8 +438,8 @@ function goBack(): void {
 // 格式化时间（只显示日期部分）
 // ============================================================
 function formatDate(dateStr: string): string {
-  if (!dateStr) return '-'
-  return dateStr.split(' ')[0]
+  if (!dateStr) return "-";
+  return dateStr.split(" ")[0];
 }
 
 // ============================================================
@@ -457,12 +447,12 @@ function formatDate(dateStr: string): string {
 // ============================================================
 function handleDownload(att: { name: string; url: string }): void {
   // TODO: 替换为真实下载逻辑
-  console.log('[Mock] 下载附件：', att.name, att.url)
+  console.log("[Mock] 下载附件：", att.name, att.url);
 }
 
 onMounted(() => {
-  loadDetail()
-})
+  loadDetail();
+});
 </script>
 
 <template>
@@ -528,9 +518,7 @@ onMounted(() => {
                 @click="handleDownload(att)"
               >
                 <span class="attachment-name">{{ att.name }}</span>
-                <el-button size="small" type="primary" link class="attachment-download">
-                  下载
-                </el-button>
+                <el-button size="small" type="primary" link class="attachment-download"> 下载 </el-button>
               </li>
             </ul>
           </div>

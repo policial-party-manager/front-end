@@ -20,12 +20,12 @@ export interface NewsItem {
 
 /** 轮播图条目 */
 export interface BannerItem {
-  id: number
-  image: string
-  title: string
-  subtitle: string
+  id: number;
+  image: string;
+  title: string;
+  subtitle: string;
   /** 点击跳转的路由路径，如 /news/1 */
-  linkTo: string
+  linkTo: string;
 }
 
 /** 快捷入口 */
@@ -192,24 +192,24 @@ export const useAppStore = defineStore("app", () => {
   const banners = ref<BannerItem[]>([
     {
       id: 1,
-      image: new URL('@/assets/images/Carousel Images/1.jpg', import.meta.url).href,
-      title: '不忘初心 牢记使命',
-      subtitle: '深入学习贯彻习近平新时代中国特色社会主义思想',
-      linkTo: '/news/1',
+      image: new URL("@/assets/images/Carousel Images/1.jpg", import.meta.url).href,
+      title: "不忘初心 牢记使命",
+      subtitle: "深入学习贯彻习近平新时代中国特色社会主义思想",
+      linkTo: "/news/1",
     },
     {
       id: 2,
-      image: new URL('@/assets/images/Carousel Images/2.jpg', import.meta.url).href,
-      title: '党建引领 砥砺前行',
-      subtitle: '全面推进党员发展全过程管理体系建设',
-      linkTo: '/news/2',
+      image: new URL("@/assets/images/Carousel Images/2.jpg", import.meta.url).href,
+      title: "党建引领 砥砺前行",
+      subtitle: "全面推进党员发展全过程管理体系建设",
+      linkTo: "/news/2",
     },
     {
       id: 3,
-      image: new URL('@/assets/images/Carousel Images/3.jpeg', import.meta.url).href,
-      title: '凝心聚力 筑梦远航',
-      subtitle: '加强高校基层党组织标准化规范化建设',
-      linkTo: '/news/5',
+      image: new URL("@/assets/images/Carousel Images/3.jpeg", import.meta.url).href,
+      title: "凝心聚力 筑梦远航",
+      subtitle: "加强高校基层党组织标准化规范化建设",
+      linkTo: "/news/5",
     },
   ]);
 
