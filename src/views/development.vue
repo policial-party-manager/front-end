@@ -11,26 +11,26 @@
  *     【Mock 模拟】支委所属支部硬编码为"计算机学院学生第一党支部"
  *     TODO: 接入真实接口后，由后端根据当前登录用户的支部进行数据过滤
  */
-import { ref, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAppStore } from '@/stores/app'
+import { ref, computed, watch } from "vue";
+import { useRouter } from "vue-router";
+import { useAppStore } from "@/stores/app";
 
-const router = useRouter()
-const store = useAppStore()
+const router = useRouter();
+const store = useAppStore();
 
 // ============================================================
 // 权限
 // ============================================================
-const isSuperAdmin = computed(() => store.currentRole === 'super_admin')
+const isSuperAdmin = computed(() => store.currentRole === "super_admin");
 // 支委所属支部（Mock 模拟）
-const branchOfSecretary = '计算机学院学生第一党支部'
+const branchOfSecretary = "计算机学院学生第一党支部";
 
 // ============================================================
 // 可调整身份的角色
 // ============================================================
 const canAdjust = computed(() => {
-  return store.currentRole === 'super_admin' || store.currentRole === 'party_secretary'
-})
+  return store.currentRole === "super_admin" || store.currentRole === "party_secretary";
+});
 
 // ============================================================
 // Mock 数据：全部成员（20+ 条，覆盖 4 个支部、5 种身份）
@@ -45,149 +45,362 @@ const canAdjust = computed(() => {
 //   updateTime      - 最后更新时间
 // ============================================================
 const allMembers = ref([
-  { id: 1,  name: '张三', studentId: '20230101001', gender: '男', partyBranch: '计算机学院学生第一党支部', currentIdentity: '发展对象', contactPerson: '李老师', updateTime: '2026-07-20' },
-  { id: 2,  name: '李四', studentId: '20230101002', gender: '女', partyBranch: '计算机学院学生第一党支部', currentIdentity: '积极分子', contactPerson: '赵老师', updateTime: '2026-07-18' },
-  { id: 3,  name: '王五', studentId: '20230101003', gender: '男', partyBranch: '计算机学院学生第二党支部', currentIdentity: '预备党员', contactPerson: '陈老师', updateTime: '2026-07-15' },
-  { id: 4,  name: '赵六', studentId: '20230101004', gender: '女', partyBranch: '计算机学院学生第一党支部', currentIdentity: '入党申请人', contactPerson: '李老师', updateTime: '2026-07-12' },
-  { id: 5,  name: '孙七', studentId: '20230101005', gender: '男', partyBranch: '计算机学院学生第二党支部', currentIdentity: '积极分子', contactPerson: '周老师', updateTime: '2026-07-10' },
-  { id: 6,  name: '周八', studentId: '20220201006', gender: '女', partyBranch: '计算机学院学生第一党支部', currentIdentity: '正式党员', contactPerson: '李老师', updateTime: '2026-07-08' },
-  { id: 7,  name: '吴九', studentId: '20220201001', gender: '男', partyBranch: '计算机学院学生第二党支部', currentIdentity: '发展对象', contactPerson: '刘老师', updateTime: '2026-07-06' },
-  { id: 8,  name: '郑十', studentId: '20220201002', gender: '女', partyBranch: '计算机学院学生第二党支部', currentIdentity: '积极分子', contactPerson: '周老师', updateTime: '2026-07-04' },
-  { id: 9,  name: '陈一', studentId: '20220201003', gender: '男', partyBranch: '软件学院学生党支部',     currentIdentity: '入党申请人', contactPerson: '江老师', updateTime: '2026-07-02' },
-  { id: 10, name: '刘二', studentId: '20220201004', gender: '女', partyBranch: '软件学院学生党支部',     currentIdentity: '正式党员', contactPerson: '江老师', updateTime: '2026-06-28' },
-  { id: 11, name: '黄三', studentId: '20220201005', gender: '男', partyBranch: '软件学院学生党支部',     currentIdentity: '积极分子', contactPerson: '何老师', updateTime: '2026-06-25' },
-  { id: 12, name: '杨四', studentId: '20210101001', gender: '女', partyBranch: '软件学院学生党支部',     currentIdentity: '发展对象', contactPerson: '江老师', updateTime: '2026-06-22' },
-  { id: 13, name: '朱五', studentId: '20210101002', gender: '男', partyBranch: '软件学院学生党支部',     currentIdentity: '预备党员', contactPerson: '何老师', updateTime: '2026-06-20' },
-  { id: 14, name: '马六', studentId: '20210101003', gender: '女', partyBranch: '计算机学院学生第一党支部', currentIdentity: '入党申请人', contactPerson: '李老师', updateTime: '2026-06-18' },
-  { id: 15, name: '胡七', studentId: '20210101004', gender: '男', partyBranch: '网络空间安全学院学生党支部', currentIdentity: '预备党员', contactPerson: '林老师', updateTime: '2026-06-15' },
-  { id: 16, name: '林八', studentId: '20210101005', gender: '女', partyBranch: '网络空间安全学院学生党支部', currentIdentity: '正式党员', contactPerson: '林老师', updateTime: '2026-06-12' },
-  { id: 17, name: '何九', studentId: '20200101001', gender: '男', partyBranch: '网络空间安全学院学生党支部', currentIdentity: '积极分子', contactPerson: '林老师', updateTime: '2026-06-10' },
-  { id: 18, name: '罗十', studentId: '20200101002', gender: '女', partyBranch: '网络空间安全学院学生党支部', currentIdentity: '发展对象', contactPerson: '林老师', updateTime: '2026-06-08' },
-  { id: 19, name: '梁一', studentId: '20200101003', gender: '男', partyBranch: '网络空间安全学院学生党支部', currentIdentity: '入党申请人', contactPerson: '林老师', updateTime: '2026-06-05' },
-  { id: 20, name: '宋二', studentId: '20200101004', gender: '女', partyBranch: '计算机学院学生第二党支部', currentIdentity: '正式党员', contactPerson: '周老师', updateTime: '2026-06-01' },
-  { id: 21, name: '唐三', studentId: '20230101006', gender: '男', partyBranch: '计算机学院学生第二党支部', currentIdentity: '入党申请人', contactPerson: '周老师', updateTime: '2026-05-28' },
-  { id: 22, name: '许四', studentId: '20230101007', gender: '女', partyBranch: '计算机学院学生第一党支部', currentIdentity: '积极分子', contactPerson: '赵老师', updateTime: '2026-05-25' },
-  { id: 23, name: '秦五', studentId: '20220201007', gender: '男', partyBranch: '软件学院学生党支部',     currentIdentity: '正式党员', contactPerson: '何老师', updateTime: '2026-05-20' },
-  { id: 24, name: '韩六', studentId: '20210101006', gender: '女', partyBranch: '网络空间安全学院学生党支部', currentIdentity: '入党申请人', contactPerson: '林老师', updateTime: '2026-05-18' },
-])
+  {
+    id: 1,
+    name: "张三",
+    studentId: "20230101001",
+    gender: "男",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "发展对象",
+    contactPerson: "李老师",
+    updateTime: "2026-07-20",
+  },
+  {
+    id: 2,
+    name: "李四",
+    studentId: "20230101002",
+    gender: "女",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "积极分子",
+    contactPerson: "赵老师",
+    updateTime: "2026-07-18",
+  },
+  {
+    id: 3,
+    name: "王五",
+    studentId: "20230101003",
+    gender: "男",
+    partyBranch: "计算机学院学生第二党支部",
+    currentIdentity: "预备党员",
+    contactPerson: "陈老师",
+    updateTime: "2026-07-15",
+  },
+  {
+    id: 4,
+    name: "赵六",
+    studentId: "20230101004",
+    gender: "女",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "入党申请人",
+    contactPerson: "李老师",
+    updateTime: "2026-07-12",
+  },
+  {
+    id: 5,
+    name: "孙七",
+    studentId: "20230101005",
+    gender: "男",
+    partyBranch: "计算机学院学生第二党支部",
+    currentIdentity: "积极分子",
+    contactPerson: "周老师",
+    updateTime: "2026-07-10",
+  },
+  {
+    id: 6,
+    name: "周八",
+    studentId: "20220201006",
+    gender: "女",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "正式党员",
+    contactPerson: "李老师",
+    updateTime: "2026-07-08",
+  },
+  {
+    id: 7,
+    name: "吴九",
+    studentId: "20220201001",
+    gender: "男",
+    partyBranch: "计算机学院学生第二党支部",
+    currentIdentity: "发展对象",
+    contactPerson: "刘老师",
+    updateTime: "2026-07-06",
+  },
+  {
+    id: 8,
+    name: "郑十",
+    studentId: "20220201002",
+    gender: "女",
+    partyBranch: "计算机学院学生第二党支部",
+    currentIdentity: "积极分子",
+    contactPerson: "周老师",
+    updateTime: "2026-07-04",
+  },
+  {
+    id: 9,
+    name: "陈一",
+    studentId: "20220201003",
+    gender: "男",
+    partyBranch: "软件学院学生党支部",
+    currentIdentity: "入党申请人",
+    contactPerson: "江老师",
+    updateTime: "2026-07-02",
+  },
+  {
+    id: 10,
+    name: "刘二",
+    studentId: "20220201004",
+    gender: "女",
+    partyBranch: "软件学院学生党支部",
+    currentIdentity: "正式党员",
+    contactPerson: "江老师",
+    updateTime: "2026-06-28",
+  },
+  {
+    id: 11,
+    name: "黄三",
+    studentId: "20220201005",
+    gender: "男",
+    partyBranch: "软件学院学生党支部",
+    currentIdentity: "积极分子",
+    contactPerson: "何老师",
+    updateTime: "2026-06-25",
+  },
+  {
+    id: 12,
+    name: "杨四",
+    studentId: "20210101001",
+    gender: "女",
+    partyBranch: "软件学院学生党支部",
+    currentIdentity: "发展对象",
+    contactPerson: "江老师",
+    updateTime: "2026-06-22",
+  },
+  {
+    id: 13,
+    name: "朱五",
+    studentId: "20210101002",
+    gender: "男",
+    partyBranch: "软件学院学生党支部",
+    currentIdentity: "预备党员",
+    contactPerson: "何老师",
+    updateTime: "2026-06-20",
+  },
+  {
+    id: 14,
+    name: "马六",
+    studentId: "20210101003",
+    gender: "女",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "入党申请人",
+    contactPerson: "李老师",
+    updateTime: "2026-06-18",
+  },
+  {
+    id: 15,
+    name: "胡七",
+    studentId: "20210101004",
+    gender: "男",
+    partyBranch: "网络空间安全学院学生党支部",
+    currentIdentity: "预备党员",
+    contactPerson: "林老师",
+    updateTime: "2026-06-15",
+  },
+  {
+    id: 16,
+    name: "林八",
+    studentId: "20210101005",
+    gender: "女",
+    partyBranch: "网络空间安全学院学生党支部",
+    currentIdentity: "正式党员",
+    contactPerson: "林老师",
+    updateTime: "2026-06-12",
+  },
+  {
+    id: 17,
+    name: "何九",
+    studentId: "20200101001",
+    gender: "男",
+    partyBranch: "网络空间安全学院学生党支部",
+    currentIdentity: "积极分子",
+    contactPerson: "林老师",
+    updateTime: "2026-06-10",
+  },
+  {
+    id: 18,
+    name: "罗十",
+    studentId: "20200101002",
+    gender: "女",
+    partyBranch: "网络空间安全学院学生党支部",
+    currentIdentity: "发展对象",
+    contactPerson: "林老师",
+    updateTime: "2026-06-08",
+  },
+  {
+    id: 19,
+    name: "梁一",
+    studentId: "20200101003",
+    gender: "男",
+    partyBranch: "网络空间安全学院学生党支部",
+    currentIdentity: "入党申请人",
+    contactPerson: "林老师",
+    updateTime: "2026-06-05",
+  },
+  {
+    id: 20,
+    name: "宋二",
+    studentId: "20200101004",
+    gender: "女",
+    partyBranch: "计算机学院学生第二党支部",
+    currentIdentity: "正式党员",
+    contactPerson: "周老师",
+    updateTime: "2026-06-01",
+  },
+  {
+    id: 21,
+    name: "唐三",
+    studentId: "20230101006",
+    gender: "男",
+    partyBranch: "计算机学院学生第二党支部",
+    currentIdentity: "入党申请人",
+    contactPerson: "周老师",
+    updateTime: "2026-05-28",
+  },
+  {
+    id: 22,
+    name: "许四",
+    studentId: "20230101007",
+    gender: "女",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "积极分子",
+    contactPerson: "赵老师",
+    updateTime: "2026-05-25",
+  },
+  {
+    id: 23,
+    name: "秦五",
+    studentId: "20220201007",
+    gender: "男",
+    partyBranch: "软件学院学生党支部",
+    currentIdentity: "正式党员",
+    contactPerson: "何老师",
+    updateTime: "2026-05-20",
+  },
+  {
+    id: 24,
+    name: "韩六",
+    studentId: "20210101006",
+    gender: "女",
+    partyBranch: "网络空间安全学院学生党支部",
+    currentIdentity: "入党申请人",
+    contactPerson: "林老师",
+    updateTime: "2026-05-18",
+  },
+]);
 
 // ============================================================
 // 身份标签颜色映射
 // ============================================================
 const identityTagMap = {
-  '入党申请人': 'info',
-  '积极分子': 'warning',
-  '发展对象': 'primary',
-  '预备党员': 'success',
-  '正式党员': 'danger',
-}
+  入党申请人: "info",
+  积极分子: "warning",
+  发展对象: "primary",
+  预备党员: "success",
+  正式党员: "danger",
+};
 
 // ============================================================
 // 权限过滤：支委只看本支部
 // TODO: 接入真实接口后，后端根据角色返回数据
 // ============================================================
 const membersByRole = computed(() => {
-  if (isSuperAdmin.value) return allMembers.value
-  return allMembers.value.filter(m => m.partyBranch === branchOfSecretary)
-})
+  if (isSuperAdmin.value) return allMembers.value;
+  return allMembers.value.filter((m) => m.partyBranch === branchOfSecretary);
+});
 
 // ============================================================
 // 筛选选项（从数据中提取）
 // ============================================================
 const branchOptions = computed(() => {
-  const branches = [...new Set(allMembers.value.map(m => m.partyBranch))]
-  return [{ value: '', label: '全部' }, ...branches.map(b => ({ value: b, label: b }))]
-})
+  const branches = [...new Set(allMembers.value.map((m) => m.partyBranch))];
+  return [{ value: "", label: "全部" }, ...branches.map((b) => ({ value: b, label: b }))];
+});
 
 const identityOptions = [
-  { value: '', label: '全部' },
-  { value: '入党申请人', label: '入党申请人' },
-  { value: '积极分子',   label: '积极分子' },
-  { value: '发展对象',   label: '发展对象' },
-  { value: '预备党员',   label: '预备党员' },
-  { value: '正式党员',   label: '正式党员' },
-]
+  { value: "", label: "全部" },
+  { value: "入党申请人", label: "入党申请人" },
+  { value: "积极分子", label: "积极分子" },
+  { value: "发展对象", label: "发展对象" },
+  { value: "预备党员", label: "预备党员" },
+  { value: "正式党员", label: "正式党员" },
+];
 
 // ============================================================
 // 用户输入的筛选条件（未点击搜索前不生效）
 // ============================================================
-const filterBranch = ref('')       // 所属支部
-const filterIdentity = ref('')     // 当前身份
-const filterKeyword = ref('')      // 关键词（姓名/学号）
+const filterBranch = ref(""); // 所属支部
+const filterIdentity = ref(""); // 当前身份
+const filterKeyword = ref(""); // 关键词（姓名/学号）
 
 // ============================================================
 // 已应用的筛选条件（点击搜索后才赋值）
 // ============================================================
-const appliedBranch = ref('')
-const appliedIdentity = ref('')
-const appliedKeyword = ref('')
+const appliedBranch = ref("");
+const appliedIdentity = ref("");
+const appliedKeyword = ref("");
 
 // ============================================================
 // 加载 & 分页
 // ============================================================
-const loading = ref(false)
-const currentPage = ref(1)
-const pageSize = ref(10)
+const loading = ref(false);
+const currentPage = ref(1);
+const pageSize = ref(10);
 
 // ============================================================
 // 筛选后的数据（权限过滤 + 已应用筛选条件）
 // ============================================================
 const filteredMembers = computed(() => {
-  let list = membersByRole.value
+  let list = membersByRole.value;
 
   // 支部筛选（仅超级管理员有此筛选项，支委只能看自己支部）
   if (appliedBranch.value) {
-    list = list.filter(m => m.partyBranch === appliedBranch.value)
+    list = list.filter((m) => m.partyBranch === appliedBranch.value);
   }
 
   // 身份筛选
   if (appliedIdentity.value) {
-    list = list.filter(m => m.currentIdentity === appliedIdentity.value)
+    list = list.filter((m) => m.currentIdentity === appliedIdentity.value);
   }
 
   // 关键词搜索（姓名 / 学号）
   if (appliedKeyword.value.trim()) {
-    const kw = appliedKeyword.value.trim().toLowerCase()
-    list = list.filter(m =>
-      m.name.toLowerCase().includes(kw) ||
-      m.studentId.toLowerCase().includes(kw)
-    )
+    const kw = appliedKeyword.value.trim().toLowerCase();
+    list = list.filter((m) => m.name.toLowerCase().includes(kw) || m.studentId.toLowerCase().includes(kw));
   }
 
-  return list
-})
+  return list;
+});
 
 // ============================================================
 // 分页数据
 // ============================================================
-const totalFiltered = computed(() => filteredMembers.value.length)
+const totalFiltered = computed(() => filteredMembers.value.length);
 
 const pagedMembers = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  return filteredMembers.value.slice(start, start + pageSize.value)
-})
+  const start = (currentPage.value - 1) * pageSize.value;
+  return filteredMembers.value.slice(start, start + pageSize.value);
+});
 
 // ============================================================
 // 统计概览（基于权限可见的全部成员，不受搜索筛选影响）
 // ============================================================
 const statsData = computed(() => ({
   total: membersByRole.value.length,
-  developmentCandidates: membersByRole.value.filter(m => m.currentIdentity === '发展对象').length,
-  probationary: membersByRole.value.filter(m => m.currentIdentity === '预备党员').length,
-}))
+  developmentCandidates: membersByRole.value.filter((m) => m.currentIdentity === "发展对象").length,
+  probationary: membersByRole.value.filter((m) => m.currentIdentity === "预备党员").length,
+}));
 
 // ============================================================
 // 当已应用的筛选条件变化时，重置到第 1 页
 // ============================================================
 watch([appliedBranch, appliedIdentity, appliedKeyword], () => {
-  currentPage.value = 1
-})
+  currentPage.value = 1;
+});
 
 // ============================================================
 // 点击搜索：应用当前筛选条件（模拟接口延迟）
 // ============================================================
 async function handleSearch(): Promise<void> {
-  loading.value = true
+  loading.value = true;
   try {
     // TODO: 替换为真实 API 调用
     // const res = await api.getMemberList({
@@ -197,21 +410,21 @@ async function handleSearch(): Promise<void> {
     // })
 
     // 模拟接口延迟 300ms
-    await new Promise(resolve => setTimeout(resolve, 300))
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     // 应用筛选条件
-    appliedBranch.value = filterBranch.value
-    appliedIdentity.value = filterIdentity.value
-    appliedKeyword.value = filterKeyword.value
+    appliedBranch.value = filterBranch.value;
+    appliedIdentity.value = filterIdentity.value;
+    appliedKeyword.value = filterKeyword.value;
 
-    console.log('[Mock] 搜索完成：', {
-      branch: appliedBranch.value || '全部',
-      identity: appliedIdentity.value || '全部',
-      keyword: appliedKeyword.value || '无',
+    console.log("[Mock] 搜索完成：", {
+      branch: appliedBranch.value || "全部",
+      identity: appliedIdentity.value || "全部",
+      keyword: appliedKeyword.value || "无",
       results: filteredMembers.value.length,
-    })
+    });
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
@@ -219,31 +432,31 @@ async function handleSearch(): Promise<void> {
 // 点击重置：清空所有筛选条件并立即刷新
 // ============================================================
 function handleReset(): void {
-  filterBranch.value = ''
-  filterIdentity.value = ''
-  filterKeyword.value = ''
-  appliedBranch.value = ''
-  appliedIdentity.value = ''
-  appliedKeyword.value = ''
+  filterBranch.value = "";
+  filterIdentity.value = "";
+  filterKeyword.value = "";
+  appliedBranch.value = "";
+  appliedIdentity.value = "";
+  appliedKeyword.value = "";
 }
 
 // ============================================================
 // 分页变更
 // ============================================================
 function handlePageChange(page: number): void {
-  currentPage.value = page
+  currentPage.value = page;
 }
 
 function handleSizeChange(size: number): void {
-  pageSize.value = size
-  currentPage.value = 1
+  pageSize.value = size;
+  currentPage.value = 1;
 }
 
 // ============================================================
 // 跳转详情
 // ============================================================
 function goDetail(id: number): void {
-  router.push(`/development/member/${id}`)
+  router.push(`/development/member/${id}`);
 }
 </script>
 
@@ -277,12 +490,7 @@ function goDetail(id: number): void {
         <!-- 卡片标题 -->
         <div class="card-header">
           <span class="card-title">培养成员列表</span>
-          <el-button
-            v-if="canAdjust"
-            type="primary"
-            size="small"
-            @click="router.push('/development/batch')"
-          >
+          <el-button v-if="canAdjust" type="primary" size="small" @click="router.push('/development/batch')">
             批量调整
           </el-button>
         </div>
@@ -299,18 +507,8 @@ function goDetail(id: number): void {
             <el-col :xs="24" :sm="12" :md="8" :lg="6" v-if="isSuperAdmin">
               <div class="filter-item">
                 <label class="filter-label">所属党支部</label>
-                <el-select
-                  v-model="filterBranch"
-                  placeholder="全部"
-                  clearable
-                  style="width: 100%"
-                >
-                  <el-option
-                    v-for="item in branchOptions"
-                    :key="item.value"
-                    :label="item.label"
-                    :value="item.value"
-                  />
+                <el-select v-model="filterBranch" placeholder="全部" clearable style="width: 100%">
+                  <el-option v-for="item in branchOptions" :key="item.value" :label="item.label" :value="item.value" />
                 </el-select>
               </div>
             </el-col>
@@ -319,12 +517,7 @@ function goDetail(id: number): void {
             <el-col :xs="24" :sm="12" :md="8" :lg="6">
               <div class="filter-item">
                 <label class="filter-label">当前身份</label>
-                <el-select
-                  v-model="filterIdentity"
-                  placeholder="全部"
-                  clearable
-                  style="width: 100%"
-                >
+                <el-select v-model="filterIdentity" placeholder="全部" clearable style="width: 100%">
                   <el-option
                     v-for="item in identityOptions"
                     :key="item.value"
@@ -339,12 +532,7 @@ function goDetail(id: number): void {
             <el-col :xs="24" :sm="12" :md="8" :lg="6">
               <div class="filter-item">
                 <label class="filter-label">关键词搜索</label>
-                <el-input
-                  v-model="filterKeyword"
-                  placeholder="输入姓名或学号"
-                  clearable
-                  @keyup.enter="handleSearch"
-                >
+                <el-input v-model="filterKeyword" placeholder="输入姓名或学号" clearable @keyup.enter="handleSearch">
                   <template #prefix>
                     <el-icon><Search /></el-icon>
                   </template>
@@ -371,12 +559,7 @@ function goDetail(id: number): void {
         </div>
 
         <!-- ==================== 表格 ==================== -->
-        <el-table
-          v-if="pagedMembers.length > 0"
-          :data="pagedMembers"
-          style="width: 100%"
-          stripe
-        >
+        <el-table v-if="pagedMembers.length > 0" :data="pagedMembers" style="width: 100%" stripe>
           <el-table-column prop="name" label="姓名" width="100" />
           <el-table-column prop="studentId" label="学号" width="140" />
           <el-table-column prop="gender" label="性别" width="70" />
@@ -392,19 +575,13 @@ function goDetail(id: number): void {
           <el-table-column prop="updateTime" label="最后更新" width="140" />
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">
-              <el-button type="primary" link size="small" @click="goDetail(row.id)">
-                查看详情
-              </el-button>
+              <el-button type="primary" link size="small" @click="goDetail(row.id)"> 查看详情 </el-button>
             </template>
           </el-table-column>
         </el-table>
 
         <!-- 空状态 -->
-        <el-empty
-          v-else
-          description="暂无匹配的成员"
-          :image-size="100"
-        />
+        <el-empty v-else description="暂无匹配的成员" :image-size="100" />
 
         <!-- 分页 -->
         <div class="table-footer" v-if="totalFiltered > 0">
@@ -466,7 +643,7 @@ function goDetail(id: number): void {
 .stat-num {
   font-size: 28px;
   font-weight: 700;
-  color: var(--party-red, #C12C1F);
+  color: var(--party-red, #c12c1f);
 }
 
 .stat-label {
@@ -485,14 +662,14 @@ function goDetail(id: number): void {
 .card-title {
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-primary, #2C3E50);
+  color: var(--text-primary, #2c3e50);
 
   &::before {
-    content: '';
+    content: "";
     display: inline-block;
     width: 4px;
     height: 18px;
-    background: var(--party-red, #C12C1F);
+    background: var(--party-red, #c12c1f);
     border-radius: 2px;
     margin-right: 10px;
     vertical-align: middle;
@@ -505,7 +682,7 @@ function goDetail(id: number): void {
 .filter-bar {
   margin-bottom: 20px;
   padding: 16px 20px;
-  background: var(--bg-page, #F5F6FA);
+  background: var(--bg-page, #f5f6fa);
   border-radius: var(--radius-base, 8px);
 }
 
@@ -536,7 +713,7 @@ function goDetail(id: number): void {
 
 .result-count {
   font-size: 13px;
-  color: var(--party-red, #C12C1F);
+  color: var(--party-red, #c12c1f);
   white-space: nowrap;
 }
 

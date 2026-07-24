@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useAppStore } from '@/stores/app'
+import { ref, onMounted, onUnmounted } from "vue";
+import { useAppStore } from "@/stores/app";
 
 /**
  * CarouselBanner - 轮播图组件
@@ -15,83 +15,68 @@ import { useAppStore } from '@/stores/app'
  * 当前使用项目已有图片占位，请替换为实际党建宣传图片
  */
 
-const store = useAppStore()
-const banners = store.banners
+const store = useAppStore();
+const banners = store.banners;
 
-const currentIndex = ref(0)
-const isHovering = ref(false)
-let autoPlayTimer: ReturnType<typeof setInterval> | null = null
+const currentIndex = ref(0);
+const isHovering = ref(false);
+let autoPlayTimer: ReturnType<typeof setInterval> | null = null;
 
 // 自动播放间隔（毫秒）
-const AUTO_PLAY_INTERVAL = 5000
+const AUTO_PLAY_INTERVAL = 5000;
 
 function next(): void {
-  currentIndex.value = (currentIndex.value + 1) % banners.length
+  currentIndex.value = (currentIndex.value + 1) % banners.length;
 }
 
 function prev(): void {
-  currentIndex.value = (currentIndex.value - 1 + banners.length) % banners.length
+  currentIndex.value = (currentIndex.value - 1 + banners.length) % banners.length;
 }
 
 function goTo(index: number): void {
-  currentIndex.value = index
+  currentIndex.value = index;
 }
 
 function startAutoPlay(): void {
-  stopAutoPlay()
+  stopAutoPlay();
   autoPlayTimer = setInterval(() => {
     if (!isHovering.value) {
-      next()
+      next();
     }
-  }, AUTO_PLAY_INTERVAL)
+  }, AUTO_PLAY_INTERVAL);
 }
 
 function stopAutoPlay(): void {
   if (autoPlayTimer) {
-    clearInterval(autoPlayTimer)
-    autoPlayTimer = null
+    clearInterval(autoPlayTimer);
+    autoPlayTimer = null;
   }
 }
 
 function handleMouseEnter(): void {
-  isHovering.value = true
+  isHovering.value = true;
 }
 
 function handleMouseLeave(): void {
-  isHovering.value = false
+  isHovering.value = false;
 }
 
 onMounted(() => {
-  startAutoPlay()
-})
+  startAutoPlay();
+});
 
 onUnmounted(() => {
-  stopAutoPlay()
-})
+  stopAutoPlay();
+});
 </script>
 
 <template>
-  <div
-    class="carousel-container"
-    @mouseenter="handleMouseEnter"
-    @mouseleave="handleMouseLeave"
-  >
+  <div class="carousel-container" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
     <!-- 轮播图轨道 -->
     <div class="carousel-track">
-      <div
-        class="carousel-slides"
-        :style="{ transform: `translateX(-${currentIndex * 100}%)` }"
-      >
-        <div
-          v-for="banner in banners"
-          :key="banner.id"
-          class="carousel-slide"
-        >
-          <img
-            :src="banner.image"
-            :alt="banner.title"
-            class="slide-image"
-          />
+      <div class="carousel-slides" :style="{ transform: `translateX(-${currentIndex * 100}%)` }">
+        <div v-for="banner in banners" :key="banner.id" class="carousel-slide">
+          <img :src="banner.image" :alt="banner.title" class="slide-image" />
           <div class="slide-overlay">
             <h3 class="slide-title">{{ banner.title }}</h3>
             <p class="slide-subtitle">{{ banner.subtitle }}</p>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useAppStore } from '@/stores/app'
+import { useAppStore } from "@/stores/app";
 
 /**
  * NewsSection - 双栏内容区组件
@@ -10,7 +10,7 @@ import { useAppStore } from '@/stores/app'
  * 右下角"更多>>"链接
  */
 
-const store = useAppStore()
+const store = useAppStore();
 </script>
 
 <template>
@@ -19,11 +19,7 @@ const store = useAppStore()
     <div class="content-card news-panel">
       <h3 class="section-title">党建新闻</h3>
       <ul class="news-list">
-        <li
-          v-for="item in store.newsList"
-          :key="item.id"
-          class="news-item"
-        >
+        <li v-for="item in store.newsList" :key="item.id" class="news-item">
           <span class="news-title" :title="item.title">{{ item.title }}</span>
           <span class="news-date">{{ item.date }}</span>
         </li>
@@ -37,11 +33,7 @@ const store = useAppStore()
     <div class="content-card news-panel">
       <h3 class="section-title">通知公告</h3>
       <ul class="news-list">
-        <li
-          v-for="item in store.noticeList"
-          :key="item.id"
-          class="news-item"
-        >
+        <li v-for="item in store.noticeList" :key="item.id" class="news-item">
           <span class="news-title" :title="item.title">{{ item.title }}</span>
           <span class="news-date">{{ item.date }}</span>
         </li>

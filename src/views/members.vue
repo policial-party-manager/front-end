@@ -16,13 +16,7 @@ const store = useAppStore();
 // ============================================================
 
 /** 政治身份 */
-type PartyIdentity =
-  | "普通学生"
-  | "入党申请人"
-  | "积极分子"
-  | "发展对象"
-  | "预备党员"
-  | "正式党员";
+type PartyIdentity = "普通学生" | "入党申请人" | "积极分子" | "发展对象" | "预备党员" | "正式党员";
 
 /** 成员信息 */
 interface Member {
@@ -490,10 +484,7 @@ const identityOptions = [
 // ============================================================
 const branchOptions = computed(() => {
   const branches = [...new Set(allMembers.value.map((m) => m.branchName))];
-  return [
-    { value: "", label: "全部" },
-    ...branches.map((b) => ({ value: b, label: b })),
-  ];
+  return [{ value: "", label: "全部" }, ...branches.map((b) => ({ value: b, label: b }))];
 });
 
 // ============================================================
@@ -528,10 +519,8 @@ const pageSize = ref(10);
 // ============================================================
 const filteredMembers = computed(() => {
   let list = membersByRole.value;
-  if (appliedBranch.value)
-    list = list.filter((m) => m.branchName === appliedBranch.value);
-  if (appliedIdentity.value)
-    list = list.filter((m) => m.identity === appliedIdentity.value);
+  if (appliedBranch.value) list = list.filter((m) => m.branchName === appliedBranch.value);
+  if (appliedIdentity.value) list = list.filter((m) => m.identity === appliedIdentity.value);
   if (appliedKeyword.value.trim()) {
     const kw = appliedKeyword.value.trim().toLowerCase();
     list = list.filter(
@@ -557,17 +546,11 @@ const pagedMembers = computed(() => {
 // ============================================================
 const statsData = computed(() => ({
   total: membersByRole.value.length,
-  applicants: membersByRole.value.filter((m) => m.identity === "入党申请人")
-    .length,
-  activists: membersByRole.value.filter((m) => m.identity === "积极分子")
-    .length,
-  developmentTargets: membersByRole.value.filter(
-    (m) => m.identity === "发展对象",
-  ).length,
-  probationary: membersByRole.value.filter((m) => m.identity === "预备党员")
-    .length,
-  fullMembers: membersByRole.value.filter((m) => m.identity === "正式党员")
-    .length,
+  applicants: membersByRole.value.filter((m) => m.identity === "入党申请人").length,
+  activists: membersByRole.value.filter((m) => m.identity === "积极分子").length,
+  developmentTargets: membersByRole.value.filter((m) => m.identity === "发展对象").length,
+  probationary: membersByRole.value.filter((m) => m.identity === "预备党员").length,
+  fullMembers: membersByRole.value.filter((m) => m.identity === "正式党员").length,
 }));
 
 // ============================================================
@@ -648,9 +631,7 @@ const formRules: FormRules = {
   grade: [{ required: true, message: "请输入年级", trigger: "blur" }],
   major: [{ required: true, message: "请输入专业", trigger: "blur" }],
   className: [{ required: true, message: "请输入班级", trigger: "blur" }],
-  branchName: [
-    { required: true, message: "请选择所属支部", trigger: "change" },
-  ],
+  branchName: [{ required: true, message: "请选择所属支部", trigger: "change" }],
   identity: [{ required: true, message: "请选择政治身份", trigger: "change" }],
   phone: [
     {
@@ -717,9 +698,7 @@ async function handleSubmit(formEl: FormInstance | undefined): Promise<void> {
         // TODO: 替换为真实 API 调用
         await new Promise((resolve) => setTimeout(resolve, 300));
         if (isEdit.value && editingId.value) {
-          const idx = allMembers.value.findIndex(
-            (m) => m.id === editingId.value,
-          );
+          const idx = allMembers.value.findIndex((m) => m.id === editingId.value);
           if (idx !== -1) {
             const member = allMembers.value[idx];
             Object.assign(member, formData);
@@ -754,15 +733,11 @@ function handleDialogClose(): void {
 // ============================================================
 async function handleDelete(row: Member): Promise<void> {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除成员「${row.name}」(${row.studentNo}) 吗？此操作不可恢复。`,
-      "删除确认",
-      {
-        confirmButtonText: "确定删除",
-        cancelButtonText: "取消",
-        type: "warning",
-      },
-    );
+    await ElMessageBox.confirm(`确定要删除成员「${row.name}」(${row.studentNo}) 吗？此操作不可恢复。`, "删除确认", {
+      confirmButtonText: "确定删除",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
     // TODO: 替换为真实 API 调用
     await new Promise((resolve) => setTimeout(resolve, 200));
     const idx = allMembers.value.findIndex((m) => m.id === row.id);
@@ -824,10 +799,7 @@ function handleExport(): void {
       m.contactPerson,
       m.remark,
     ]);
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((r) => r.join(",")),
-    ].join("\n");
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const BOM = "\uFEFF";
     const blob = new Blob([BOM + csvContent], {
       type: "text/csv;charset=utf-8;",
@@ -851,9 +823,7 @@ function handleExport(): void {
       <!-- 页头 -->
       <div class="page-header">
         <h2 class="section-title">成员管理</h2>
-        <p class="page-desc">
-          管理学院全体党员成员基础信息，支持增删改查、批量导入导出
-        </p>
+        <p class="page-desc">管理学院全体党员成员基础信息，支持增删改查、批量导入导出</p>
       </div>
 
       <!-- 统计概览 -->
@@ -872,9 +842,7 @@ function handleExport(): void {
             <el-icon :size="24"><EditPen /></el-icon>
           </div>
           <div class="stat-body">
-            <span class="stat-num num-applicant">{{
-              statsData.applicants
-            }}</span>
+            <span class="stat-num num-applicant">{{ statsData.applicants }}</span>
             <span class="stat-label">入党申请人</span>
           </div>
         </div>
@@ -883,9 +851,7 @@ function handleExport(): void {
             <el-icon :size="24"><StarFilled /></el-icon>
           </div>
           <div class="stat-body">
-            <span class="stat-num num-activist">{{
-              statsData.activists
-            }}</span>
+            <span class="stat-num num-activist">{{ statsData.activists }}</span>
             <span class="stat-label">积极分子</span>
           </div>
         </div>
@@ -894,9 +860,7 @@ function handleExport(): void {
             <el-icon :size="24"><TrendCharts /></el-icon>
           </div>
           <div class="stat-body">
-            <span class="stat-num num-development">{{
-              statsData.developmentTargets
-            }}</span>
+            <span class="stat-num num-development">{{ statsData.developmentTargets }}</span>
             <span class="stat-label">发展对象</span>
           </div>
         </div>
@@ -905,9 +869,7 @@ function handleExport(): void {
             <el-icon :size="24"><CircleCheckFilled /></el-icon>
           </div>
           <div class="stat-body">
-            <span class="stat-num num-probationary">{{
-              statsData.probationary
-            }}</span>
+            <span class="stat-num num-probationary">{{ statsData.probationary }}</span>
             <span class="stat-label">预备党员</span>
           </div>
         </div>
@@ -916,9 +878,7 @@ function handleExport(): void {
             <el-icon :size="24"><Medal /></el-icon>
           </div>
           <div class="stat-body">
-            <span class="stat-num num-full">{{
-              statsData.fullMembers
-            }}</span>
+            <span class="stat-num num-full">{{ statsData.fullMembers }}</span>
             <span class="stat-label">正式党员</span>
           </div>
         </div>
@@ -930,20 +890,9 @@ function handleExport(): void {
         <div class="card-header">
           <span class="card-title">成员列表</span>
           <div class="card-actions">
-            <el-button
-              v-if="canEdit"
-              type="primary"
-              :icon="Plus"
-              @click="handleAdd"
-            >
-              新增成员
-            </el-button>
-            <el-button v-if="canEdit" :icon="Upload" @click="handleImport">
-              Excel导入
-            </el-button>
-            <el-button :icon="Download" @click="handleExport">
-              导出数据
-            </el-button>
+            <el-button v-if="canEdit" type="primary" :icon="Plus" @click="handleAdd"> 新增成员 </el-button>
+            <el-button v-if="canEdit" :icon="Upload" @click="handleImport"> Excel导入 </el-button>
+            <el-button :icon="Download" @click="handleExport"> 导出数据 </el-button>
           </div>
         </div>
 
@@ -954,18 +903,8 @@ function handleExport(): void {
             <el-col :xs="24" :sm="12" :md="8" :lg="6" v-if="isSuperAdmin">
               <div class="filter-item">
                 <label class="filter-label">所属支部</label>
-                <el-select
-                  v-model="filterBranch"
-                  placeholder="全部"
-                  clearable
-                  style="width: 100%"
-                >
-                  <el-option
-                    v-for="item in branchOptions"
-                    :key="item.value"
-                    :label="item.label"
-                    :value="item.value"
-                  />
+                <el-select v-model="filterBranch" placeholder="全部" clearable style="width: 100%">
+                  <el-option v-for="item in branchOptions" :key="item.value" :label="item.label" :value="item.value" />
                 </el-select>
               </div>
             </el-col>
@@ -974,12 +913,7 @@ function handleExport(): void {
             <el-col :xs="24" :sm="12" :md="8" :lg="6">
               <div class="filter-item">
                 <label class="filter-label">政治身份</label>
-                <el-select
-                  v-model="filterIdentity"
-                  placeholder="全部"
-                  clearable
-                  style="width: 100%"
-                >
+                <el-select v-model="filterIdentity" placeholder="全部" clearable style="width: 100%">
                   <el-option
                     v-for="item in identityOptions"
                     :key="item.value"
@@ -1016,10 +950,7 @@ function handleExport(): void {
                     <el-icon><Search /></el-icon> 搜索
                   </el-button>
                   <el-button @click="handleReset">重置</el-button>
-                  <span
-                    class="result-count"
-                    v-if="appliedBranch || appliedIdentity || appliedKeyword"
-                  >
+                  <span class="result-count" v-if="appliedBranch || appliedIdentity || appliedKeyword">
                     {{ totalFiltered }} 条结果
                   </span>
                 </div>
@@ -1056,46 +987,14 @@ function handleExport(): void {
             </template>
           </el-table-column>
           <el-table-column prop="phone" label="联系电话" width="130" />
-          <el-table-column
-            prop="contactPerson"
-            label="培养联系人"
-            width="110"
-          />
-          <el-table-column
-            prop="updateTime"
-            label="最后更新"
-            width="120"
-            sortable
-          />
+          <el-table-column prop="contactPerson" label="培养联系人" width="110" />
+          <el-table-column prop="updateTime" label="最后更新" width="120" sortable />
           <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
               <div class="table-actions">
-                <el-button
-                  type="primary"
-                  link
-                  size="small"
-                  @click="handleView(row)"
-                >
-                  查看
-                </el-button>
-                <el-button
-                  v-if="canEdit"
-                  type="warning"
-                  link
-                  size="small"
-                  @click="handleEdit(row)"
-                >
-                  编辑
-                </el-button>
-                <el-button
-                  v-if="canEdit"
-                  type="danger"
-                  link
-                  size="small"
-                  @click="handleDelete(row)"
-                >
-                  删除
-                </el-button>
+                <el-button type="primary" link size="small" @click="handleView(row)"> 查看 </el-button>
+                <el-button v-if="canEdit" type="warning" link size="small" @click="handleEdit(row)"> 编辑 </el-button>
+                <el-button v-if="canEdit" type="danger" link size="small" @click="handleDelete(row)"> 删除 </el-button>
               </div>
             </template>
           </el-table-column>
@@ -1130,13 +1029,7 @@ function handleExport(): void {
       :close-on-click-modal="false"
       @closed="handleDialogClose"
     >
-      <el-form
-        ref="formRef"
-        :model="formData"
-        :rules="formRules"
-        label-width="100px"
-        label-position="right"
-      >
+      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="100px" label-position="right">
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="学号" prop="studentNo">
@@ -1179,11 +1072,7 @@ function handleExport(): void {
           </el-col>
           <el-col :span="12">
             <el-form-item label="年级" prop="grade">
-              <el-select
-                v-model="formData.grade"
-                style="width: 100%"
-                placeholder="请选择"
-              >
+              <el-select v-model="formData.grade" style="width: 100%" placeholder="请选择">
                 <el-option label="2025级" value="2025级" />
                 <el-option label="2024级" value="2024级" />
                 <el-option label="2023级" value="2023级" />
@@ -1208,11 +1097,7 @@ function handleExport(): void {
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="所属支部" prop="branchName">
-              <el-select
-                v-model="formData.branchName"
-                style="width: 100%"
-                placeholder="请选择"
-              >
+              <el-select v-model="formData.branchName" style="width: 100%" placeholder="请选择">
                 <el-option
                   v-for="opt in branchOptions.filter((o) => o.value !== '')"
                   :key="opt.value"
@@ -1224,10 +1109,7 @@ function handleExport(): void {
           </el-col>
           <el-col :span="12">
             <el-form-item label="培养联系人" prop="contactPerson">
-              <el-input
-                v-model="formData.contactPerson"
-                placeholder="请输入培养联系人"
-              />
+              <el-input v-model="formData.contactPerson" placeholder="请输入培养联系人" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -1244,12 +1126,7 @@ function handleExport(): void {
           </el-col>
         </el-row>
         <el-form-item label="备注" prop="remark">
-          <el-input
-            v-model="formData.remark"
-            type="textarea"
-            :rows="3"
-            placeholder="可选，填写备注信息"
-          />
+          <el-input v-model="formData.remark" type="textarea" :rows="3" placeholder="可选，填写备注信息" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -1321,12 +1198,24 @@ function handleExport(): void {
 }
 
 /* 各身份图标背景色 */
-.icon-total { background: rgba(193, 44, 31, 0.1); }
-.icon-applicant { background: rgba(64, 158, 255, 0.1); }
-.icon-activist { background: rgba(230, 162, 60, 0.1); }
-.icon-development { background: rgba(114, 46, 209, 0.1); }
-.icon-probationary { background: rgba(103, 194, 58, 0.1); }
-.icon-full { background: rgba(193, 44, 31, 0.1); }
+.icon-total {
+  background: rgba(193, 44, 31, 0.1);
+}
+.icon-applicant {
+  background: rgba(64, 158, 255, 0.1);
+}
+.icon-activist {
+  background: rgba(230, 162, 60, 0.1);
+}
+.icon-development {
+  background: rgba(114, 46, 209, 0.1);
+}
+.icon-probationary {
+  background: rgba(103, 194, 58, 0.1);
+}
+.icon-full {
+  background: rgba(193, 44, 31, 0.1);
+}
 
 .stat-body {
   display: flex;
@@ -1342,11 +1231,21 @@ function handleExport(): void {
 }
 
 /* 各身份统计数字颜色 */
-.num-applicant { color: #409EFF; }
-.num-activist { color: #E6A23C; }
-.num-development { color: #722ED1; }
-.num-probationary { color: #67C23A; }
-.num-full { color: var(--party-red, #c12c1f); }
+.num-applicant {
+  color: #409eff;
+}
+.num-activist {
+  color: #e6a23c;
+}
+.num-development {
+  color: #722ed1;
+}
+.num-probationary {
+  color: #67c23a;
+}
+.num-full {
+  color: var(--party-red, #c12c1f);
+}
 
 .stat-label {
   font-size: 13px;

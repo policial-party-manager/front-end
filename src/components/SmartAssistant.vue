@@ -9,7 +9,7 @@
 
 function handleClick(): void {
   // 功能预留，后续可接入AI对话能力
-  console.log('智能助手功能开发中...')
+  console.log("智能助手功能开发中...");
 }
 </script>
 
@@ -41,7 +41,7 @@ function handleClick(): void {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #C12C1F, #E84646);
+  background: linear-gradient(135deg, #c12c1f, #e84646);
   box-shadow: 0 4px 16px rgba(193, 44, 31, 0.4);
   display: flex;
   align-items: center;

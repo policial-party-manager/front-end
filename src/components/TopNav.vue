@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAppStore } from '@/stores/app'
+import { computed } from "vue";
+import { useRouter } from "vue-router";
+import { useAppStore } from "@/stores/app";
 
 /**
  * TopNav - 顶部导航栏组件
@@ -11,26 +11,26 @@ import { useAppStore } from '@/stores/app'
  * 用户下拉菜单中预留角色切换入口（仅UI，功能待实现）
  */
 
-const store = useAppStore()
-const router = useRouter()
+const store = useAppStore();
+const router = useRouter();
 
 // 党徽图标路径
 // 用途：顶部导航栏左侧品牌标识
 // 使用项目中已有的黄色党徽图片
 const emblemUrl = computed(() => {
-  return new URL('@/assets/images/Party/党徽黄色1024X1024.png', import.meta.url).href
-})
+  return new URL("@/assets/images/Party/党徽黄色1024X1024.png", import.meta.url).href;
+});
 
 function handleNavClick(key: string): void {
-  store.setActiveNav(key)
+  store.setActiveNav(key);
   // 根据导航 key 跳转到对应路由
-  const item = store.navItems.find(n => n.key === key)
-  if (item) router.push(item.path)
+  const item = store.navItems.find((n) => n.key === key);
+  if (item) router.push(item.path);
 }
 
 function handleLogout(): void {
   // 退出登录逻辑（待实现）
-  console.log('退出登录')
+  console.log("退出登录");
 }
 </script>
 
@@ -39,11 +39,7 @@ function handleLogout(): void {
     <div class="nav-inner">
       <!-- 左侧：品牌标识 -->
       <div class="nav-brand">
-        <img
-          :src="emblemUrl"
-          alt="党徽"
-          class="brand-emblem"
-        />
+        <img :src="emblemUrl" alt="党徽" class="brand-emblem" />
         <span class="brand-name">党建云平台</span>
       </div>
 
@@ -117,7 +113,7 @@ function handleLogout(): void {
   /* 红色背景 - 使用纯色，如需背景纹理图可替换为：
      background-image: url('@/assets/images/backgrounds/red-bg-pure.jpg');
      当前使用党建红纯色背景 */
-  background: linear-gradient(135deg, #C12C1F 0%, #D4332A 50%, #C12C1F 100%);
+  background: linear-gradient(135deg, #c12c1f 0%, #d4332a 50%, #c12c1f 100%);
   box-shadow: var(--shadow-nav);
 }
 
