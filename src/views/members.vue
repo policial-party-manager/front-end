@@ -859,64 +859,64 @@ function handleExport(): void {
       <!-- 统计概览 -->
       <div class="stats-grid">
         <div class="stat-card stat-total">
-          <div class="stat-icon bg-red-50">
+          <div class="stat-icon icon-total">
             <el-icon :size="24"><UserFilled /></el-icon>
           </div>
           <div class="stat-body">
-            <span class="stat-num">{{ statsData.total }}</span>
+            <span class="stat-num num-total">{{ statsData.total }}</span>
             <span class="stat-label">成员总数</span>
           </div>
         </div>
         <div class="stat-card stat-applicant">
-          <div class="stat-icon bg-blue-50">
+          <div class="stat-icon icon-applicant">
             <el-icon :size="24"><EditPen /></el-icon>
           </div>
           <div class="stat-body">
-            <span class="stat-num text-blue-600">{{
+            <span class="stat-num num-applicant">{{
               statsData.applicants
             }}</span>
             <span class="stat-label">入党申请人</span>
           </div>
         </div>
         <div class="stat-card stat-activist">
-          <div class="stat-icon bg-orange-50">
+          <div class="stat-icon icon-activist">
             <el-icon :size="24"><StarFilled /></el-icon>
           </div>
           <div class="stat-body">
-            <span class="stat-num text-orange-600">{{
+            <span class="stat-num num-activist">{{
               statsData.activists
             }}</span>
             <span class="stat-label">积极分子</span>
           </div>
         </div>
         <div class="stat-card stat-development">
-          <div class="stat-icon bg-purple-50">
+          <div class="stat-icon icon-development">
             <el-icon :size="24"><TrendCharts /></el-icon>
           </div>
           <div class="stat-body">
-            <span class="stat-num text-purple-600">{{
+            <span class="stat-num num-development">{{
               statsData.developmentTargets
             }}</span>
             <span class="stat-label">发展对象</span>
           </div>
         </div>
         <div class="stat-card stat-probationary">
-          <div class="stat-icon bg-green-50">
+          <div class="stat-icon icon-probationary">
             <el-icon :size="24"><CircleCheckFilled /></el-icon>
           </div>
           <div class="stat-body">
-            <span class="stat-num text-green-600">{{
+            <span class="stat-num num-probationary">{{
               statsData.probationary
             }}</span>
             <span class="stat-label">预备党员</span>
           </div>
         </div>
         <div class="stat-card stat-full">
-          <div class="stat-icon bg-red-50">
+          <div class="stat-icon icon-full">
             <el-icon :size="24"><Medal /></el-icon>
           </div>
           <div class="stat-body">
-            <span class="stat-num text-red-600">{{
+            <span class="stat-num num-full">{{
               statsData.fullMembers
             }}</span>
             <span class="stat-label">正式党员</span>
@@ -1267,7 +1267,7 @@ function handleExport(): void {
 <style lang="scss" scoped>
 /* ============================================================
  * members.vue 样式
- * 使用 Tailwind CSS + SCSS，遵循项目设计规范
+ * 遵循项目设计规范，使用 SCSS + CSS 自定义属性
  * ============================================================ */
 
 .members-page {
@@ -1320,6 +1320,14 @@ function handleExport(): void {
   color: var(--party-red, #c12c1f);
 }
 
+/* 各身份图标背景色 */
+.icon-total { background: rgba(193, 44, 31, 0.1); }
+.icon-applicant { background: rgba(64, 158, 255, 0.1); }
+.icon-activist { background: rgba(230, 162, 60, 0.1); }
+.icon-development { background: rgba(114, 46, 209, 0.1); }
+.icon-probationary { background: rgba(103, 194, 58, 0.1); }
+.icon-full { background: rgba(193, 44, 31, 0.1); }
+
 .stat-body {
   display: flex;
   flex-direction: column;
@@ -1332,6 +1340,13 @@ function handleExport(): void {
   color: var(--party-red, #c12c1f);
   line-height: 1.2;
 }
+
+/* 各身份统计数字颜色 */
+.num-applicant { color: #409EFF; }
+.num-activist { color: #E6A23C; }
+.num-development { color: #722ED1; }
+.num-probationary { color: #67C23A; }
+.num-full { color: var(--party-red, #c12c1f); }
 
 .stat-label {
   font-size: 13px;
