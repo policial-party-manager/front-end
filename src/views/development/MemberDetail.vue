@@ -301,7 +301,7 @@ onMounted(() => {
 
 <template>
   <div class="member-detail-page">
-    <div class="detail-layout" v-loading="loading">
+    <div v-loading="loading" class="detail-layout">
       <!-- ==================== 左侧：成员基本信息卡片 ==================== -->
       <aside class="left-panel">
         <el-card class="member-card" shadow="hover">

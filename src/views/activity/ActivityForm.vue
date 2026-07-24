@@ -495,12 +495,12 @@ function goBack(): void {
 </script>
 
 <template>
-  <div class="activity-form-page" v-loading="editLoading" element-loading-text="正在加载活动数据...">
+  <div v-loading="editLoading" class="activity-form-page" element-loading-text="正在加载活动数据...">
     <div class="page-container">
       <!-- ==================== 页面头部 ==================== -->
       <div class="page-header">
         <div class="header-left">
-          <el-button text @click="goBack" class="back-btn">
+          <el-button text class="back-btn" @click="goBack">
             <el-icon><ArrowLeft /></el-icon>
             返回列表
           </el-button>
@@ -730,10 +730,10 @@ function goBack(): void {
       <!-- ==================== 底部操作栏 ==================== -->
       <div class="form-footer">
         <div class="footer-inner">
-          <el-button size="large" @click="handleCancel" :disabled="submitting"> 取消 </el-button>
+          <el-button size="large" :disabled="submitting" @click="handleCancel"> 取消 </el-button>
           <div class="footer-right">
-            <el-button size="large" @click="handleSaveDraft" :loading="submitting"> 保存草稿 </el-button>
-            <el-button type="primary" size="large" @click="handlePublish" :loading="submitting">
+            <el-button size="large" :loading="submitting" @click="handleSaveDraft"> 保存草稿 </el-button>
+            <el-button type="primary" size="large" :loading="submitting" @click="handlePublish">
               {{ isEditMode ? "保存并查看" : "发布活动" }}
             </el-button>
           </div>

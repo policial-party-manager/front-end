@@ -541,7 +541,7 @@ onMounted(() => {
             <span class="selected-count">
               已选 <strong>{{ selectedIds.length }}</strong> 人
             </span>
-            <span class="selected-hint" v-if="selectedIds.length > 0">
+            <span v-if="selectedIds.length > 0" class="selected-hint">
               （{{ selectedMembers.map((m) => m.name).join("、") }}）
             </span>
           </div>
@@ -610,10 +610,10 @@ onMounted(() => {
         <el-button type="danger" :loading="submitting" :disabled="!canConfirm" @click="handleConfirm">
           确认调整
         </el-button>
-        <span class="action-hint" v-if="!canConfirm && selectedIds.length > 0">
+        <span v-if="!canConfirm && selectedIds.length > 0" class="action-hint">
           {{ !targetIdentity ? "请选择目标身份" : "请填写调整原因（至少 10 个字）" }}
         </span>
-        <span class="action-hint" v-else-if="selectedIds.length === 0"> 请先勾选需要调整身份的成员 </span>
+        <span v-else-if="selectedIds.length === 0" class="action-hint"> 请先勾选需要调整身份的成员 </span>
       </div>
     </div>
   </div>

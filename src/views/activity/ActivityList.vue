@@ -536,7 +536,7 @@ function formatDateTime(dateStr: string): string {
       </div>
 
       <!-- ==================== 搜索筛选栏 ==================== -->
-      <div class="content-card" v-loading="loading">
+      <div v-loading="loading" class="content-card">
         <div class="filter-bar">
           <el-row :gutter="16" class="filter-row">
             <!-- 活动类型 -->
@@ -704,7 +704,7 @@ function formatDateTime(dateStr: string): string {
         <el-empty v-else description="暂无匹配的活动" :image-size="100" />
 
         <!-- 分页 -->
-        <div class="table-footer" v-if="totalFiltered > 0">
+        <div v-if="totalFiltered > 0" class="table-footer">
           <span class="total-info">共 {{ totalFiltered }} 条记录</span>
           <el-pagination
             v-model:current-page="currentPage"

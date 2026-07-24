@@ -158,7 +158,7 @@ function toggleExpand(id: number): void {
                   <span class="detail-label">操作人</span>
                   <span class="detail-value">{{ item.operator }}</span>
                 </div>
-                <div class="detail-item" v-if="item.previousIdentity">
+                <div v-if="item.previousIdentity" class="detail-item">
                   <span class="detail-label">调整前身份</span>
                   <span class="detail-value">{{ item.previousIdentity }}</span>
                 </div>
@@ -170,11 +170,11 @@ function toggleExpand(id: number): void {
                   <span class="detail-label">调整原因</span>
                   <span class="detail-value">{{ item.reason }}</span>
                 </div>
-                <div class="detail-item" v-if="item.approver">
+                <div v-if="item.approver" class="detail-item">
                   <span class="detail-label">审批人</span>
                   <span class="detail-value">{{ item.approver }}</span>
                 </div>
-                <div class="detail-item detail-full" v-if="item.notes">
+                <div v-if="item.notes" class="detail-item detail-full">
                   <span class="detail-label">备注</span>
                   <span class="detail-value">{{ item.notes }}</span>
                 </div>

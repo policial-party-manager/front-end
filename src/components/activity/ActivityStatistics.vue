@@ -245,7 +245,7 @@ const signInRateFormatted = computed(() => {
 </script>
 
 <template>
-  <div class="activity-statistics" v-loading="loading" element-loading-text="加载统计数据...">
+  <div v-loading="loading" class="activity-statistics" element-loading-text="加载统计数据...">
     <!-- ==================== 统计卡片 ==================== -->
     <el-row :gutter="16" class="stats-row">
       <el-col :xs="12" :sm="6" :span="6">

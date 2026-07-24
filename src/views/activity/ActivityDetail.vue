@@ -594,12 +594,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="activity-detail-page" v-loading="loading" element-loading-text="正在加载活动详情...">
+  <div v-loading="loading" class="activity-detail-page" element-loading-text="正在加载活动详情...">
     <div class="page-container">
       <!-- ==================== 页面头部 ==================== -->
-      <div class="detail-header" v-if="activity">
+      <div v-if="activity" class="detail-header">
         <div class="header-top">
-          <el-button text @click="goBack" class="back-btn">
+          <el-button text class="back-btn" @click="goBack">
             <el-icon><ArrowLeft /></el-icon>
             返回列表
           </el-button>
@@ -616,7 +616,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="header-actions" v-if="headerActions.length > 0">
+          <div v-if="headerActions.length > 0" class="header-actions">
             <el-button
               v-for="action in headerActions"
               :key="action.key"
@@ -631,7 +631,7 @@ onUnmounted(() => {
       </div>
 
       <!-- ==================== 基本信息卡片 ==================== -->
-      <div class="content-card info-card" v-if="activity">
+      <div v-if="activity" class="content-card info-card">
         <h3 class="section-subtitle">基本信息</h3>
         <el-descriptions :column="2" border size="large">
           <el-descriptions-item label="活动类型" :span="1">
@@ -662,14 +662,14 @@ onUnmounted(() => {
             <span class="time-separator"> ~ </span>
             {{ formatDateTime(activity.signInEndTime) }}
           </el-descriptions-item>
-          <el-descriptions-item label="活动简介" :span="2" v-if="activity.description">
+          <el-descriptions-item v-if="activity.description" label="活动简介" :span="2">
             <span class="description-text">{{ activity.description }}</span>
           </el-descriptions-item>
         </el-descriptions>
       </div>
 
       <!-- ==================== 标签页 ==================== -->
-      <div class="content-card tabs-card" v-if="activity">
+      <div v-if="activity" class="content-card tabs-card">
         <el-tabs v-model="activeTab" @tab-change="handleTabChange">
           <el-tab-pane v-for="tab in visibleTabs" :key="tab.name" :label="tab.label" :name="tab.name">
             <!-- ========== 标签页 1：签到管理 ========== -->
@@ -677,7 +677,7 @@ onUnmounted(() => {
               <div class="signin-layout">
                 <!-- 左侧：二维码区 -->
                 <div class="signin-qrcode">
-                  <div class="qr-card" v-loading="qrLoading">
+                  <div v-loading="qrLoading" class="qr-card">
                     <img v-if="qrDataUrl" :src="qrDataUrl" alt="签到二维码" class="qr-image" />
                     <div v-else class="qr-placeholder">
                       <el-icon :size="48" class="qr-placeholder-icon"><PictureFilled /></el-icon>
@@ -702,9 +702,9 @@ onUnmounted(() => {
                   <el-button
                     v-if="!qrDataUrl"
                     type="primary"
-                    @click="handleRefreshQR"
                     :loading="qrLoading"
                     class="qr-refresh-btn"
+                    @click="handleRefreshQR"
                   >
                     <el-icon><PictureFilled /></el-icon>
                     生成二维码
@@ -718,7 +718,7 @@ onUnmounted(() => {
                     </div>
 
                     <div class="qr-actions">
-                      <el-button class="qr-action-btn" plain @click="handleRefreshQR" :loading="qrLoading">
+                      <el-button class="qr-action-btn" plain :loading="qrLoading" @click="handleRefreshQR">
                         <el-icon><RefreshRight /></el-icon>
                         刷新二维码
                       </el-button>
@@ -777,7 +777,7 @@ onUnmounted(() => {
                     </el-table-column>
                   </el-table>
 
-                  <div class="records-footer" v-if="signTotalFiltered > 0">
+                  <div v-if="signTotalFiltered > 0" class="records-footer">
                     <span class="total-info">共 {{ signTotalFiltered }} 条</span>
                     <el-pagination
                       v-model:current-page="signCurrentPage"

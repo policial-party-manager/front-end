@@ -486,7 +486,7 @@ function goDetail(id: number): void {
       </div>
 
       <!-- 成员列表 -->
-      <div class="content-card" v-loading="loading">
+      <div v-loading="loading" class="content-card">
         <!-- 卡片标题 -->
         <div class="card-header">
           <span class="card-title">培养成员列表</span>
@@ -504,7 +504,7 @@ function goDetail(id: number): void {
         <div class="filter-bar">
           <el-row :gutter="16" class="filter-row">
             <!-- 所属党支部：仅超级管理员可见 -->
-            <el-col :xs="24" :sm="12" :md="8" :lg="6" v-if="isSuperAdmin">
+            <el-col v-if="isSuperAdmin" :xs="24" :sm="12" :md="8" :lg="6">
               <div class="filter-item">
                 <label class="filter-label">所属党支部</label>
                 <el-select v-model="filterBranch" placeholder="全部" clearable style="width: 100%">
@@ -549,7 +549,7 @@ function goDetail(id: number): void {
                     <el-icon><Search /></el-icon> 搜索
                   </el-button>
                   <el-button @click="handleReset">重置</el-button>
-                  <span class="result-count" v-if="appliedBranch || appliedIdentity || appliedKeyword">
+                  <span v-if="appliedBranch || appliedIdentity || appliedKeyword" class="result-count">
                     {{ totalFiltered }} 条结果
                   </span>
                 </div>
@@ -584,7 +584,7 @@ function goDetail(id: number): void {
         <el-empty v-else description="暂无匹配的成员" :image-size="100" />
 
         <!-- 分页 -->
-        <div class="table-footer" v-if="totalFiltered > 0">
+        <div v-if="totalFiltered > 0" class="table-footer">
           <span class="total-info">共 {{ totalFiltered }} 条记录</span>
           <el-pagination
             v-model:current-page="currentPage"
