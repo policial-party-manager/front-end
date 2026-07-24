@@ -113,7 +113,7 @@ export const useAppStore = defineStore('app', () => {
     { key: 'home', label: '首页', path: '/' },
     { key: 'members', label: '成员管理', path: '/members' },
     { key: 'development', label: '党员发展', path: '/development' },
-    { key: 'activities', label: '活动中心', path: '/activities' },
+    { key: 'activities', label: '活动中心', path: '/activity' },
     { key: 'statistics', label: '数据统计', path: '/statistics' },
     { key: 'downloads', label: '下载专区', path: '/downloads' },
   ]
