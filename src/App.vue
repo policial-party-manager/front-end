@@ -5,9 +5,9 @@
  * 全局布局：顶部导航栏 + 页面主体 + 底部版权 + 智能助手悬浮按钮
  * 导航栏和底部栏在所有页面中保持一致，方便用户随时切换模块
  */
-import TopNav from '@/components/TopNav.vue'
-import FooterBar from '@/components/FooterBar.vue'
-import SmartAssistant from '@/components/SmartAssistant.vue'
+import TopNav from "@/components/TopNav.vue";
+import FooterBar from "@/components/FooterBar.vue";
+import SmartAssistant from "@/components/SmartAssistant.vue";
 </script>
 
 <template>

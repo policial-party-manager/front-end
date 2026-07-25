@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useAppStore } from '@/stores/app'
+import { computed } from "vue";
+import { useAppStore } from "@/stores/app";
 
 /**
  * StatCards - 统计卡片行组件
@@ -10,46 +10,46 @@ import { useAppStore } from '@/stores/app'
  * 数据来源于 Pinia store，根据角色展示不同数据
  */
 
-const store = useAppStore()
+const store = useAppStore();
 
 const cards = computed(() => [
   {
-    key: 'totalMembers',
-    label: '总成员数',
+    key: "totalMembers",
+    label: "总成员数",
     value: store.statData.totalMembers,
-    unit: '人',
-    icon: 'User',
-    color: '#C12C1F',
-    bgColor: 'rgba(193, 44, 31, 0.1)',
+    unit: "人",
+    icon: "User",
+    color: "#C12C1F",
+    bgColor: "rgba(193, 44, 31, 0.1)",
   },
   {
-    key: 'activists',
-    label: '积极分子',
+    key: "activists",
+    label: "积极分子",
     value: store.statData.activists,
-    unit: '人',
-    icon: 'Star',
-    color: '#E84646',
-    bgColor: 'rgba(232, 70, 70, 0.1)',
+    unit: "人",
+    icon: "Star",
+    color: "#E84646",
+    bgColor: "rgba(232, 70, 70, 0.1)",
   },
   {
-    key: 'developmentCandidates',
-    label: '发展对象',
+    key: "developmentCandidates",
+    label: "发展对象",
     value: store.statData.developmentCandidates,
-    unit: '人',
-    icon: 'Medal',
-    color: '#D4513A',
-    bgColor: 'rgba(212, 81, 58, 0.1)',
+    unit: "人",
+    icon: "Medal",
+    color: "#D4513A",
+    bgColor: "rgba(212, 81, 58, 0.1)",
   },
   {
-    key: 'weeklyActivities',
-    label: '本周活动',
+    key: "weeklyActivities",
+    label: "本周活动",
     value: store.statData.weeklyActivities,
-    unit: '场',
-    icon: 'Calendar',
-    color: '#B8302A',
-    bgColor: 'rgba(184, 48, 42, 0.1)',
+    unit: "场",
+    icon: "Calendar",
+    color: "#B8302A",
+    bgColor: "rgba(184, 48, 42, 0.1)",
   },
-])
+]);
 </script>
 
 <template>
@@ -60,11 +60,7 @@ const cards = computed(() => [
     数据逻辑见 stores/app.js 中的 statData
   -->
   <div class="stat-cards">
-    <div
-      v-for="card in cards"
-      :key="card.key"
-      class="stat-card"
-    >
+    <div v-for="card in cards" :key="card.key" class="stat-card">
       <div class="card-icon" :style="{ background: card.bgColor, color: card.color }">
         <el-icon :size="28">
           <component :is="card.icon" />

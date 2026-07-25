@@ -14,22 +14,22 @@
  *   第二步：设置目标身份 + 调整原因 + 培养联系人
  *   第三步：确认执行 → 二次确认 → 跳转回列表
  */
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAppStore } from '@/stores/app'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useAppStore } from "@/stores/app";
+import { ElMessage, ElMessageBox } from "element-plus";
 
-const router = useRouter()
-const store = useAppStore()
+const router = useRouter();
+const store = useAppStore();
 
 // ============================================================
 // 权限：超级管理员看全部，支委仅看本支部
 // 当前使用 Mock 模拟，通过过滤模拟数据实现
 // TODO: 接入真实接口后，由后端根据角色返回不同数据范围
 // ============================================================
-const isSuperAdmin = computed(() => store.currentRole === 'super_admin')
+const isSuperAdmin = computed(() => store.currentRole === "super_admin");
 // 支委所属支部（Mock：假设当前支委属于"计算机学院学生第一党支部"）
-const branchOfSecretary = '计算机学院学生第一党支部'
+const branchOfSecretary = "计算机学院学生第一党支部";
 
 // ============================================================
 // Mock 数据：成员列表（20+ 条，覆盖 4 个支部、5 种身份）
@@ -42,29 +42,183 @@ const branchOfSecretary = '计算机学院学生第一党支部'
 //   currentIdentity - 当前党员身份
 // ============================================================
 const allMembers = ref([
-  { id: 1,  studentId: '20230101001', name: '张三', gender: '男', partyBranch: '计算机学院学生第一党支部', currentIdentity: '发展对象' },
-  { id: 2,  studentId: '20230101002', name: '李四', gender: '女', partyBranch: '计算机学院学生第一党支部', currentIdentity: '积极分子' },
-  { id: 3,  studentId: '20230101003', name: '王五', gender: '男', partyBranch: '计算机学院学生第一党支部', currentIdentity: '入党申请人' },
-  { id: 4,  studentId: '20230101004', name: '赵六', gender: '女', partyBranch: '计算机学院学生第一党支部', currentIdentity: '积极分子' },
-  { id: 5,  studentId: '20230101005', name: '孙七', gender: '男', partyBranch: '计算机学院学生第一党支部', currentIdentity: '入党申请人' },
-  { id: 6,  studentId: '20220201001', name: '周八', gender: '女', partyBranch: '计算机学院学生第一党支部', currentIdentity: '预备党员' },
-  { id: 7,  studentId: '20220201002', name: '吴九', gender: '男', partyBranch: '计算机学院学生第二党支部', currentIdentity: '发展对象' },
-  { id: 8,  studentId: '20220201003', name: '郑十', gender: '女', partyBranch: '计算机学院学生第二党支部', currentIdentity: '积极分子' },
-  { id: 9,  studentId: '20220201004', name: '陈一', gender: '男', partyBranch: '计算机学院学生第二党支部', currentIdentity: '入党申请人' },
-  { id: 10, studentId: '20220201005', name: '刘二', gender: '女', partyBranch: '计算机学院学生第二党支部', currentIdentity: '正式党员' },
-  { id: 11, studentId: '20220201006', name: '黄三', gender: '男', partyBranch: '计算机学院学生第二党支部', currentIdentity: '积极分子' },
-  { id: 12, studentId: '20210101001', name: '杨四', gender: '女', partyBranch: '软件学院学生党支部',     currentIdentity: '发展对象' },
-  { id: 13, studentId: '20210101002', name: '朱五', gender: '男', partyBranch: '软件学院学生党支部',     currentIdentity: '入党申请人' },
-  { id: 14, studentId: '20210101003', name: '马六', gender: '女', partyBranch: '软件学院学生党支部',     currentIdentity: '积极分子' },
-  { id: 15, studentId: '20210101004', name: '胡七', gender: '男', partyBranch: '软件学院学生党支部',     currentIdentity: '预备党员' },
-  { id: 16, studentId: '20210101005', name: '林八', gender: '女', partyBranch: '软件学院学生党支部',     currentIdentity: '正式党员' },
-  { id: 17, studentId: '20200101001', name: '何九', gender: '男', partyBranch: '网络空间安全学院学生党支部', currentIdentity: '积极分子' },
-  { id: 18, studentId: '20200101002', name: '罗十', gender: '女', partyBranch: '网络空间安全学院学生党支部', currentIdentity: '发展对象' },
-  { id: 19, studentId: '20200101003', name: '梁一', gender: '男', partyBranch: '网络空间安全学院学生党支部', currentIdentity: '入党申请人' },
-  { id: 20, studentId: '20200101004', name: '宋二', gender: '女', partyBranch: '网络空间安全学院学生党支部', currentIdentity: '正式党员' },
-  { id: 21, studentId: '20200101005', name: '唐三', gender: '男', partyBranch: '网络空间安全学院学生党支部', currentIdentity: '积极分子' },
-  { id: 22, studentId: '20230101006', name: '许四', gender: '女', partyBranch: '计算机学院学生第一党支部', currentIdentity: '入党申请人' },
-])
+  {
+    id: 1,
+    studentId: "20230101001",
+    name: "张三",
+    gender: "男",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "发展对象",
+  },
+  {
+    id: 2,
+    studentId: "20230101002",
+    name: "李四",
+    gender: "女",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "积极分子",
+  },
+  {
+    id: 3,
+    studentId: "20230101003",
+    name: "王五",
+    gender: "男",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "入党申请人",
+  },
+  {
+    id: 4,
+    studentId: "20230101004",
+    name: "赵六",
+    gender: "女",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "积极分子",
+  },
+  {
+    id: 5,
+    studentId: "20230101005",
+    name: "孙七",
+    gender: "男",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "入党申请人",
+  },
+  {
+    id: 6,
+    studentId: "20220201001",
+    name: "周八",
+    gender: "女",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "预备党员",
+  },
+  {
+    id: 7,
+    studentId: "20220201002",
+    name: "吴九",
+    gender: "男",
+    partyBranch: "计算机学院学生第二党支部",
+    currentIdentity: "发展对象",
+  },
+  {
+    id: 8,
+    studentId: "20220201003",
+    name: "郑十",
+    gender: "女",
+    partyBranch: "计算机学院学生第二党支部",
+    currentIdentity: "积极分子",
+  },
+  {
+    id: 9,
+    studentId: "20220201004",
+    name: "陈一",
+    gender: "男",
+    partyBranch: "计算机学院学生第二党支部",
+    currentIdentity: "入党申请人",
+  },
+  {
+    id: 10,
+    studentId: "20220201005",
+    name: "刘二",
+    gender: "女",
+    partyBranch: "计算机学院学生第二党支部",
+    currentIdentity: "正式党员",
+  },
+  {
+    id: 11,
+    studentId: "20220201006",
+    name: "黄三",
+    gender: "男",
+    partyBranch: "计算机学院学生第二党支部",
+    currentIdentity: "积极分子",
+  },
+  {
+    id: 12,
+    studentId: "20210101001",
+    name: "杨四",
+    gender: "女",
+    partyBranch: "软件学院学生党支部",
+    currentIdentity: "发展对象",
+  },
+  {
+    id: 13,
+    studentId: "20210101002",
+    name: "朱五",
+    gender: "男",
+    partyBranch: "软件学院学生党支部",
+    currentIdentity: "入党申请人",
+  },
+  {
+    id: 14,
+    studentId: "20210101003",
+    name: "马六",
+    gender: "女",
+    partyBranch: "软件学院学生党支部",
+    currentIdentity: "积极分子",
+  },
+  {
+    id: 15,
+    studentId: "20210101004",
+    name: "胡七",
+    gender: "男",
+    partyBranch: "软件学院学生党支部",
+    currentIdentity: "预备党员",
+  },
+  {
+    id: 16,
+    studentId: "20210101005",
+    name: "林八",
+    gender: "女",
+    partyBranch: "软件学院学生党支部",
+    currentIdentity: "正式党员",
+  },
+  {
+    id: 17,
+    studentId: "20200101001",
+    name: "何九",
+    gender: "男",
+    partyBranch: "网络空间安全学院学生党支部",
+    currentIdentity: "积极分子",
+  },
+  {
+    id: 18,
+    studentId: "20200101002",
+    name: "罗十",
+    gender: "女",
+    partyBranch: "网络空间安全学院学生党支部",
+    currentIdentity: "发展对象",
+  },
+  {
+    id: 19,
+    studentId: "20200101003",
+    name: "梁一",
+    gender: "男",
+    partyBranch: "网络空间安全学院学生党支部",
+    currentIdentity: "入党申请人",
+  },
+  {
+    id: 20,
+    studentId: "20200101004",
+    name: "宋二",
+    gender: "女",
+    partyBranch: "网络空间安全学院学生党支部",
+    currentIdentity: "正式党员",
+  },
+  {
+    id: 21,
+    studentId: "20200101005",
+    name: "唐三",
+    gender: "男",
+    partyBranch: "网络空间安全学院学生党支部",
+    currentIdentity: "积极分子",
+  },
+  {
+    id: 22,
+    studentId: "20230101006",
+    name: "许四",
+    gender: "女",
+    partyBranch: "计算机学院学生第一党支部",
+    currentIdentity: "入党申请人",
+  },
+]);
 
 // ============================================================
 // 权限过滤：支委仅看本支部成员
@@ -73,155 +227,152 @@ const filteredByRole = computed(() => {
   // TODO: 接入真实接口后，后端根据角色返回数据
   // 当前使用 Mock 数据模拟权限过滤
   if (isSuperAdmin.value) {
-    return allMembers.value
+    return allMembers.value;
   }
   // 支委仅查看本支部
-  return allMembers.value.filter(m => m.partyBranch === branchOfSecretary)
-})
+  return allMembers.value.filter((m) => m.partyBranch === branchOfSecretary);
+});
 
 // ============================================================
 // 筛选条件
 // ============================================================
-const filterBranch = ref('')        // 支部筛选
-const filterIdentity = ref('')      // 身份筛选
-const filterKeyword = ref('')       // 关键词搜索（姓名/学号）
+const filterBranch = ref(""); // 支部筛选
+const filterIdentity = ref(""); // 身份筛选
+const filterKeyword = ref(""); // 关键词搜索（姓名/学号）
 
 // ============================================================
 // 筛选后的数据（权限过滤 + 用户筛选）
 // ============================================================
 const filteredMembers = computed(() => {
-  let list = filteredByRole.value
+  let list = filteredByRole.value;
 
   // 支部筛选
   if (filterBranch.value) {
-    list = list.filter(m => m.partyBranch === filterBranch.value)
+    list = list.filter((m) => m.partyBranch === filterBranch.value);
   }
   // 身份筛选
   if (filterIdentity.value) {
-    list = list.filter(m => m.currentIdentity === filterIdentity.value)
+    list = list.filter((m) => m.currentIdentity === filterIdentity.value);
   }
   // 关键词搜索
   if (filterKeyword.value.trim()) {
-    const kw = filterKeyword.value.trim().toLowerCase()
-    list = list.filter(m =>
-      m.name.toLowerCase().includes(kw) ||
-      m.studentId.toLowerCase().includes(kw)
-    )
+    const kw = filterKeyword.value.trim().toLowerCase();
+    list = list.filter((m) => m.name.toLowerCase().includes(kw) || m.studentId.toLowerCase().includes(kw));
   }
-  return list
-})
+  return list;
+});
 
 // ============================================================
 // 支部列表（从 Mock 数据中提取）
 // ============================================================
 const branchOptions = computed(() => {
-  const branches = [...new Set(allMembers.value.map(m => m.partyBranch))]
-  return branches.map(b => ({ value: b, label: b }))
-})
+  const branches = [...new Set(allMembers.value.map((m) => m.partyBranch))];
+  return branches.map((b) => ({ value: b, label: b }));
+});
 
 // ============================================================
 // 身份列表
 // ============================================================
 const identityOptions = [
-  { value: '入党申请人', label: '入党申请人' },
-  { value: '积极分子',   label: '积极分子' },
-  { value: '发展对象',   label: '发展对象' },
-  { value: '预备党员',   label: '预备党员' },
-  { value: '正式党员',   label: '正式党员' },
-]
+  { value: "入党申请人", label: "入党申请人" },
+  { value: "积极分子", label: "积极分子" },
+  { value: "发展对象", label: "发展对象" },
+  { value: "预备党员", label: "预备党员" },
+  { value: "正式党员", label: "正式党员" },
+];
 
 // 身份标签颜色
 const identityTagMap: Record<string, string> = {
-  '入党申请人': 'info',
-  '积极分子':   'warning',
-  '发展对象':   'primary',
-  '预备党员':   'success',
-  '正式党员':   'danger',
-}
+  入党申请人: "info",
+  积极分子: "warning",
+  发展对象: "primary",
+  预备党员: "success",
+  正式党员: "danger",
+};
 
 // ============================================================
 // Mock 数据：培养联系人候选（同 AdjustIdentityDialog）
 // TODO: 替换为接口获取
 // ============================================================
 const teacherList = ref([
-  { id: 1, name: '李老师', title: '党支部书记' },
-  { id: 2, name: '赵老师', title: '组织委员' },
-  { id: 3, name: '陈老师', title: '宣传委员' },
-  { id: 4, name: '周老师', title: '辅导员' },
-  { id: 5, name: '王书记', title: '党委副书记' },
-  { id: 6, name: '刘老师', title: '支部委员' },
-])
+  { id: 1, name: "李老师", title: "党支部书记" },
+  { id: 2, name: "赵老师", title: "组织委员" },
+  { id: 3, name: "陈老师", title: "宣传委员" },
+  { id: 4, name: "周老师", title: "辅导员" },
+  { id: 5, name: "王书记", title: "党委副书记" },
+  { id: 6, name: "刘老师", title: "支部委员" },
+]);
 
 // ============================================================
 // 表格选中相关
 // ============================================================
-const selectedIds = ref<number[]>([])  // 已选成员 ID 列表
+const selectedIds = ref<number[]>([]); // 已选成员 ID 列表
 
 // 已选成员对象列表
 const selectedMembers = computed(() => {
-  return allMembers.value.filter(m => selectedIds.value.includes(m.id))
-})
+  return allMembers.value.filter((m) => selectedIds.value.includes(m.id));
+});
 
 // ============================================================
 // 分页
 // ============================================================
-const currentPage = ref(1)
-const pageSize = ref(10)
+const currentPage = ref(1);
+const pageSize = ref(10);
 
 // 筛选条件变更时回到第一页（通过 watch 实现，此处用 computed 简化）
 
 // ============================================================
 // 第二步：设置目标信息
 // ============================================================
-const targetIdentity = ref('')       // 目标身份
-const adjustReason = ref('')          // 调整原因
-const contactPersonIds = ref<number[]>([])     // 培养联系人 ID 列表
+const targetIdentity = ref(""); // 目标身份
+const adjustReason = ref(""); // 调整原因
+const contactPersonIds = ref<number[]>([]); // 培养联系人 ID 列表
 
-const contactMaxReached = computed(() => contactPersonIds.value.length >= 2)
+const contactMaxReached = computed(() => contactPersonIds.value.length >= 2);
 
 // ============================================================
 // 提交状态
 // ============================================================
-const submitting = ref(false)
+const submitting = ref(false);
 
 // ============================================================
 // 按钮禁用判断
 // ============================================================
 const canConfirm = computed(() => {
-  return selectedIds.value.length > 0 && targetIdentity.value && adjustReason.value.trim().length >= 10
-})
+  return selectedIds.value.length > 0 && targetIdentity.value && adjustReason.value.trim().length >= 10;
+});
 
 // ============================================================
 // 重置筛选
 // ============================================================
 function handleResetFilter(): void {
-  filterBranch.value = ''
-  filterIdentity.value = ''
-  filterKeyword.value = ''
-  currentPage.value = 1
+  filterBranch.value = "";
+  filterIdentity.value = "";
+  filterKeyword.value = "";
+  currentPage.value = 1;
 }
 
 // ============================================================
 // 筛选条件变更时回到第一页
 // ============================================================
 function onFilterChange(): void {
-  currentPage.value = 1
+  currentPage.value = 1;
 }
 
 // ============================================================
 // 确认调整
 // ============================================================
 async function handleConfirm(): Promise<void> {
-  if (!canConfirm.value) return
+  if (!canConfirm.value) return;
 
   // 二次确认
   try {
-    await confirmBatchAdjust()
+    await confirmBatchAdjust();
   } catch {
-    return // 用户取消
+    return; // 用户取消
   }
 
-  submitting.value = true
+  submitting.value = true;
   try {
     // TODO: 替换为真实 API 调用
     // await api.batchAdjustIdentity({
@@ -232,15 +383,15 @@ async function handleConfirm(): Promise<void> {
     // })
 
     // 模拟接口延迟
-    await new Promise(resolve => setTimeout(resolve, 800))
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
-    ElMessage.success(`成功将 ${selectedIds.value.length} 位成员调整为【${targetIdentity.value}】`)
+    ElMessage.success(`成功将 ${selectedIds.value.length} 位成员调整为【${targetIdentity.value}】`);
     // 跳转回党员发展列表页
-    router.push('/development')
+    router.push("/development");
   } catch (error) {
-    ElMessage.error('批量调整失败，请重试')
+    ElMessage.error("批量调整失败，请重试");
   } finally {
-    submitting.value = false
+    submitting.value = false;
   }
 }
 
@@ -248,14 +399,18 @@ async function handleConfirm(): Promise<void> {
 // 二次确认弹窗
 // ============================================================
 async function confirmBatchAdjust(): Promise<void> {
-  const count = selectedIds.value.length
-  const names = selectedMembers.value.map(m => m.name).join('、')
-  const contactNames = contactPersonIds.value.length > 0
-    ? contactPersonIds.value.map(id => {
-        const t = teacherList.value.find(item => item.id === id)
-        return t ? t.name : ''
-      }).filter(Boolean).join('、')
-    : '未指定（沿用现有联系人）'
+  const count = selectedIds.value.length;
+  const names = selectedMembers.value.map((m) => m.name).join("、");
+  const contactNames =
+    contactPersonIds.value.length > 0
+      ? contactPersonIds.value
+          .map((id) => {
+            const t = teacherList.value.find((item) => item.id === id);
+            return t ? t.name : "";
+          })
+          .filter(Boolean)
+          .join("、")
+      : "未指定（沿用现有联系人）";
 
   const message = `
     <div style="line-height: 2.2; font-size: 14px;">
@@ -266,22 +421,22 @@ async function confirmBatchAdjust(): Promise<void> {
       <p><strong>培养联系人：</strong>${contactNames}</p>
       <p style="margin-top: 12px; color: var(--text-secondary);">请仔细核对以上信息，确认后不可撤销。</p>
     </div>
-  `
+  `;
 
-  await ElMessageBox.confirm(message, '确认批量调整身份', {
-    confirmButtonText: '确认调整',
-    cancelButtonText: '取消',
-    type: 'warning',
+  await ElMessageBox.confirm(message, "确认批量调整身份", {
+    confirmButtonText: "确认调整",
+    cancelButtonText: "取消",
+    type: "warning",
     dangerouslyUseHTMLString: true,
-    confirmButtonClass: 'el-button--danger',
-  })
+    confirmButtonClass: "el-button--danger",
+  });
 }
 
 // ============================================================
 // 取消：返回列表
 // ============================================================
 function handleCancel(): void {
-  router.push('/development')
+  router.push("/development");
 }
 
 // ============================================================
@@ -291,8 +446,8 @@ onMounted(() => {
   // TODO: 接入真实接口后，获取成员列表
   // const res = await api.getMemberList({ role: store.currentRole })
   // allMembers.value = res.data
-  console.log(`[Mock] 批量调整页面加载，当前角色：${store.currentRole}，可查看成员数：${filteredByRole.value.length}`)
-})
+  console.log(`[Mock] 批量调整页面加载，当前角色：${store.currentRole}，可查看成员数：${filteredByRole.value.length}`);
+});
 </script>
 
 <template>
@@ -303,9 +458,7 @@ onMounted(() => {
         <h2 class="section-title">批量调整身份</h2>
         <p class="page-desc">
           勾选需要调整的成员，设置目标身份后一键批量调整
-          <span v-if="!isSuperAdmin" class="role-hint">
-            （当前仅显示{{ branchOfSecretary }}成员）
-          </span>
+          <span v-if="!isSuperAdmin" class="role-hint"> （当前仅显示{{ branchOfSecretary }}成员） </span>
         </p>
       </div>
 
@@ -323,12 +476,7 @@ onMounted(() => {
               style="width: 200px"
               @change="onFilterChange"
             >
-              <el-option
-                v-for="item in branchOptions"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
+              <el-option v-for="item in branchOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
             <el-select
               v-model="filterIdentity"
@@ -337,12 +485,7 @@ onMounted(() => {
               style="width: 160px"
               @change="onFilterChange"
             >
-              <el-option
-                v-for="item in identityOptions"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
+              <el-option v-for="item in identityOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
             <el-input
               v-model="filterKeyword"
@@ -369,7 +512,11 @@ onMounted(() => {
           style="width: 100%"
           stripe
           row-key="id"
-          @selection-change="(_rows: any) => { /* 保留手动勾选 */ }"
+          @selection-change="
+            (_rows: any) => {
+              /* 保留手动勾选 */
+            }
+          "
         >
           <el-table-column type="selection" width="50" :reserve-selection="false" />
 
@@ -394,8 +541,8 @@ onMounted(() => {
             <span class="selected-count">
               已选 <strong>{{ selectedIds.length }}</strong> 人
             </span>
-            <span class="selected-hint" v-if="selectedIds.length > 0">
-              （{{ selectedMembers.map(m => m.name).join('、') }}）
+            <span v-if="selectedIds.length > 0" class="selected-hint">
+              （{{ selectedMembers.map((m) => m.name).join("、") }}）
             </span>
           </div>
           <div class="footer-right">
@@ -418,17 +565,8 @@ onMounted(() => {
         <div class="config-form">
           <div class="form-row">
             <label class="form-label required">目标身份</label>
-            <el-select
-              v-model="targetIdentity"
-              placeholder="请选择目标身份"
-              style="width: 280px"
-            >
-              <el-option
-                v-for="item in identityOptions"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
+            <el-select v-model="targetIdentity" placeholder="请选择目标身份" style="width: 280px">
+              <el-option v-for="item in identityOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </div>
 
@@ -469,20 +607,13 @@ onMounted(() => {
       <!-- ==================== 第三步：确认执行 ==================== -->
       <div class="action-bar">
         <el-button @click="handleCancel">取消</el-button>
-        <el-button
-          type="danger"
-          :loading="submitting"
-          :disabled="!canConfirm"
-          @click="handleConfirm"
-        >
+        <el-button type="danger" :loading="submitting" :disabled="!canConfirm" @click="handleConfirm">
           确认调整
         </el-button>
-        <span class="action-hint" v-if="!canConfirm && selectedIds.length > 0">
-          {{ !targetIdentity ? '请选择目标身份' : '请填写调整原因（至少 10 个字）' }}
+        <span v-if="!canConfirm && selectedIds.length > 0" class="action-hint">
+          {{ !targetIdentity ? "请选择目标身份" : "请填写调整原因（至少 10 个字）" }}
         </span>
-        <span class="action-hint" v-else-if="selectedIds.length === 0">
-          请先勾选需要调整身份的成员
-        </span>
+        <span v-else-if="selectedIds.length === 0" class="action-hint"> 请先勾选需要调整身份的成员 </span>
       </div>
     </div>
   </div>
@@ -515,7 +646,7 @@ onMounted(() => {
 }
 
 .role-hint {
-  color: var(--party-red, #C12C1F);
+  color: var(--party-red, #c12c1f);
   font-size: 13px;
 }
 
@@ -527,17 +658,17 @@ onMounted(() => {
 .step-title {
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-primary, #2C3E50);
+  color: var(--text-primary, #2c3e50);
   margin-bottom: 20px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-light, #F2F6FC);
+  border-bottom: 1px solid var(--border-light, #f2f6fc);
 
   &::before {
-    content: '';
+    content: "";
     display: inline-block;
     width: 4px;
     height: 18px;
-    background: var(--party-red, #C12C1F);
+    background: var(--party-red, #c12c1f);
     border-radius: 2px;
     margin-right: 10px;
     vertical-align: middle;
@@ -581,10 +712,10 @@ onMounted(() => {
 
 .selected-count {
   font-size: 14px;
-  color: var(--text-primary, #2C3E50);
+  color: var(--text-primary, #2c3e50);
 
   strong {
-    color: var(--party-red, #C12C1F);
+    color: var(--party-red, #c12c1f);
     font-size: 16px;
   }
 }
@@ -615,19 +746,19 @@ onMounted(() => {
   width: 100px;
   text-align: right;
   font-size: 14px;
-  color: var(--text-primary, #2C3E50);
+  color: var(--text-primary, #2c3e50);
   padding-top: 6px;
   flex-shrink: 0;
 
   &.required::after {
-    content: ' *';
-    color: var(--party-red, #C12C1F);
+    content: " *";
+    color: var(--party-red, #c12c1f);
   }
 }
 
 .form-hint {
   font-size: 12px;
-  color: var(--text-placeholder, #C0C4CC);
+  color: var(--text-placeholder, #c0c4cc);
   align-self: center;
   margin-left: 4px;
 }
@@ -658,7 +789,8 @@ onMounted(() => {
     flex-direction: column;
     width: 100%;
 
-    .el-select, .el-input {
+    .el-select,
+    .el-input {
       width: 100% !important;
     }
   }

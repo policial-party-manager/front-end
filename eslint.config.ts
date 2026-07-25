@@ -1,21 +1,14 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import pluginVue from "eslint-plugin-vue";
+import vueParser from "vue-eslint-parser";
 import globals from "globals";
 import eslintConfigPrettier from "eslint-config-prettier";
 
 export default tseslint.config(
   // 全局忽略文件，替代 .eslintignore
   {
-    ignores: [
-      "node_modules/**",
-      "dist/**",
-      "build/**",
-      "public/**",
-      "*.d.ts",
-      "vite.config.*",
-      "src/assets/**",
-    ],
+    ignores: ["node_modules/**", "dist/**", "build/**", "public/**", "*.d.ts", "vite.config.*", "src/assets/**"],
   },
 
   // JS 官方基础推荐规则
@@ -33,14 +26,16 @@ export default tseslint.config(
   // 解析器、全局环境配置
   {
     languageOptions: {
+      parser: vueParser,
+      parserOptions: {
+        parser: tseslint.parser,
+        ecmaVersion: "latest",
+        sourceType: "module",
+      },
       // 全局变量：浏览器 + node
       globals: {
         ...globals.browser,
         ...globals.node,
-      },
-      parserOptions: {
-        ecmaVersion: "latest",
-        sourceType: "module",
       },
     },
   },
@@ -50,12 +45,10 @@ export default tseslint.config(
     rules: {
       // TS 规则
       "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
-      ],
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       "@typescript-eslint/ban-ts-comment": "off",
       "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/no-empty-object-type": "warn",
 
       // Vue 规则
       "vue/multi-word-component-names": "off",

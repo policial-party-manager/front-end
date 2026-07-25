@@ -31,7 +31,7 @@
 <style lang="scss" scoped>
 .footer-bar {
   width: 100%;
-  background: linear-gradient(135deg, #C12C1F 0%, #A01E1A 100%);
+  background: linear-gradient(135deg, #c12c1f 0%, #a01e1a 100%);
   color: rgba(255, 255, 255, 0.85);
 }
 

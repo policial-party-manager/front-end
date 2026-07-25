@@ -11,23 +11,23 @@
 // Types
 // ============================================================
 export interface HistoryItem {
-  id: number
-  date: string            // 时间（如 "2025-09-01"）
-  identity: string        // 身份名称
-  reason: string          // 操作原因
-  operator: string        // 操作人
-  contact?: string        // 培养联系人（可选）
-  previousIdentity?: string // 调整前身份（可选，用于详情）
-  approver?: string       // 审批人（可选，用于详情）
-  notes?: string          // 备注（可选，用于详情）
+  id: number;
+  date: string; // 时间（如 "2025-09-01"）
+  identity: string; // 身份名称
+  reason: string; // 操作原因
+  operator: string; // 操作人
+  contact?: string; // 培养联系人（可选）
+  previousIdentity?: string; // 调整前身份（可选，用于详情）
+  approver?: string; // 审批人（可选，用于详情）
+  notes?: string; // 备注（可选，用于详情）
 }
 
 // ============================================================
 // Props
 // ============================================================
 defineProps<{
-  historyList: HistoryItem[]
-}>()
+  historyList: HistoryItem[];
+}>();
 
 // ============================================================
 // 身份 → 颜色映射
@@ -35,61 +35,61 @@ defineProps<{
 // 发展对象: 紫色    预备党员:   金色    正式党员:   红色
 // ============================================================
 const identityColorMap: Record<string, string> = {
-  '普通学生': '#909399',
-  '共青团员': '#909399',
-  '入党申请人': '#409EFF',
-  '积极分子': '#E6A23C',
-  '发展对象': '#9B59B6',
-  '预备党员': '#D4A017',
-  '正式党员': '#C12C1F',
-}
+  普通学生: "#909399",
+  共青团员: "#909399",
+  入党申请人: "#409EFF",
+  积极分子: "#E6A23C",
+  发展对象: "#9B59B6",
+  预备党员: "#D4A017",
+  正式党员: "#C12C1F",
+};
 
 // 身份标签类型映射（用于 el-tag）
 const identityTagMap: Record<string, string> = {
-  '普通学生': 'info',
-  '共青团员': 'info',
-  '入党申请人': '',       // 默认蓝色
-  '积极分子': 'warning',
-  '发展对象': '',        // 紫色，用自定义样式
-  '预备党员': 'warning',  // 金色，用自定义样式覆盖
-  '正式党员': 'danger',
-}
+  普通学生: "info",
+  共青团员: "info",
+  入党申请人: "", // 默认蓝色
+  积极分子: "warning",
+  发展对象: "", // 紫色，用自定义样式
+  预备党员: "warning", // 金色，用自定义样式覆盖
+  正式党员: "danger",
+};
 
 // ============================================================
 // 获取身份颜色
 // ============================================================
 function getIdentityColor(identity: string): string {
-  return identityColorMap[identity] || '#409EFF'
+  return identityColorMap[identity] || "#409EFF";
 }
 
 // ============================================================
 // 获取标签类型
 // ============================================================
 function getTagType(identity: string): string {
-  return identityTagMap[identity] || 'info'
+  return identityTagMap[identity] || "info";
 }
 
 // ============================================================
 // 是否为最后一个节点（最新记录，当前身份）
 // ============================================================
 function isLatest(index: number): boolean {
-  return index === 0
+  return index === 0;
 }
 
 // ============================================================
 // 展开/收起状态管理
 // ============================================================
-const expandedIds = new Set<number>()
+const expandedIds = new Set<number>();
 
 function isExpanded(id: number): boolean {
-  return expandedIds.has(id)
+  return expandedIds.has(id);
 }
 
 function toggleExpand(id: number): void {
   if (expandedIds.has(id)) {
-    expandedIds.delete(id)
+    expandedIds.delete(id);
   } else {
-    expandedIds.add(id)
+    expandedIds.add(id);
   }
 }
 </script>
@@ -97,11 +97,7 @@ function toggleExpand(id: number): void {
 <template>
   <div class="identity-timeline">
     <!-- 空状态 -->
-    <el-empty
-      v-if="!historyList || historyList.length === 0"
-      description="暂无身份历史记录"
-      :image-size="100"
-    />
+    <el-empty v-if="!historyList || historyList.length === 0" description="暂无身份历史记录" :image-size="100" />
 
     <!-- 时间线 -->
     <el-timeline v-else>
@@ -114,11 +110,7 @@ function toggleExpand(id: number): void {
         :hollow="!isLatest(index)"
       >
         <!-- 身份卡片 -->
-        <div
-          class="timeline-node"
-          :class="{ expanded: isExpanded(item.id) }"
-          @click="toggleExpand(item.id)"
-        >
+        <div class="timeline-node" :class="{ expanded: isExpanded(item.id) }" @click="toggleExpand(item.id)">
           <!-- 摘要行：点击可展开/收起 -->
           <div class="node-summary">
             <div class="summary-top">
@@ -126,7 +118,15 @@ function toggleExpand(id: number): void {
                 :type="getTagType(item.identity)"
                 size="small"
                 :class="{ 'custom-tag': !getTagType(item.identity) }"
-                :style="!getTagType(item.identity) ? { backgroundColor: getIdentityColor(item.identity), borderColor: getIdentityColor(item.identity), color: '#fff' } : {}"
+                :style="
+                  !getTagType(item.identity)
+                    ? {
+                        backgroundColor: getIdentityColor(item.identity),
+                        borderColor: getIdentityColor(item.identity),
+                        color: '#fff',
+                      }
+                    : {}
+                "
               >
                 {{ item.identity }}
               </el-tag>
@@ -158,7 +158,7 @@ function toggleExpand(id: number): void {
                   <span class="detail-label">操作人</span>
                   <span class="detail-value">{{ item.operator }}</span>
                 </div>
-                <div class="detail-item" v-if="item.previousIdentity">
+                <div v-if="item.previousIdentity" class="detail-item">
                   <span class="detail-label">调整前身份</span>
                   <span class="detail-value">{{ item.previousIdentity }}</span>
                 </div>
@@ -170,11 +170,11 @@ function toggleExpand(id: number): void {
                   <span class="detail-label">调整原因</span>
                   <span class="detail-value">{{ item.reason }}</span>
                 </div>
-                <div class="detail-item" v-if="item.approver">
+                <div v-if="item.approver" class="detail-item">
                   <span class="detail-label">审批人</span>
                   <span class="detail-value">{{ item.approver }}</span>
                 </div>
-                <div class="detail-item detail-full" v-if="item.notes">
+                <div v-if="item.notes" class="detail-item detail-full">
                   <span class="detail-label">备注</span>
                   <span class="detail-value">{{ item.notes }}</span>
                 </div>
@@ -188,11 +188,7 @@ function toggleExpand(id: number): void {
     <!-- 图例 -->
     <div v-if="historyList && historyList.length > 0" class="timeline-legend">
       <span class="legend-title">身份图例：</span>
-      <span
-        v-for="(color, identity) in identityColorMap"
-        :key="identity"
-        class="legend-item"
-      >
+      <span v-for="(color, identity) in identityColorMap" :key="identity" class="legend-item">
         <span class="legend-dot" :style="{ backgroundColor: color }"></span>
         {{ identity }}
       </span>
@@ -212,7 +208,7 @@ function toggleExpand(id: number): void {
 /* ---- 时间线节点卡片 ---- */
 .timeline-node {
   background: var(--bg-white, #fff);
-  border: 1px solid var(--border-color, #EBEEF5);
+  border: 1px solid var(--border-color, #ebeef5);
   border-radius: var(--radius-base, 8px);
   padding: 14px 16px;
   cursor: pointer;
@@ -220,11 +216,11 @@ function toggleExpand(id: number): void {
 
   &:hover {
     box-shadow: var(--shadow-hover, 0 4px 20px rgba(0, 0, 0, 0.12));
-    border-color: var(--party-red, #C12C1F);
+    border-color: var(--party-red, #c12c1f);
   }
 
   &.expanded {
-    border-color: var(--party-red, #C12C1F);
+    border-color: var(--party-red, #c12c1f);
   }
 }
 
@@ -237,7 +233,7 @@ function toggleExpand(id: number): void {
 
 .summary-reason {
   font-size: 14px;
-  color: var(--text-primary, #2C3E50);
+  color: var(--text-primary, #2c3e50);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -271,13 +267,13 @@ function toggleExpand(id: number): void {
 }
 
 .meta-contact {
-  color: var(--party-red, #C12C1F);
+  color: var(--party-red, #c12c1f);
 }
 
 /* ---- 展开详情 ---- */
 .detail-divider {
   height: 1px;
-  background: var(--border-light, #F2F6FC);
+  background: var(--border-light, #f2f6fc);
   margin: 12px 0;
 }
 
@@ -304,10 +300,10 @@ function toggleExpand(id: number): void {
 
 .detail-value {
   font-size: 14px;
-  color: var(--text-primary, #2C3E50);
+  color: var(--text-primary, #2c3e50);
 
   &.highlight {
-    color: var(--party-red, #C12C1F);
+    color: var(--party-red, #c12c1f);
     font-weight: 600;
   }
 }
@@ -339,7 +335,7 @@ function toggleExpand(id: number): void {
 .timeline-legend {
   margin-top: 20px;
   padding: 12px 16px;
-  background: var(--bg-page, #F5F6FA);
+  background: var(--bg-page, #f5f6fa);
   border-radius: var(--radius-base, 8px);
   display: flex;
   flex-wrap: wrap;

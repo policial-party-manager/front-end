@@ -12,10 +12,10 @@
  * 注：TopNav / FooterBar / SmartAssistant 已提升至 App.vue 全局布局
  */
 
-import StatCards from '@/components/StatCards.vue'
-import CarouselBanner from '@/components/CarouselBanner.vue'
-import NewsSection from '@/components/NewsSection.vue'
-import QuickEntries from '@/components/QuickEntries.vue'
+import StatCards from "@/components/StatCards.vue";
+import CarouselBanner from "@/components/CarouselBanner.vue";
+import NewsSection from "@/components/NewsSection.vue";
+import QuickEntries from "@/components/QuickEntries.vue";
 </script>
 
 <template>

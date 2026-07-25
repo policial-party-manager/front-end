@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useAppStore } from '@/stores/app'
+import { useAppStore } from "@/stores/app";
 
 /**
  * QuickEntries - 快捷入口组件
@@ -8,16 +8,12 @@ import { useAppStore } from '@/stores/app'
  * 每个入口包含图标 + 文字，悬停有缩放效果
  */
 
-const store = useAppStore()
+const store = useAppStore();
 </script>
 
 <template>
   <div class="quick-entries">
-    <div
-      v-for="entry in store.quickEntries"
-      :key="entry.key"
-      class="entry-card"
-    >
+    <div v-for="entry in store.quickEntries" :key="entry.key" class="entry-card">
       <div class="entry-icon" :style="{ background: entry.color }">
         <el-icon :size="28" color="#fff">
           <component :is="entry.icon" />

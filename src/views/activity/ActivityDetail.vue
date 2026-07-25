@@ -15,114 +15,104 @@
  *   - super_admin / party_secretary：全部标签页 + 操作按钮
  *   - party_member / activist：仅"签到管理"标签页（只读）
  */
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAppStore } from '@/stores/app'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import QRCode from 'qrcode'
-import ActivityStatistics from '@/components/activity/ActivityStatistics.vue'
-import {
-  ArrowLeft,
-  Edit,
-  Delete,
-  RefreshRight,
-  Download,
-  PictureFilled,
-  CircleClose,
-} from '@element-plus/icons-vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useAppStore } from "@/stores/app";
+import { ElMessage, ElMessageBox } from "element-plus";
+import QRCode from "qrcode";
+import ActivityStatistics from "@/components/activity/ActivityStatistics.vue";
+import { ArrowLeft, Edit, Delete, RefreshRight, Download, PictureFilled, CircleClose } from "@element-plus/icons-vue";
 
-const route = useRoute()
-const router = useRouter()
-const store = useAppStore()
+const route = useRoute();
+const router = useRouter();
+const store = useAppStore();
 
 // ============================================================
 // 类型定义
 // ============================================================
-type ActivityType = '组织生活' | '主题党日' | '党课学习' | '二课活动' | '志愿服务' | '其他'
-type ActivityStatus = '未开始' | '报名中' | '进行中' | '已结束' | '已归档'
+type ActivityType = "组织生活" | "主题党日" | "党课学习" | "二课活动" | "志愿服务" | "其他";
+type ActivityStatus = "未开始" | "报名中" | "进行中" | "已结束" | "已归档";
 
 interface ActivityDetail {
-  id: number
-  name: string
-  type: ActivityType
-  branch: string
-  location: string
-  description: string
-  coverUrl: string
-  activityStartTime: string
-  activityEndTime: string
-  signInStartTime: string
-  signInEndTime: string
-  status: ActivityStatus
-  participantScope: 'all' | 'specified'
-  specifiedIdentities: string[]
+  id: number;
+  name: string;
+  type: ActivityType;
+  branch: string;
+  location: string;
+  description: string;
+  coverUrl: string;
+  activityStartTime: string;
+  activityEndTime: string;
+  signInStartTime: string;
+  signInEndTime: string;
+  status: ActivityStatus;
+  participantScope: "all" | "specified";
+  specifiedIdentities: string[];
 }
 
 interface SignInRecord {
-  id: number
-  name: string
-  studentId: string
-  signInTime: string
-  status: '已签到' | '未签到'
+  id: number;
+  name: string;
+  studentId: string;
+  signInTime: string;
+  status: "已签到" | "未签到";
 }
 
 interface RegistrationRecord {
-  id: number
-  name: string
-  studentId: string
-  identity: string
-  registrationTime: string
+  id: number;
+  name: string;
+  studentId: string;
+  identity: string;
+  registrationTime: string;
 }
 
 // ============================================================
 // 角色权限
 // ============================================================
-const isSuperAdmin = computed(() => store.currentRole === 'super_admin')
-const isSecretary = computed(() => store.currentRole === 'party_secretary')
-const isAdmin = computed(() => isSuperAdmin.value || isSecretary.value)
-const isRegularMember = computed(
-  () => store.currentRole === 'party_member' || store.currentRole === 'activist'
-)
+const isSuperAdmin = computed(() => store.currentRole === "super_admin");
+const isSecretary = computed(() => store.currentRole === "party_secretary");
+const isAdmin = computed(() => isSuperAdmin.value || isSecretary.value);
+const isRegularMember = computed(() => store.currentRole === "party_member" || store.currentRole === "activist");
 
 // ============================================================
 // 活动 ID & 数据加载
 // ============================================================
-const activityId = computed(() => Number(route.params.id))
-const loading = ref(false)
-const activity = ref<ActivityDetail | null>(null)
+const activityId = computed(() => Number(route.params.id));
+const loading = ref(false);
+const activity = ref<ActivityDetail | null>(null);
 
 // ============================================================
 // 颜色映射（与列表页保持一致）
 // ============================================================
 const activityTypeColorMap: Record<string, string> = {
-  '组织生活': '#C12C1F',
-  '主题党日': '#E6A23C',
-  '党课学习': '#409EFF',
-  '二课活动': '#67C23A',
-  '志愿服务': '#E84646',
-  '其他': '#909399',
-}
+  组织生活: "#C12C1F",
+  主题党日: "#E6A23C",
+  党课学习: "#409EFF",
+  二课活动: "#67C23A",
+  志愿服务: "#E84646",
+  其他: "#909399",
+};
 
 const activityStatusColorMap: Record<string, string> = {
-  '未开始': '#909399',
-  '报名中': '#409EFF',
-  '进行中': '#67C23A',
-  '已结束': '#E6A23C',
-  '已归档': '#909399',
-}
+  未开始: "#909399",
+  报名中: "#409EFF",
+  进行中: "#67C23A",
+  已结束: "#E6A23C",
+  已归档: "#909399",
+};
 
 const signInStatusColorMap: Record<string, string> = {
-  '已签到': '#67C23A',
-  '未签到': '#E6A23C',
-}
+  已签到: "#67C23A",
+  未签到: "#E6A23C",
+};
 
 const identityColorMap: Record<string, string> = {
-  '入党申请人': '#909399',
-  '积极分子': '#E6A23C',
-  '发展对象': '#409EFF',
-  '预备党员': '#67C23A',
-  '正式党员': '#C12C1F',
-}
+  入党申请人: "#909399",
+  积极分子: "#E6A23C",
+  发展对象: "#409EFF",
+  预备党员: "#67C23A",
+  正式党员: "#C12C1F",
+};
 
 // ============================================================
 // Mock 活动详情数据
@@ -131,88 +121,90 @@ const identityColorMap: Record<string, string> = {
 const mockDetailMap: Record<number, ActivityDetail> = {
   1: {
     id: 1,
-    name: '学习贯彻党的二十届三中全会精神主题党日',
-    type: '主题党日',
-    branch: '计算机学院学生第一党支部',
-    location: '学院楼A座301会议室',
-    description: '深入学习贯彻党的二十届三中全会精神，结合学院党建工作实际，开展专题学习研讨。重点学习全会关于全面深化改革的重要论述，研讨如何将全会精神落实到学院党建和育人工作中。',
-    coverUrl: '',
-    activityStartTime: '2026-08-15 14:00:00',
-    activityEndTime: '2026-08-15 16:30:00',
-    signInStartTime: '2026-08-15 13:30:00',
-    signInEndTime: '2026-08-15 17:00:00',
-    status: '已结束',
-    participantScope: 'all',
+    name: "学习贯彻党的二十届三中全会精神主题党日",
+    type: "主题党日",
+    branch: "计算机学院学生第一党支部",
+    location: "学院楼A座301会议室",
+    description:
+      "深入学习贯彻党的二十届三中全会精神，结合学院党建工作实际，开展专题学习研讨。重点学习全会关于全面深化改革的重要论述，研讨如何将全会精神落实到学院党建和育人工作中。",
+    coverUrl: "",
+    activityStartTime: "2026-08-15 14:00:00",
+    activityEndTime: "2026-08-15 16:30:00",
+    signInStartTime: "2026-08-15 13:30:00",
+    signInEndTime: "2026-08-15 17:00:00",
+    status: "已结束",
+    participantScope: "all",
     specifiedIdentities: [],
   },
   2: {
     id: 2,
-    name: '习近平新时代中国特色社会主义思想专题党课',
-    type: '党课学习',
-    branch: '计算机学院学生第一党支部',
-    location: '学院楼C座阶梯教室101',
-    description: '深入学习习近平新时代中国特色社会主义思想的核心要义和精神实质，增强"四个意识"、坚定"四个自信"、做到"两个维护"。',
-    coverUrl: '',
-    activityStartTime: '2026-08-20 09:00:00',
-    activityEndTime: '2026-08-20 11:00:00',
-    signInStartTime: '2026-08-20 08:30:00',
-    signInEndTime: '2026-08-20 11:30:00',
-    status: '报名中',
-    participantScope: 'all',
+    name: "习近平新时代中国特色社会主义思想专题党课",
+    type: "党课学习",
+    branch: "计算机学院学生第一党支部",
+    location: "学院楼C座阶梯教室101",
+    description:
+      '深入学习习近平新时代中国特色社会主义思想的核心要义和精神实质，增强"四个意识"、坚定"四个自信"、做到"两个维护"。',
+    coverUrl: "",
+    activityStartTime: "2026-08-20 09:00:00",
+    activityEndTime: "2026-08-20 11:00:00",
+    signInStartTime: "2026-08-20 08:30:00",
+    signInEndTime: "2026-08-20 11:30:00",
+    status: "报名中",
+    participantScope: "all",
     specifiedIdentities: [],
   },
   4: {
     id: 4,
-    name: '社区志愿服务活动——关爱空巢老人',
-    type: '志愿服务',
-    branch: '软件学院学生党支部',
-    location: '阳光社区服务中心',
-    description: '组织党员和积极分子走进社区，为空巢老人提供生活照料、心理慰藉等志愿服务，弘扬尊老敬老传统美德。',
-    coverUrl: '',
-    activityStartTime: '2026-08-10 08:00:00',
-    activityEndTime: '2026-08-10 12:00:00',
-    signInStartTime: '2026-08-10 07:30:00',
-    signInEndTime: '2026-08-10 12:30:00',
-    status: '进行中',
-    participantScope: 'specified',
-    specifiedIdentities: ['积极分子', '发展对象', '预备党员', '正式党员'],
+    name: "社区志愿服务活动——关爱空巢老人",
+    type: "志愿服务",
+    branch: "软件学院学生党支部",
+    location: "阳光社区服务中心",
+    description: "组织党员和积极分子走进社区，为空巢老人提供生活照料、心理慰藉等志愿服务，弘扬尊老敬老传统美德。",
+    coverUrl: "",
+    activityStartTime: "2026-08-10 08:00:00",
+    activityEndTime: "2026-08-10 12:00:00",
+    signInStartTime: "2026-08-10 07:30:00",
+    signInEndTime: "2026-08-10 12:30:00",
+    status: "进行中",
+    participantScope: "specified",
+    specifiedIdentities: ["积极分子", "发展对象", "预备党员", "正式党员"],
   },
   11: {
     id: 11,
-    name: '学习党章党规组织生活会',
-    type: '组织生活',
-    branch: '计算机学院学生第一党支部',
-    location: '学院楼B座201党员活动室',
-    description: '围绕党章党规开展组织生活会，交流学习心得，查摆问题不足，开展批评与自我批评。',
-    coverUrl: '',
-    activityStartTime: '2026-08-12 15:00:00',
-    activityEndTime: '2026-08-12 17:00:00',
-    signInStartTime: '2026-08-12 14:30:00',
-    signInEndTime: '2026-08-12 17:30:00',
-    status: '进行中',
-    participantScope: 'specified',
-    specifiedIdentities: ['预备党员', '正式党员'],
+    name: "学习党章党规组织生活会",
+    type: "组织生活",
+    branch: "计算机学院学生第一党支部",
+    location: "学院楼B座201党员活动室",
+    description: "围绕党章党规开展组织生活会，交流学习心得，查摆问题不足，开展批评与自我批评。",
+    coverUrl: "",
+    activityStartTime: "2026-08-12 15:00:00",
+    activityEndTime: "2026-08-12 17:00:00",
+    signInStartTime: "2026-08-12 14:30:00",
+    signInEndTime: "2026-08-12 17:30:00",
+    status: "进行中",
+    participantScope: "specified",
+    specifiedIdentities: ["预备党员", "正式党员"],
   },
-}
+};
 
 /** 生成默认 Mock 详情（ID 未命中时使用） */
 function generateDefaultDetail(id: number): ActivityDetail {
   return {
     id,
     name: `活动详情 #${id}`,
-    type: '主题党日',
-    branch: '计算机学院学生第一党支部',
-    location: '学院楼会议室',
-    description: '这是一条通过 Mock 生成的默认活动数据。实际项目中此处由后端接口返回。',
-    coverUrl: '',
-    activityStartTime: '2026-09-20 14:00:00',
-    activityEndTime: '2026-09-20 16:00:00',
-    signInStartTime: '2026-09-20 13:30:00',
-    signInEndTime: '2026-09-20 16:30:00',
-    status: '未开始',
-    participantScope: 'all',
+    type: "主题党日",
+    branch: "计算机学院学生第一党支部",
+    location: "学院楼会议室",
+    description: "这是一条通过 Mock 生成的默认活动数据。实际项目中此处由后端接口返回。",
+    coverUrl: "",
+    activityStartTime: "2026-09-20 14:00:00",
+    activityEndTime: "2026-09-20 16:00:00",
+    signInStartTime: "2026-09-20 13:30:00",
+    signInEndTime: "2026-09-20 16:30:00",
+    status: "未开始",
+    participantScope: "all",
     specifiedIdentities: [],
-  }
+  };
 }
 
 // ============================================================
@@ -221,28 +213,28 @@ function generateDefaultDetail(id: number): ActivityDetail {
 // ============================================================
 function generateSignInRecords(act: ActivityDetail): SignInRecord[] {
   const allRecords: SignInRecord[] = [
-    { id: 1,  name: '张明',   studentId: '20230101001', signInTime: '2026-08-15 13:35:22', status: '已签到' },
-    { id: 2,  name: '李娟',   studentId: '20230101002', signInTime: '2026-08-15 13:38:15', status: '已签到' },
-    { id: 3,  name: '王磊',   studentId: '20230101003', signInTime: '2026-08-15 13:42:08', status: '已签到' },
-    { id: 4,  name: '赵婷',   studentId: '20230101004', signInTime: '2026-08-15 13:45:33', status: '已签到' },
-    { id: 5,  name: '孙浩',   studentId: '20230101005', signInTime: '2026-08-15 13:50:01', status: '已签到' },
-    { id: 6,  name: '周颖',   studentId: '20220201006', signInTime: '2026-08-15 13:52:44', status: '已签到' },
-    { id: 7,  name: '吴强',   studentId: '20220201001', signInTime: '2026-08-15 13:55:19', status: '已签到' },
-    { id: 8,  name: '郑雪',   studentId: '20220201002', signInTime: '2026-08-15 13:58:30', status: '已签到' },
-    { id: 9,  name: '陈伟',   studentId: '20220201003', signInTime: '2026-08-15 14:02:11', status: '已签到' },
-    { id: 10, name: '刘洋',   studentId: '20220201004', signInTime: '2026-08-15 14:05:47', status: '已签到' },
-    { id: 11, name: '黄丽',   studentId: '20220201005', signInTime: '2026-08-15 14:08:23', status: '已签到' },
-    { id: 12, name: '杨帆',   studentId: '20210101001', signInTime: '2026-08-15 14:12:05', status: '已签到' },
-    { id: 13, name: '朱峰',   studentId: '20210101002', signInTime: '2026-08-15 14:15:38', status: '已签到' },
-    { id: 14, name: '马丽',   studentId: '20210101003', signInTime: '2026-08-15 14:18:52', status: '已签到' },
-    { id: 15, name: '胡涛',   studentId: '20210101004', signInTime: '2026-08-15 14:22:10', status: '已签到' },
-    { id: 16, name: '林芳',   studentId: '20210101005', signInTime: '', status: '未签到' },
-    { id: 17, name: '何军',   studentId: '20200101001', signInTime: '', status: '未签到' },
-    { id: 18, name: '罗兰',   studentId: '20200101002', signInTime: '', status: '未签到' },
-    { id: 19, name: '梁超',   studentId: '20200101003', signInTime: '', status: '未签到' },
-    { id: 20, name: '宋雨',   studentId: '20200101004', signInTime: '', status: '未签到' },
-  ]
-  return allRecords
+    { id: 1, name: "张明", studentId: "20230101001", signInTime: "2026-08-15 13:35:22", status: "已签到" },
+    { id: 2, name: "李娟", studentId: "20230101002", signInTime: "2026-08-15 13:38:15", status: "已签到" },
+    { id: 3, name: "王磊", studentId: "20230101003", signInTime: "2026-08-15 13:42:08", status: "已签到" },
+    { id: 4, name: "赵婷", studentId: "20230101004", signInTime: "2026-08-15 13:45:33", status: "已签到" },
+    { id: 5, name: "孙浩", studentId: "20230101005", signInTime: "2026-08-15 13:50:01", status: "已签到" },
+    { id: 6, name: "周颖", studentId: "20220201006", signInTime: "2026-08-15 13:52:44", status: "已签到" },
+    { id: 7, name: "吴强", studentId: "20220201001", signInTime: "2026-08-15 13:55:19", status: "已签到" },
+    { id: 8, name: "郑雪", studentId: "20220201002", signInTime: "2026-08-15 13:58:30", status: "已签到" },
+    { id: 9, name: "陈伟", studentId: "20220201003", signInTime: "2026-08-15 14:02:11", status: "已签到" },
+    { id: 10, name: "刘洋", studentId: "20220201004", signInTime: "2026-08-15 14:05:47", status: "已签到" },
+    { id: 11, name: "黄丽", studentId: "20220201005", signInTime: "2026-08-15 14:08:23", status: "已签到" },
+    { id: 12, name: "杨帆", studentId: "20210101001", signInTime: "2026-08-15 14:12:05", status: "已签到" },
+    { id: 13, name: "朱峰", studentId: "20210101002", signInTime: "2026-08-15 14:15:38", status: "已签到" },
+    { id: 14, name: "马丽", studentId: "20210101003", signInTime: "2026-08-15 14:18:52", status: "已签到" },
+    { id: 15, name: "胡涛", studentId: "20210101004", signInTime: "2026-08-15 14:22:10", status: "已签到" },
+    { id: 16, name: "林芳", studentId: "20210101005", signInTime: "", status: "未签到" },
+    { id: 17, name: "何军", studentId: "20200101001", signInTime: "", status: "未签到" },
+    { id: 18, name: "罗兰", studentId: "20200101002", signInTime: "", status: "未签到" },
+    { id: 19, name: "梁超", studentId: "20200101003", signInTime: "", status: "未签到" },
+    { id: 20, name: "宋雨", studentId: "20200101004", signInTime: "", status: "未签到" },
+  ];
+  return allRecords;
 }
 
 // ============================================================
@@ -251,338 +243,336 @@ function generateSignInRecords(act: ActivityDetail): SignInRecord[] {
 // ============================================================
 function generateRegistrationRecords(): RegistrationRecord[] {
   return [
-    { id: 1,  name: '张明', studentId: '20230101001', identity: '发展对象', registrationTime: '2026-08-10 09:15:00' },
-    { id: 2,  name: '李娟', studentId: '20230101002', identity: '积极分子', registrationTime: '2026-08-10 09:22:00' },
-    { id: 3,  name: '王磊', studentId: '20230101003', identity: '预备党员', registrationTime: '2026-08-10 10:05:00' },
-    { id: 4,  name: '赵婷', studentId: '20230101004', identity: '入党申请人', registrationTime: '2026-08-10 10:18:00' },
-    { id: 5,  name: '孙浩', studentId: '20230101005', identity: '积极分子', registrationTime: '2026-08-10 11:30:00' },
-    { id: 6,  name: '周颖', studentId: '20220201006', identity: '正式党员', registrationTime: '2026-08-10 14:00:00' },
-    { id: 7,  name: '吴强', studentId: '20220201001', identity: '发展对象', registrationTime: '2026-08-10 14:45:00' },
-    { id: 8,  name: '郑雪', studentId: '20220201002', identity: '积极分子', registrationTime: '2026-08-11 08:30:00' },
-    { id: 9,  name: '陈伟', studentId: '20220201003', identity: '入党申请人', registrationTime: '2026-08-11 09:00:00' },
-    { id: 10, name: '刘洋', studentId: '20220201004', identity: '正式党员', registrationTime: '2026-08-11 09:45:00' },
-    { id: 11, name: '黄丽', studentId: '20220201005', identity: '积极分子', registrationTime: '2026-08-11 10:20:00' },
-    { id: 12, name: '杨帆', studentId: '20210101001', identity: '发展对象', registrationTime: '2026-08-11 11:00:00' },
-    { id: 13, name: '朱峰', studentId: '20210101002', identity: '预备党员', registrationTime: '2026-08-11 14:30:00' },
-    { id: 14, name: '马丽', studentId: '20210101003', identity: '入党申请人', registrationTime: '2026-08-11 15:15:00' },
-    { id: 15, name: '胡涛', studentId: '20210101004', identity: '预备党员', registrationTime: '2026-08-12 08:00:00' },
-    { id: 16, name: '林芳', studentId: '20210101005', identity: '正式党员', registrationTime: '2026-08-12 08:45:00' },
-    { id: 17, name: '何军', studentId: '20200101001', identity: '积极分子', registrationTime: '2026-08-12 09:30:00' },
-    { id: 18, name: '罗兰', studentId: '20200101002', identity: '发展对象', registrationTime: '2026-08-12 10:15:00' },
-    { id: 19, name: '梁超', studentId: '20200101003', identity: '入党申请人', registrationTime: '2026-08-12 11:00:00' },
-    { id: 20, name: '宋雨', studentId: '20200101004', identity: '正式党员', registrationTime: '2026-08-12 14:00:00' },
-    { id: 21, name: '唐明', studentId: '20230101006', identity: '积极分子', registrationTime: '2026-08-12 14:45:00' },
-    { id: 22, name: '许婷', studentId: '20230101007', identity: '积极分子', registrationTime: '2026-08-12 15:30:00' },
-    { id: 23, name: '秦汉', studentId: '20220201007', identity: '正式党员', registrationTime: '2026-08-12 16:15:00' },
-    { id: 24, name: '韩冰', studentId: '20210101006', identity: '入党申请人', registrationTime: '2026-08-13 08:00:00' },
-    { id: 25, name: '丁一', studentId: '20200101005', identity: '预备党员', registrationTime: '2026-08-13 09:00:00' },
-  ]
+    { id: 1, name: "张明", studentId: "20230101001", identity: "发展对象", registrationTime: "2026-08-10 09:15:00" },
+    { id: 2, name: "李娟", studentId: "20230101002", identity: "积极分子", registrationTime: "2026-08-10 09:22:00" },
+    { id: 3, name: "王磊", studentId: "20230101003", identity: "预备党员", registrationTime: "2026-08-10 10:05:00" },
+    { id: 4, name: "赵婷", studentId: "20230101004", identity: "入党申请人", registrationTime: "2026-08-10 10:18:00" },
+    { id: 5, name: "孙浩", studentId: "20230101005", identity: "积极分子", registrationTime: "2026-08-10 11:30:00" },
+    { id: 6, name: "周颖", studentId: "20220201006", identity: "正式党员", registrationTime: "2026-08-10 14:00:00" },
+    { id: 7, name: "吴强", studentId: "20220201001", identity: "发展对象", registrationTime: "2026-08-10 14:45:00" },
+    { id: 8, name: "郑雪", studentId: "20220201002", identity: "积极分子", registrationTime: "2026-08-11 08:30:00" },
+    { id: 9, name: "陈伟", studentId: "20220201003", identity: "入党申请人", registrationTime: "2026-08-11 09:00:00" },
+    { id: 10, name: "刘洋", studentId: "20220201004", identity: "正式党员", registrationTime: "2026-08-11 09:45:00" },
+    { id: 11, name: "黄丽", studentId: "20220201005", identity: "积极分子", registrationTime: "2026-08-11 10:20:00" },
+    { id: 12, name: "杨帆", studentId: "20210101001", identity: "发展对象", registrationTime: "2026-08-11 11:00:00" },
+    { id: 13, name: "朱峰", studentId: "20210101002", identity: "预备党员", registrationTime: "2026-08-11 14:30:00" },
+    { id: 14, name: "马丽", studentId: "20210101003", identity: "入党申请人", registrationTime: "2026-08-11 15:15:00" },
+    { id: 15, name: "胡涛", studentId: "20210101004", identity: "预备党员", registrationTime: "2026-08-12 08:00:00" },
+    { id: 16, name: "林芳", studentId: "20210101005", identity: "正式党员", registrationTime: "2026-08-12 08:45:00" },
+    { id: 17, name: "何军", studentId: "20200101001", identity: "积极分子", registrationTime: "2026-08-12 09:30:00" },
+    { id: 18, name: "罗兰", studentId: "20200101002", identity: "发展对象", registrationTime: "2026-08-12 10:15:00" },
+    { id: 19, name: "梁超", studentId: "20200101003", identity: "入党申请人", registrationTime: "2026-08-12 11:00:00" },
+    { id: 20, name: "宋雨", studentId: "20200101004", identity: "正式党员", registrationTime: "2026-08-12 14:00:00" },
+    { id: 21, name: "唐明", studentId: "20230101006", identity: "积极分子", registrationTime: "2026-08-12 14:45:00" },
+    { id: 22, name: "许婷", studentId: "20230101007", identity: "积极分子", registrationTime: "2026-08-12 15:30:00" },
+    { id: 23, name: "秦汉", studentId: "20220201007", identity: "正式党员", registrationTime: "2026-08-12 16:15:00" },
+    { id: 24, name: "韩冰", studentId: "20210101006", identity: "入党申请人", registrationTime: "2026-08-13 08:00:00" },
+    { id: 25, name: "丁一", studentId: "20200101005", identity: "预备党员", registrationTime: "2026-08-13 09:00:00" },
+  ];
 }
 
 // ============================================================
 // 参与范围文本
 // ============================================================
 const participantScopeText = computed(() => {
-  if (!activity.value) return ''
-  if (activity.value.participantScope === 'all') return '全部成员'
-  return activity.value.specifiedIdentities.join('、')
-})
+  if (!activity.value) return "";
+  if (activity.value.participantScope === "all") return "全部成员";
+  return activity.value.specifiedIdentities.join("、");
+});
 
 // ============================================================
 // 加载活动详情
 // ============================================================
-const signInRecords = ref<SignInRecord[]>([])
-const registrationRecords = ref<RegistrationRecord[]>([])
+const signInRecords = ref<SignInRecord[]>([]);
+const registrationRecords = ref<RegistrationRecord[]>([]);
 
 async function loadActivityDetail(): Promise<void> {
-  loading.value = true
+  loading.value = true;
   try {
     // TODO: 替换为真实 API 调用
     // const res = await api.getActivityDetail(activityId.value)
-    await new Promise(resolve => setTimeout(resolve, 350))
+    await new Promise((resolve) => setTimeout(resolve, 350));
 
-    const detail = mockDetailMap[activityId.value] || generateDefaultDetail(activityId.value)
-    activity.value = detail
+    const detail = mockDetailMap[activityId.value] || generateDefaultDetail(activityId.value);
+    activity.value = detail;
 
     // 加载关联数据
-    signInRecords.value = generateSignInRecords(detail)
-    registrationRecords.value = generateRegistrationRecords()
+    signInRecords.value = generateSignInRecords(detail);
+    registrationRecords.value = generateRegistrationRecords();
 
     // 根据 URL 参数设置初始 tab
-    const tabParam = route.query.tab as string
-    if (['sign', 'registration', 'statistics'].includes(tabParam)) {
-      activeTab.value = tabParam as 'sign' | 'registration' | 'statistics'
+    const tabParam = route.query.tab as string;
+    if (["sign", "registration", "statistics"].includes(tabParam)) {
+      activeTab.value = tabParam as "sign" | "registration" | "statistics";
     }
   } catch {
-    ElMessage.error('加载活动详情失败')
-    router.push('/activity')
+    ElMessage.error("加载活动详情失败");
+    router.push("/activity");
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 onMounted(() => {
-  loadActivityDetail()
-})
+  loadActivityDetail();
+});
 
 // ============================================================
 // 标签页管理（URL 参数同步）
 // ============================================================
-type TabName = 'sign' | 'registration' | 'statistics'
+type TabName = "sign" | "registration" | "statistics";
 
-const activeTab = ref<TabName>('sign')
+const activeTab = ref<TabName>("sign");
 
 /** 管理员可看的标签页 */
 const adminTabs = [
-  { name: 'sign' as TabName, label: '签到管理' },
-  { name: 'registration' as TabName, label: '报名列表' },
-  { name: 'statistics' as TabName, label: '活动统计' },
-]
+  { name: "sign" as TabName, label: "签到管理" },
+  { name: "registration" as TabName, label: "报名列表" },
+  { name: "statistics" as TabName, label: "活动统计" },
+];
 
 /** 普通成员可看的标签页（仅签到管理，只读） */
-const memberTabs = [
-  { name: 'sign' as TabName, label: '签到管理' },
-]
+const memberTabs = [{ name: "sign" as TabName, label: "签到管理" }];
 
-const visibleTabs = computed(() => (isAdmin.value ? adminTabs : memberTabs))
+const visibleTabs = computed(() => (isAdmin.value ? adminTabs : memberTabs));
 
 function handleTabChange(name: TabName): void {
-  router.replace({ query: { ...route.query, tab: name } })
+  router.replace({ query: { ...route.query, tab: name } });
 }
 
 // ============================================================
 // 日期格式化
 // ============================================================
 function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '-'
-  return dateStr
+  if (!dateStr) return "-";
+  return dateStr;
 }
 
 function formatDateOnly(dateStr: string): string {
-  if (!dateStr) return '-'
-  return dateStr.split(' ')[0]
+  if (!dateStr) return "-";
+  return dateStr.split(" ")[0];
 }
 
 function formatTimeOnly(dateStr: string): string {
-  if (!dateStr) return '-'
-  return dateStr.split(' ')[1] || dateStr
+  if (!dateStr) return "-";
+  return dateStr.split(" ")[1] || dateStr;
 }
 
 // ============================================================
 // 二维码签到
 // ============================================================
-const qrDataUrl = ref('')
-const qrCountdown = ref(60)
-const qrLoading = ref(false)
-let qrTimer: ReturnType<typeof setInterval> | null = null
+const qrDataUrl = ref("");
+const qrCountdown = ref(60);
+const qrLoading = ref(false);
+let qrTimer: ReturnType<typeof setInterval> | null = null;
 
 async function generateQRCode(): Promise<void> {
-  if (!activity.value) return
+  if (!activity.value) return;
 
-  qrLoading.value = true
+  qrLoading.value = true;
   try {
     const payload = JSON.stringify({
       activityId: activity.value.id,
       timestamp: Date.now(),
-    })
+    });
     qrDataUrl.value = await QRCode.toDataURL(payload, {
       width: 220,
       margin: 2,
-      color: { dark: '#C12C1F', light: '#FFFFFF' },
-    })
-    qrCountdown.value = 60
+      color: { dark: "#C12C1F", light: "#FFFFFF" },
+    });
+    qrCountdown.value = 60;
   } catch {
-    ElMessage.error('二维码生成失败')
+    ElMessage.error("二维码生成失败");
   } finally {
-    qrLoading.value = false
+    qrLoading.value = false;
   }
 }
 
 function startQRTimer(): void {
-  stopQRTimer()
+  stopQRTimer();
   qrTimer = setInterval(() => {
-    qrCountdown.value--
+    qrCountdown.value--;
     if (qrCountdown.value <= 0) {
-      generateQRCode()
+      generateQRCode();
     }
-  }, 1000)
+  }, 1000);
 }
 
 function stopQRTimer(): void {
   if (qrTimer) {
-    clearInterval(qrTimer)
-    qrTimer = null
+    clearInterval(qrTimer);
+    qrTimer = null;
   }
 }
 
 function handleRefreshQR(): void {
-  generateQRCode()
+  generateQRCode();
 }
 
 function handleCloseQR(): void {
-  stopQRTimer()
-  qrDataUrl.value = ''
-  qrCountdown.value = 60
+  stopQRTimer();
+  qrDataUrl.value = "";
+  qrCountdown.value = 60;
 }
 
 // 离开签到标签页时停止二维码倒计时
 watch(activeTab, (tab) => {
-  if (tab !== 'sign') {
-    stopQRTimer()
+  if (tab !== "sign") {
+    stopQRTimer();
   }
-})
+});
 
 // ============================================================
 // 签到记录筛选 & 分页
 // ============================================================
-const signFilterStatus = ref('')
-const signCurrentPage = ref(1)
-const signPageSize = ref(10)
+const signFilterStatus = ref("");
+const signCurrentPage = ref(1);
+const signPageSize = ref(10);
 
 const signStatusOptions = [
-  { value: '', label: '全部' },
-  { value: '已签到', label: '已签到' },
-  { value: '未签到', label: '未签到' },
-]
+  { value: "", label: "全部" },
+  { value: "已签到", label: "已签到" },
+  { value: "未签到", label: "未签到" },
+];
 
 const filteredSignInRecords = computed(() => {
-  let list = signInRecords.value
+  let list = signInRecords.value;
   if (signFilterStatus.value) {
-    list = list.filter(r => r.status === signFilterStatus.value)
+    list = list.filter((r) => r.status === signFilterStatus.value);
   }
-  return list
-})
+  return list;
+});
 
-const signTotalFiltered = computed(() => filteredSignInRecords.value.length)
+const signTotalFiltered = computed(() => filteredSignInRecords.value.length);
 
 const pagedSignInRecords = computed(() => {
-  const start = (signCurrentPage.value - 1) * signPageSize.value
-  return filteredSignInRecords.value.slice(start, start + signPageSize.value)
-})
+  const start = (signCurrentPage.value - 1) * signPageSize.value;
+  return filteredSignInRecords.value.slice(start, start + signPageSize.value);
+});
 
 watch(signFilterStatus, () => {
-  signCurrentPage.value = 1
-})
+  signCurrentPage.value = 1;
+});
 
 function handleSignPageChange(page: number): void {
-  signCurrentPage.value = page
+  signCurrentPage.value = page;
 }
 
 function handleSignSizeChange(size: number): void {
-  signPageSize.value = size
-  signCurrentPage.value = 1
+  signPageSize.value = size;
+  signCurrentPage.value = 1;
 }
 
 // ============================================================
 // 签到统计
 // ============================================================
 const signInStats = computed(() => {
-  const total = signInRecords.value.length
-  const signedIn = signInRecords.value.filter(r => r.status === '已签到').length
-  const notSignedIn = total - signedIn
-  const rate = total > 0 ? Math.round((signedIn / total) * 100) : 0
-  return { total, signedIn, notSignedIn, rate }
-})
+  const total = signInRecords.value.length;
+  const signedIn = signInRecords.value.filter((r) => r.status === "已签到").length;
+  const notSignedIn = total - signedIn;
+  const rate = total > 0 ? Math.round((signedIn / total) * 100) : 0;
+  return { total, signedIn, notSignedIn, rate };
+});
 
 /** 导出签到数据 */
 function handleExportSignIn(): void {
   // TODO: 替换为真实导出逻辑（调用后端接口下载 Excel/CSV）
-  ElMessage.success('签到数据导出成功（Mock）')
-  console.log('[Mock] 导出签到数据：', signInRecords.value)
+  ElMessage.success("签到数据导出成功（Mock）");
+  console.log("[Mock] 导出签到数据：", signInRecords.value);
 }
 
 // ============================================================
 // 操作按钮（页面头部）
 // ============================================================
 interface HeaderAction {
-  key: string
-  label: string
-  icon?: any
-  type?: 'primary' | 'danger' | 'warning' | 'default'
-  visible: boolean
-  handler: () => void
+  key: string;
+  label: string;
+  icon?: any;
+  type?: "primary" | "danger" | "warning" | "default";
+  visible: boolean;
+  handler: () => void;
 }
 
 const headerActions = computed<HeaderAction[]>(() => {
-  if (!activity.value) return []
-  const { status } = activity.value
+  if (!activity.value) return [];
+  const { status } = activity.value;
 
   return [
     {
-      key: 'edit',
-      label: '编辑',
+      key: "edit",
+      label: "编辑",
       icon: Edit,
-      type: 'default',
-      visible: isAdmin.value && status === '未开始',
+      type: "default",
+      visible: isAdmin.value && status === "未开始",
       handler: handleEdit,
     },
     {
-      key: 'delete',
-      label: '删除',
+      key: "delete",
+      label: "删除",
       icon: Delete,
-      type: 'danger',
-      visible: isSuperAdmin.value && status === '未开始',
+      type: "danger",
+      visible: isSuperAdmin.value && status === "未开始",
       handler: handleDelete,
     },
     {
-      key: 'qrcode',
-      label: '生成二维码',
+      key: "qrcode",
+      label: "生成二维码",
       icon: PictureFilled,
-      type: 'primary',
-      visible: isAdmin.value && (status === '报名中' || status === '进行中'),
+      type: "primary",
+      visible: isAdmin.value && (status === "报名中" || status === "进行中"),
       handler: () => {
-        switchToTab('sign')
-        generateQRCode()
-        startQRTimer()
+        switchToTab("sign");
+        generateQRCode();
+        startQRTimer();
       },
     },
     {
-      key: 'archive',
-      label: '归档',
-      type: 'warning',
-      visible: isAdmin.value && status === '已结束',
+      key: "archive",
+      label: "归档",
+      type: "warning",
+      visible: isAdmin.value && status === "已结束",
       handler: handleArchive,
     },
-  ]
-})
+  ];
+});
 
 function switchToTab(tab: TabName): void {
-  activeTab.value = tab
-  router.replace({ query: { ...route.query, tab } })
+  activeTab.value = tab;
+  router.replace({ query: { ...route.query, tab } });
 }
 
 function handleEdit(): void {
-  if (!activity.value) return
-  router.push(`/activity/edit/${activity.value.id}`)
+  if (!activity.value) return;
+  router.push(`/activity/edit/${activity.value.id}`);
 }
 
 async function handleDelete(): Promise<void> {
-  if (!activity.value) return
+  if (!activity.value) return;
   try {
-    await ElMessageBox.confirm(
-      `确定要删除活动"${activity.value.name}"吗？删除后不可恢复。`,
-      '删除确认',
-      { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
-    )
+    await ElMessageBox.confirm(`确定要删除活动"${activity.value.name}"吗？删除后不可恢复。`, "删除确认", {
+      confirmButtonText: "确定删除",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
     // TODO: 替换为真实 API 调用
-    ElMessage.success('活动已删除')
-    router.push('/activity')
+    ElMessage.success("活动已删除");
+    router.push("/activity");
   } catch {
     // 用户取消
   }
 }
 
 async function handleArchive(): Promise<void> {
-  if (!activity.value) return
+  if (!activity.value) return;
   try {
-    await ElMessageBox.confirm(
-      `确定要归档活动"${activity.value.name}"吗？`,
-      '归档确认',
-      { confirmButtonText: '确定归档', cancelButtonText: '取消', type: 'info' }
-    )
+    await ElMessageBox.confirm(`确定要归档活动"${activity.value.name}"吗？`, "归档确认", {
+      confirmButtonText: "确定归档",
+      cancelButtonText: "取消",
+      type: "info",
+    });
     // TODO: 替换为真实 API 调用
-    activity.value.status = '已归档'
-    ElMessage.success('活动已归档')
+    activity.value.status = "已归档";
+    ElMessage.success("活动已归档");
   } catch {
     // 用户取消
   }
@@ -592,24 +582,24 @@ async function handleArchive(): Promise<void> {
 // 返回列表
 // ============================================================
 function goBack(): void {
-  router.push('/activity')
+  router.push("/activity");
 }
 
 // ============================================================
 // 生命周期清理
 // ============================================================
 onUnmounted(() => {
-  stopQRTimer()
-})
+  stopQRTimer();
+});
 </script>
 
 <template>
-  <div class="activity-detail-page" v-loading="loading" element-loading-text="正在加载活动详情...">
+  <div v-loading="loading" class="activity-detail-page" element-loading-text="正在加载活动详情...">
     <div class="page-container">
       <!-- ==================== 页面头部 ==================== -->
-      <div class="detail-header" v-if="activity">
+      <div v-if="activity" class="detail-header">
         <div class="header-top">
-          <el-button text @click="goBack" class="back-btn">
+          <el-button text class="back-btn" @click="goBack">
             <el-icon><ArrowLeft /></el-icon>
             返回列表
           </el-button>
@@ -619,18 +609,14 @@ onUnmounted(() => {
           <div class="header-info">
             <h2 class="activity-title">{{ activity.name }}</h2>
             <div class="header-meta">
-              <el-tag
-                :color="activityStatusColorMap[activity.status]"
-                effect="light"
-                size="large"
-              >
+              <el-tag :color="activityStatusColorMap[activity.status]" effect="light" size="large">
                 {{ activity.status }}
               </el-tag>
               <span class="meta-branch">{{ activity.branch }}</span>
             </div>
           </div>
 
-          <div class="header-actions" v-if="headerActions.length > 0">
+          <div v-if="headerActions.length > 0" class="header-actions">
             <el-button
               v-for="action in headerActions"
               :key="action.key"
@@ -645,15 +631,11 @@ onUnmounted(() => {
       </div>
 
       <!-- ==================== 基本信息卡片 ==================== -->
-      <div class="content-card info-card" v-if="activity">
+      <div v-if="activity" class="content-card info-card">
         <h3 class="section-subtitle">基本信息</h3>
         <el-descriptions :column="2" border size="large">
           <el-descriptions-item label="活动类型" :span="1">
-            <el-tag
-              :color="activityTypeColorMap[activity.type]"
-              effect="light"
-              size="small"
-            >
+            <el-tag :color="activityTypeColorMap[activity.type]" effect="light" size="small">
               {{ activity.type }}
             </el-tag>
           </el-descriptions-item>
@@ -680,33 +662,23 @@ onUnmounted(() => {
             <span class="time-separator"> ~ </span>
             {{ formatDateTime(activity.signInEndTime) }}
           </el-descriptions-item>
-          <el-descriptions-item label="活动简介" :span="2" v-if="activity.description">
+          <el-descriptions-item v-if="activity.description" label="活动简介" :span="2">
             <span class="description-text">{{ activity.description }}</span>
           </el-descriptions-item>
         </el-descriptions>
       </div>
 
       <!-- ==================== 标签页 ==================== -->
-      <div class="content-card tabs-card" v-if="activity">
+      <div v-if="activity" class="content-card tabs-card">
         <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-          <el-tab-pane
-            v-for="tab in visibleTabs"
-            :key="tab.name"
-            :label="tab.label"
-            :name="tab.name"
-          >
+          <el-tab-pane v-for="tab in visibleTabs" :key="tab.name" :label="tab.label" :name="tab.name">
             <!-- ========== 标签页 1：签到管理 ========== -->
             <template v-if="tab.name === 'sign'">
               <div class="signin-layout">
                 <!-- 左侧：二维码区 -->
                 <div class="signin-qrcode">
-                  <div class="qr-card" v-loading="qrLoading">
-                    <img
-                      v-if="qrDataUrl"
-                      :src="qrDataUrl"
-                      alt="签到二维码"
-                      class="qr-image"
-                    />
+                  <div v-loading="qrLoading" class="qr-card">
+                    <img v-if="qrDataUrl" :src="qrDataUrl" alt="签到二维码" class="qr-image" />
                     <div v-else class="qr-placeholder">
                       <el-icon :size="48" class="qr-placeholder-icon"><PictureFilled /></el-icon>
                       <p class="qr-placeholder-text">点击下方按钮生成签到二维码</p>
@@ -730,9 +702,9 @@ onUnmounted(() => {
                   <el-button
                     v-if="!qrDataUrl"
                     type="primary"
-                    @click="handleRefreshQR"
                     :loading="qrLoading"
                     class="qr-refresh-btn"
+                    @click="handleRefreshQR"
                   >
                     <el-icon><PictureFilled /></el-icon>
                     生成二维码
@@ -746,22 +718,12 @@ onUnmounted(() => {
                     </div>
 
                     <div class="qr-actions">
-                      <el-button
-                        class="qr-action-btn"
-                        plain
-                        @click="handleRefreshQR"
-                        :loading="qrLoading"
-                      >
+                      <el-button class="qr-action-btn" plain :loading="qrLoading" @click="handleRefreshQR">
                         <el-icon><RefreshRight /></el-icon>
                         刷新二维码
                       </el-button>
 
-                      <el-button
-                        class="qr-action-btn"
-                        type="danger"
-                        plain
-                        @click="handleCloseQR"
-                      >
+                      <el-button class="qr-action-btn" type="danger" plain @click="handleCloseQR">
                         <el-icon><CircleClose /></el-icon>
                         关闭二维码
                       </el-button>
@@ -795,12 +757,7 @@ onUnmounted(() => {
                     </div>
                   </div>
 
-                  <el-table
-                    :data="pagedSignInRecords"
-                    stripe
-                    size="small"
-                    style="width: 100%"
-                  >
+                  <el-table :data="pagedSignInRecords" stripe size="small" style="width: 100%">
                     <el-table-column prop="name" label="姓名" width="80" />
                     <el-table-column prop="studentId" label="学号" width="130" />
                     <el-table-column label="签到时间" min-width="160">
@@ -813,18 +770,14 @@ onUnmounted(() => {
                     </el-table-column>
                     <el-table-column label="状态" width="90" align="center">
                       <template #default="{ row }">
-                        <el-tag
-                          :color="signInStatusColorMap[row.status]"
-                          effect="light"
-                          size="small"
-                        >
+                        <el-tag :color="signInStatusColorMap[row.status]" effect="light" size="small">
                           {{ row.status }}
                         </el-tag>
                       </template>
                     </el-table-column>
                   </el-table>
 
-                  <div class="records-footer" v-if="signTotalFiltered > 0">
+                  <div v-if="signTotalFiltered > 0" class="records-footer">
                     <span class="total-info">共 {{ signTotalFiltered }} 条</span>
                     <el-pagination
                       v-model:current-page="signCurrentPage"
@@ -859,11 +812,7 @@ onUnmounted(() => {
                   <el-table-column prop="studentId" label="学号" width="130" />
                   <el-table-column label="身份" width="110" align="center">
                     <template #default="{ row }">
-                      <el-tag
-                        :color="identityColorMap[row.identity] || '#909399'"
-                        effect="light"
-                        size="small"
-                      >
+                      <el-tag :color="identityColorMap[row.identity] || '#909399'" effect="light" size="small">
                         {{ row.identity }}
                       </el-tag>
                     </template>
@@ -912,7 +861,7 @@ onUnmounted(() => {
   font-size: 14px;
 
   &:hover {
-    color: var(--party-red, #C12C1F);
+    color: var(--party-red, #c12c1f);
   }
 }
 
@@ -931,7 +880,7 @@ onUnmounted(() => {
 .activity-title {
   font-size: 22px;
   font-weight: 700;
-  color: var(--text-primary, #2C3E50);
+  color: var(--text-primary, #2c3e50);
   line-height: 1.4;
   margin-bottom: 8px;
 }
@@ -961,15 +910,15 @@ onUnmounted(() => {
 .section-subtitle {
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-primary, #2C3E50);
+  color: var(--text-primary, #2c3e50);
   margin-bottom: 16px;
 
   &::before {
-    content: '';
+    content: "";
     display: inline-block;
     width: 4px;
     height: 18px;
-    background: var(--party-red, #C12C1F);
+    background: var(--party-red, #c12c1f);
     border-radius: 2px;
     margin-right: 10px;
     vertical-align: middle;
@@ -980,11 +929,11 @@ onUnmounted(() => {
 
 .time-highlight {
   font-weight: 600;
-  color: var(--text-primary, #2C3E50);
+  color: var(--text-primary, #2c3e50);
 }
 
 .time-separator {
-  color: var(--text-placeholder, #C0C4CC);
+  color: var(--text-placeholder, #c0c4cc);
   margin: 0 4px;
 }
 
@@ -1029,7 +978,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--border-color, #EBEEF5);
+  border: 2px solid var(--border-color, #ebeef5);
   border-radius: var(--radius-lg, 12px);
   padding: 8px;
   background: #fff;
@@ -1050,7 +999,7 @@ onUnmounted(() => {
 }
 
 .qr-placeholder-icon {
-  color: var(--text-placeholder, #C0C4CC);
+  color: var(--text-placeholder, #c0c4cc);
 }
 
 .qr-placeholder-text {
@@ -1084,8 +1033,12 @@ onUnmounted(() => {
   font-size: 24px;
   font-weight: 700;
 
-  &.signed { color: #67C23A; }
-  &.total  { color: var(--text-primary, #2C3E50); }
+  &.signed {
+    color: #67c23a;
+  }
+  &.total {
+    color: var(--text-primary, #2c3e50);
+  }
 }
 
 .qr-stat-label {
@@ -1095,7 +1048,7 @@ onUnmounted(() => {
 
 .qr-stat-divider {
   font-size: 20px;
-  color: var(--text-placeholder, #C0C4CC);
+  color: var(--text-placeholder, #c0c4cc);
   margin-top: -8px;
 }
 
@@ -1166,7 +1119,7 @@ onUnmounted(() => {
 .records-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-primary, #2C3E50);
+  color: var(--text-primary, #2c3e50);
 }
 
 .count-badge {
@@ -1175,7 +1128,7 @@ onUnmounted(() => {
   padding: 0 10px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--party-red, #C12C1F);
+  color: var(--party-red, #c12c1f);
   background: var(--party-red-bg, rgba(193, 44, 31, 0.08));
   border-radius: 10px;
   line-height: 22px;
@@ -1202,7 +1155,7 @@ onUnmounted(() => {
 }
 
 .time-empty {
-  color: var(--text-placeholder, #C0C4CC);
+  color: var(--text-placeholder, #c0c4cc);
 }
 
 /* ============================================================
