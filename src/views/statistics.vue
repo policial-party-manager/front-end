@@ -167,11 +167,31 @@ function generateMockData(period: PeriodType = "month"): void {
 
   // ---------- 党支部数据（5 个支部） ----------
   const branchTemplates: BranchItem[] = [
-    { name: "计算机学院学生第一党支部", total: 0, stages: { normalStudent: 18, applicant: 12, activist: 28, development: 8, probationary: 6, full: 15 } },
-    { name: "计算机学院学生第二党支部", total: 0, stages: { normalStudent: 22, applicant: 15, activist: 24, development: 10, probationary: 5, full: 12 } },
-    { name: "软件学院学生党支部", total: 0, stages: { normalStudent: 14, applicant: 10, activist: 20, development: 6, probationary: 4, full: 18 } },
-    { name: "网络空间安全学院学生党支部", total: 0, stages: { normalStudent: 20, applicant: 8, activist: 16, development: 5, probationary: 7, full: 10 } },
-    { name: "人工智能学院学生党支部", total: 0, stages: { normalStudent: 16, applicant: 11, activist: 19, development: 7, probationary: 3, full: 9 } },
+    {
+      name: "计算机学院学生第一党支部",
+      total: 0,
+      stages: { normalStudent: 18, applicant: 12, activist: 28, development: 8, probationary: 6, full: 15 },
+    },
+    {
+      name: "计算机学院学生第二党支部",
+      total: 0,
+      stages: { normalStudent: 22, applicant: 15, activist: 24, development: 10, probationary: 5, full: 12 },
+    },
+    {
+      name: "软件学院学生党支部",
+      total: 0,
+      stages: { normalStudent: 14, applicant: 10, activist: 20, development: 6, probationary: 4, full: 18 },
+    },
+    {
+      name: "网络空间安全学院学生党支部",
+      total: 0,
+      stages: { normalStudent: 20, applicant: 8, activist: 16, development: 5, probationary: 7, full: 10 },
+    },
+    {
+      name: "人工智能学院学生党支部",
+      total: 0,
+      stages: { normalStudent: 16, applicant: 11, activist: 19, development: 7, probationary: 3, full: 9 },
+    },
   ];
 
   // 权限示例：支委仅看到自己支部
@@ -226,20 +246,103 @@ function generateMockData(period: PeriodType = "month"): void {
   };
 
   statCards.value = [
-    { key: "total", label: "成员总数", value: totalMembers, unit: "人", trend: calcTrend(totalMembers, prev.total), iconColor: "#409EFF", iconBg: "rgba(64,158,255,0.1)", numColor: "#409EFF" },
-    { key: "activist", label: "积极分子", value: totalActivist, unit: "人", trend: calcTrend(totalActivist, prev.activist), iconColor: "#E6A23C", iconBg: "rgba(230,162,60,0.1)", numColor: "#E6A23C", linkTo: "/members", linkQuery: { identity: "积极分子" } },
-    { key: "development", label: "发展对象", value: totalDevelopment, unit: "人", trend: calcTrend(totalDevelopment, prev.development), iconColor: "#C9973B", iconBg: "rgba(114,46,209,0.1)", numColor: "#722ED1", linkTo: "/members", linkQuery: { identity: "发展对象" } },
-    { key: "probationary", label: "预备党员", value: totalProbationary, unit: "人", trend: calcTrend(totalProbationary, prev.probationary), iconColor: "#67C23A", iconBg: "rgba(103,194,58,0.1)", numColor: "#67C23A", linkTo: "/members", linkQuery: { identity: "预备党员" } },
-    { key: "full", label: "正式党员", value: totalFull, unit: "人", trend: calcTrend(totalFull, prev.full), iconColor: "#C12C1F", iconBg: "rgba(193,44,31,0.1)", numColor: "#C12C1F", linkTo: "/members", linkQuery: { identity: "正式党员" } },
-    { key: "newActivist", label: "本月新增积极分子", value: newActivist, unit: "人", trend: calcTrend(newActivist, prev.newActivist), iconColor: "#409EFF", iconBg: "rgba(64,158,255,0.1)", numColor: "#409EFF", linkTo: "/development" },
+    {
+      key: "total",
+      label: "成员总数",
+      value: totalMembers,
+      unit: "人",
+      trend: calcTrend(totalMembers, prev.total),
+      iconColor: "#409EFF",
+      iconBg: "rgba(64,158,255,0.1)",
+      numColor: "#409EFF",
+    },
+    {
+      key: "activist",
+      label: "积极分子",
+      value: totalActivist,
+      unit: "人",
+      trend: calcTrend(totalActivist, prev.activist),
+      iconColor: "#E6A23C",
+      iconBg: "rgba(230,162,60,0.1)",
+      numColor: "#E6A23C",
+      linkTo: "/members",
+      linkQuery: { identity: "积极分子" },
+    },
+    {
+      key: "development",
+      label: "发展对象",
+      value: totalDevelopment,
+      unit: "人",
+      trend: calcTrend(totalDevelopment, prev.development),
+      iconColor: "#C9973B",
+      iconBg: "rgba(114,46,209,0.1)",
+      numColor: "#722ED1",
+      linkTo: "/members",
+      linkQuery: { identity: "发展对象" },
+    },
+    {
+      key: "probationary",
+      label: "预备党员",
+      value: totalProbationary,
+      unit: "人",
+      trend: calcTrend(totalProbationary, prev.probationary),
+      iconColor: "#67C23A",
+      iconBg: "rgba(103,194,58,0.1)",
+      numColor: "#67C23A",
+      linkTo: "/members",
+      linkQuery: { identity: "预备党员" },
+    },
+    {
+      key: "full",
+      label: "正式党员",
+      value: totalFull,
+      unit: "人",
+      trend: calcTrend(totalFull, prev.full),
+      iconColor: "#C12C1F",
+      iconBg: "rgba(193,44,31,0.1)",
+      numColor: "#C12C1F",
+      linkTo: "/members",
+      linkQuery: { identity: "正式党员" },
+    },
+    {
+      key: "newActivist",
+      label: "本月新增积极分子",
+      value: newActivist,
+      unit: "人",
+      trend: calcTrend(newActivist, prev.newActivist),
+      iconColor: "#409EFF",
+      iconBg: "rgba(64,158,255,0.1)",
+      numColor: "#409EFF",
+      linkTo: "/development",
+    },
   ];
 
   // ---------- 关键指标 ----------
   kpiData.value = [
-    { label: "活动参与率（近30天）", value: (75 + rand() * 20).toFixed(1) + "%", trend: (rand() > 0.5 ? "↑ " : "↓ ") + (rand() * 8).toFixed(1) + "%", percent: Math.round(75 + rand() * 20) },
-    { label: "二课总学时（全院累计）", value: (8000 + Math.round(rand() * 8000)).toLocaleString() + " 学时", trend: "↑ " + (rand() * 15).toFixed(1) + "%", percent: Math.round(65 + rand() * 30) },
-    { label: "思想汇报完成率", value: (85 + rand() * 12).toFixed(0) + "%", trend: (rand() > 0.3 ? "↑ " : "↓ ") + (rand() * 5).toFixed(1) + "%", percent: Math.round(85 + rand() * 12) },
-    { label: "党校学习完成率", value: (78 + rand() * 18).toFixed(0) + "%", trend: "↑ " + (rand() * 10).toFixed(1) + "%", percent: Math.round(78 + rand() * 18) },
+    {
+      label: "活动参与率（近30天）",
+      value: (75 + rand() * 20).toFixed(1) + "%",
+      trend: (rand() > 0.5 ? "↑ " : "↓ ") + (rand() * 8).toFixed(1) + "%",
+      percent: Math.round(75 + rand() * 20),
+    },
+    {
+      label: "二课总学时（全院累计）",
+      value: (8000 + Math.round(rand() * 8000)).toLocaleString() + " 学时",
+      trend: "↑ " + (rand() * 15).toFixed(1) + "%",
+      percent: Math.round(65 + rand() * 30),
+    },
+    {
+      label: "思想汇报完成率",
+      value: (85 + rand() * 12).toFixed(0) + "%",
+      trend: (rand() > 0.3 ? "↑ " : "↓ ") + (rand() * 5).toFixed(1) + "%",
+      percent: Math.round(85 + rand() * 12),
+    },
+    {
+      label: "党校学习完成率",
+      value: (78 + rand() * 18).toFixed(0) + "%",
+      trend: "↑ " + (rand() * 10).toFixed(1) + "%",
+      percent: Math.round(78 + rand() * 18),
+    },
   ];
 
   // ---------- 近 6 个月趋势 ----------
@@ -258,7 +361,13 @@ function generateMockData(period: PeriodType = "month"): void {
 
 function generateDimensionData(rand: () => number, dimension: DimensionType): DimensionRow[] {
   const nameMap: Record<DimensionType, string[]> = {
-    branch: ["计算机学院学生第一党支部", "计算机学院学生第二党支部", "软件学院学生党支部", "网络空间安全学院学生党支部", "人工智能学院学生党支部"],
+    branch: [
+      "计算机学院学生第一党支部",
+      "计算机学院学生第二党支部",
+      "软件学院学生党支部",
+      "网络空间安全学院学生党支部",
+      "人工智能学院学生党支部",
+    ],
     college: ["计算机学院", "软件学院", "网络空间安全学院", "数学学院", "物理学院", "法学院"],
     major: ["计算机科学与技术", "软件工程", "人工智能", "数学与应用数学", "应用物理", "法学"],
     class: ["计科2101班", "计科2102班", "软工2101班", "人工智能2101班", "数学2101班", "物理2101班", "法学2101班"],
@@ -274,7 +383,12 @@ function generateDimensionData(rand: () => number, dimension: DimensionType): Di
     return {
       name,
       total: normalStudent + applicant + activist + development + probationary + full,
-      normalStudent, applicant, activist, development, probationary, full,
+      normalStudent,
+      applicant,
+      activist,
+      development,
+      probationary,
+      full,
       activityRate: Math.round((65 + rand() * 30) * 10) / 10,
       reportRate: Math.round((75 + rand() * 22) * 10) / 10,
     };
@@ -284,7 +398,7 @@ function generateDimensionData(rand: () => number, dimension: DimensionType): Di
 // ============================================================
 // 周期 / 维度切换
 // ============================================================
-const periodLabel = computed(() => ({ month: "本月", quarter: "本季度", year: "本年" }[currentPeriod.value]));
+const periodLabel = computed(() => ({ month: "本月", quarter: "本季度", year: "本年" })[currentPeriod.value]);
 
 function handlePeriodChange(period: PeriodType): void {
   currentPeriod.value = period;
@@ -366,17 +480,30 @@ function initStageChart(): void {
       itemHeight: 10,
       textStyle: { fontSize: 13, color: "#606266" },
     },
-    series: [{
-      name: "培养阶段分布",
-      type: "pie",
-      radius: ["52%", "78%"],
-      center: ["38%", "50%"],
-      avoidLabelOverlap: false,
-      itemStyle: { borderRadius: 4, borderColor: "#fff", borderWidth: 3 },
-      label: { show: true, position: "outside", formatter: "{b}\n{d}%", fontSize: 12, color: "#606266", lineHeight: 16 },
-      emphasis: { label: { show: true, fontSize: 16, fontWeight: "bold" }, scaleSize: 8 },
-      data: stageData.value.map((item) => ({ value: item.count, name: item.stage, itemStyle: { color: item.color } })),
-    }],
+    series: [
+      {
+        name: "培养阶段分布",
+        type: "pie",
+        radius: ["52%", "78%"],
+        center: ["38%", "50%"],
+        avoidLabelOverlap: false,
+        itemStyle: { borderRadius: 4, borderColor: "#fff", borderWidth: 3 },
+        label: {
+          show: true,
+          position: "outside",
+          formatter: "{b}\n{d}%",
+          fontSize: 12,
+          color: "#606266",
+          lineHeight: 16,
+        },
+        emphasis: { label: { show: true, fontSize: 16, fontWeight: "bold" }, scaleSize: 8 },
+        data: stageData.value.map((item) => ({
+          value: item.count,
+          name: item.stage,
+          itemStyle: { color: item.color },
+        })),
+      },
+    ],
   });
 }
 
@@ -408,31 +535,40 @@ function initBranchChart(): void {
     },
     grid: { left: "3%", right: "10%", bottom: "3%", top: 12, containLabel: true },
     xAxis: {
-      type: "value", name: "人数", minInterval: 1,
+      type: "value",
+      name: "人数",
+      minInterval: 1,
       nameTextStyle: { fontSize: 12, color: "#606266" },
       axisLabel: { fontSize: 11, color: "#909399" },
-      axisLine: { show: false }, axisTick: { show: false },
+      axisLine: { show: false },
+      axisTick: { show: false },
       splitLine: { lineStyle: { color: "#F2F6FC", type: "dashed" } },
     },
     yAxis: {
-      type: "category", data: names, inverse: true,
+      type: "category",
+      data: names,
+      inverse: true,
       axisLabel: { fontSize: 12, color: "#606266", width: 130, overflow: "truncate" },
-      axisLine: { lineStyle: { color: "#EBEEF5" } }, axisTick: { show: false },
+      axisLine: { lineStyle: { color: "#EBEEF5" } },
+      axisTick: { show: false },
     },
-    series: [{
-      type: "bar", barWidth: "50%",
-      data: values.map((v, i) => ({
-        value: v,
-        itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-            { offset: 0, color: "#C12C1F" },
-            { offset: 1, color: redShades[i] || "#FDE2E2" },
-          ]),
-          borderRadius: [0, 4, 4, 0],
-        },
-      })),
-      label: { show: true, position: "right", fontSize: 13, fontWeight: 600, color: "#C12C1F", formatter: "{c} 人" },
-    }],
+    series: [
+      {
+        type: "bar",
+        barWidth: "50%",
+        data: values.map((v, i) => ({
+          value: v,
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: "#C12C1F" },
+              { offset: 1, color: redShades[i] || "#FDE2E2" },
+            ]),
+            borderRadius: [0, 4, 4, 0],
+          },
+        })),
+        label: { show: true, position: "right", fontSize: 13, fontWeight: 600, color: "#C12C1F", formatter: "{c} 人" },
+      },
+    ],
   });
 }
 
@@ -465,15 +601,21 @@ function initTrendChart(): void {
     legend: { top: 0, itemWidth: 14, itemHeight: 10, itemGap: 20, textStyle: { fontSize: 13, color: "#606266" } },
     grid: { left: "3%", right: "4%", bottom: "3%", top: 48, containLabel: true },
     xAxis: {
-      type: "category", data: months, boundaryGap: false,
+      type: "category",
+      data: months,
+      boundaryGap: false,
       axisLabel: { fontSize: 12, color: "#909399" },
-      axisLine: { lineStyle: { color: "#EBEEF5" } }, axisTick: { show: false },
+      axisLine: { lineStyle: { color: "#EBEEF5" } },
+      axisTick: { show: false },
     },
     yAxis: {
-      type: "value", name: "人数", minInterval: 1,
+      type: "value",
+      name: "人数",
+      minInterval: 1,
       nameTextStyle: { fontSize: 12, color: "#606266" },
       axisLabel: { fontSize: 11, color: "#909399" },
-      axisLine: { show: false }, axisTick: { show: false },
+      axisLine: { show: false },
+      axisTick: { show: false },
       splitLine: { lineStyle: { color: "#F2F6FC", type: "dashed" } },
     },
     series: seriesConf.map((s) => ({
@@ -481,7 +623,8 @@ function initTrendChart(): void {
       type: "line",
       data: trendData.value.map((d) => (d as any)[s.key] || 0),
       smooth: true,
-      symbol: "circle", symbolSize: 6,
+      symbol: "circle",
+      symbolSize: 6,
       lineStyle: { width: 2.5, color: s.color },
       itemStyle: { color: s.color },
       areaStyle: {
@@ -820,9 +963,15 @@ onUnmounted(() => {
   font-size: 12px;
   font-weight: 500;
 
-  &.trend-up { color: #67c23a; }
-  &.trend-down { color: #f56c6c; }
-  &.trend-flat { color: var(--text-placeholder, #c0c4cc); }
+  &.trend-up {
+    color: #67c23a;
+  }
+  &.trend-down {
+    color: #f56c6c;
+  }
+  &.trend-flat {
+    color: var(--text-placeholder, #c0c4cc);
+  }
 }
 
 /* ---- 图表行 ---- */
@@ -889,8 +1038,12 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 600;
 
-  &.trend-up { color: #67c23a; }
-  &.trend-down { color: #f56c6c; }
+  &.trend-up {
+    color: #67c23a;
+  }
+  &.trend-down {
+    color: #f56c6c;
+  }
 }
 
 .kpi-value {
