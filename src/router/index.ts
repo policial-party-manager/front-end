@@ -79,9 +79,9 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "数据统计 - 党建云平台" },
   },
   {
-    path: "/downloads",
-    name: "Downloads",
-    component: () => import("@/views/downloads.vue"),
+    path: "/resources",
+    name: "Resources",
+    component: () => import("@/views/resources/index.vue"),
     meta: { title: "下载专区 - 党建云平台" },
   },
 ];
@@ -103,7 +103,7 @@ router.beforeEach((to, _from, next) => {
     "/development": "development",
     "/activity": "activities",
     "/statistics": "statistics",
-    "/downloads": "downloads",
+    "/resources": "downloads",
   };
   // 支持子路由匹配（如 /development/member/:id 也高亮 "党员发展"）
   const matchedKey = pathKeyMap[to.path] || pathKeyMap["/" + to.path.split("/")[1]] || "home";
