@@ -117,7 +117,7 @@ export const useAppStore = defineStore("app", () => {
     { key: "development", label: "党员发展", path: "/development" },
     { key: "activities", label: "活动中心", path: "/activity" },
     { key: "statistics", label: "数据统计", path: "/statistics" },
-    { key: "downloads", label: "下载专区", path: "/downloads" },
+    { key: "downloads", label: "下载专区", path: "/resources" },
   ];
 
   // ============ Mock 新闻数据 ============
