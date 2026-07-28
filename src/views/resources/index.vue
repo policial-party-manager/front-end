@@ -21,8 +21,8 @@
  *
  * TODO: 接入真实 API 后，替换所有 Mock 数据与上传逻辑
  */
-import { ref, computed, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, computed, reactive, onMounted } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
   Upload,
   Search,
@@ -34,90 +34,90 @@ import {
   PictureFilled,
   Document,
   Grid,
-} from '@element-plus/icons-vue'
-import { useAppStore } from '@/stores/app'
-import type { Role } from '@/stores/app'
-import type { UploadFile, UploadFiles } from 'element-plus'
+} from "@element-plus/icons-vue";
+import { useAppStore } from "@/stores/app";
+import type { Role } from "@/stores/app";
+import type { UploadFile, UploadFiles } from "element-plus";
 
 // ============================================================
 // Store & 权限
 // ============================================================
-const store = useAppStore()
-const currentRole = computed<Role>(() => store.currentRole)
+const store = useAppStore();
+const currentRole = computed<Role>(() => store.currentRole);
 
 /** 是否有上传/编辑/删除权限 */
-const canManage = computed(() => currentRole.value === 'super_admin' || currentRole.value === 'party_secretary')
+const canManage = computed(() => currentRole.value === "super_admin" || currentRole.value === "party_secretary");
 
 /** 是否为超级管理员（可操作全部资源） */
-const isSuperAdmin = computed(() => currentRole.value === 'super_admin')
+const isSuperAdmin = computed(() => currentRole.value === "super_admin");
 
 // ============================================================
 // 类型定义
 // ============================================================
 
-type ResourceCategory = '申请书模板' | '思想汇报' | '学习资料' | '常用表格' | '其他'
+type ResourceCategory = "申请书模板" | "思想汇报" | "学习资料" | "常用表格" | "其他";
 
 interface ResourceItem {
-  id: number
-  title: string
-  category: ResourceCategory
-  description: string
-  fileName: string
-  fileType: string       // 文件扩展名：pdf, doc, docx, xls, xlsx, jpg, png 等
-  fileSize: string        // 如 "2.3 MB"
-  downloadCount: number
-  uploadTime: string      // ISO 日期字符串
-  uploader: string
-  uploaderRole: Role       // 上传者角色（Mock 权限判断用）
-  uploaderBranch: string   // 上传者所属支部（支委权限判断用）
+  id: number;
+  title: string;
+  category: ResourceCategory;
+  description: string;
+  fileName: string;
+  fileType: string; // 文件扩展名：pdf, doc, docx, xls, xlsx, jpg, png 等
+  fileSize: string; // 如 "2.3 MB"
+  downloadCount: number;
+  uploadTime: string; // ISO 日期字符串
+  uploader: string;
+  uploaderRole: Role; // 上传者角色（Mock 权限判断用）
+  uploaderBranch: string; // 上传者所属支部（支委权限判断用）
 }
 
 interface UploadFormData {
-  title: string
-  category: ResourceCategory | ''
-  description: string
+  title: string;
+  category: ResourceCategory | "";
+  description: string;
 }
 
 // ============================================================
 // 分类配置
 // ============================================================
 
-const CATEGORY_OPTIONS: { label: string; value: ResourceCategory | '' }[] = [
-  { label: '全部', value: '' },
-  { label: '申请书模板', value: '申请书模板' },
-  { label: '思想汇报', value: '思想汇报' },
-  { label: '学习资料', value: '学习资料' },
-  { label: '常用表格', value: '常用表格' },
-  { label: '其他', value: '其他' },
-]
+const CATEGORY_OPTIONS: { label: string; value: ResourceCategory | "" }[] = [
+  { label: "全部", value: "" },
+  { label: "申请书模板", value: "申请书模板" },
+  { label: "思想汇报", value: "思想汇报" },
+  { label: "学习资料", value: "学习资料" },
+  { label: "常用表格", value: "常用表格" },
+  { label: "其他", value: "其他" },
+];
 
 const CATEGORY_COLOR_MAP: Record<ResourceCategory, string> = {
-  '申请书模板': '#C12C1F',
-  '思想汇报': '#E6A23C',
-  '学习资料': '#409EFF',
-  '常用表格': '#67C23A',
-  '其他': '#909399',
-}
+  申请书模板: "#C12C1F",
+  思想汇报: "#E6A23C",
+  学习资料: "#409EFF",
+  常用表格: "#67C23A",
+  其他: "#909399",
+};
 
 /** 文件类型 → 图标/颜色映射 */
 const FILE_TYPE_CONFIG: Record<string, { icon: any; color: string; label: string }> = {
-  pdf:    { icon: Document, color: '#E84646', label: 'PDF' },
-  doc:    { icon: Document, color: '#409EFF', label: 'Word' },
-  docx:   { icon: Document, color: '#409EFF', label: 'Word' },
-  xls:    { icon: Grid,      color: '#67C23A', label: 'Excel' },
-  xlsx:   { icon: Grid,      color: '#67C23A', label: 'Excel' },
-  jpg:    { icon: PictureFilled, color: '#E6A23C', label: '图片' },
-  jpeg:   { icon: PictureFilled, color: '#E6A23C', label: '图片' },
-  png:    { icon: PictureFilled, color: '#E6A23C', label: '图片' },
-  gif:    { icon: PictureFilled, color: '#E6A23C', label: '图片' },
-}
+  pdf: { icon: Document, color: "#E84646", label: "PDF" },
+  doc: { icon: Document, color: "#409EFF", label: "Word" },
+  docx: { icon: Document, color: "#409EFF", label: "Word" },
+  xls: { icon: Grid, color: "#67C23A", label: "Excel" },
+  xlsx: { icon: Grid, color: "#67C23A", label: "Excel" },
+  jpg: { icon: PictureFilled, color: "#E6A23C", label: "图片" },
+  jpeg: { icon: PictureFilled, color: "#E6A23C", label: "图片" },
+  png: { icon: PictureFilled, color: "#E6A23C", label: "图片" },
+  gif: { icon: PictureFilled, color: "#E6A23C", label: "图片" },
+};
 
 function getFileConfig(ext: string) {
-  return FILE_TYPE_CONFIG[ext.toLowerCase()] || { icon: Document, color: '#909399', label: ext.toUpperCase() }
+  return FILE_TYPE_CONFIG[ext.toLowerCase()] || { icon: Document, color: "#909399", label: ext.toUpperCase() };
 }
 
 function isImageType(ext: string): boolean {
-  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext.toLowerCase())
+  return ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext.toLowerCase());
 }
 
 // ============================================================
@@ -128,246 +128,247 @@ function generateMockResources(): ResourceItem[] {
   return [
     {
       id: 1,
-      title: '入党申请书模板（2026版）',
-      category: '申请书模板',
-      description: '适用于2026年度入党申请书撰写的标准模板，包含格式规范与内容要点说明。请根据个人实际情况填写具体内容。',
-      fileName: '入党申请书模板_2026版.pdf',
-      fileType: 'pdf',
-      fileSize: '1.2 MB',
+      title: "入党申请书模板（2026版）",
+      category: "申请书模板",
+      description:
+        "适用于2026年度入党申请书撰写的标准模板，包含格式规范与内容要点说明。请根据个人实际情况填写具体内容。",
+      fileName: "入党申请书模板_2026版.pdf",
+      fileType: "pdf",
+      fileSize: "1.2 MB",
       downloadCount: 1428,
-      uploadTime: '2026-06-15',
-      uploader: '张书记',
-      uploaderRole: 'super_admin',
-      uploaderBranch: '计算机学院学生第一党支部',
+      uploadTime: "2026-06-15",
+      uploader: "张书记",
+      uploaderRole: "super_admin",
+      uploaderBranch: "计算机学院学生第一党支部",
     },
     {
       id: 2,
-      title: '转正申请书模板',
-      category: '申请书模板',
-      description: '预备党员转正申请书标准模板，含写作规范与范例参考。',
-      fileName: '转正申请书模板.docx',
-      fileType: 'docx',
-      fileSize: '856 KB',
+      title: "转正申请书模板",
+      category: "申请书模板",
+      description: "预备党员转正申请书标准模板，含写作规范与范例参考。",
+      fileName: "转正申请书模板.docx",
+      fileType: "docx",
+      fileSize: "856 KB",
       downloadCount: 967,
-      uploadTime: '2026-06-10',
-      uploader: '李支委',
-      uploaderRole: 'party_secretary',
-      uploaderBranch: '计算机学院学生第一党支部',
+      uploadTime: "2026-06-10",
+      uploader: "李支委",
+      uploaderRole: "party_secretary",
+      uploaderBranch: "计算机学院学生第一党支部",
     },
     {
       id: 3,
-      title: '2026年第三季度思想汇报撰写指南',
-      category: '思想汇报',
-      description: '第三季度思想汇报主题方向、撰写要求及提交流程说明，包含参考选题和格式规范。',
-      fileName: '2026年Q3思想汇报指南.pdf',
-      fileType: 'pdf',
-      fileSize: '2.1 MB',
+      title: "2026年第三季度思想汇报撰写指南",
+      category: "思想汇报",
+      description: "第三季度思想汇报主题方向、撰写要求及提交流程说明，包含参考选题和格式规范。",
+      fileName: "2026年Q3思想汇报指南.pdf",
+      fileType: "pdf",
+      fileSize: "2.1 MB",
       downloadCount: 856,
-      uploadTime: '2026-07-01',
-      uploader: '张书记',
-      uploaderRole: 'super_admin',
-      uploaderBranch: '计算机学院学生第一党支部',
+      uploadTime: "2026-07-01",
+      uploader: "张书记",
+      uploaderRole: "super_admin",
+      uploaderBranch: "计算机学院学生第一党支部",
     },
     {
       id: 4,
-      title: '思想汇报范文汇编（5篇）',
-      category: '思想汇报',
-      description: '精选5篇优秀思想汇报范文，涵盖理论学习、社会实践、志愿服务等主题方向。',
-      fileName: '思想汇报范文汇编.docx',
-      fileType: 'docx',
-      fileSize: '3.4 MB',
+      title: "思想汇报范文汇编（5篇）",
+      category: "思想汇报",
+      description: "精选5篇优秀思想汇报范文，涵盖理论学习、社会实践、志愿服务等主题方向。",
+      fileName: "思想汇报范文汇编.docx",
+      fileType: "docx",
+      fileSize: "3.4 MB",
       downloadCount: 1234,
-      uploadTime: '2026-05-20',
-      uploader: '王支委',
-      uploaderRole: 'party_secretary',
-      uploaderBranch: '软件学院学生党支部',
+      uploadTime: "2026-05-20",
+      uploader: "王支委",
+      uploaderRole: "party_secretary",
+      uploaderBranch: "软件学院学生党支部",
     },
     {
       id: 5,
-      title: '中国共产党章程（二十大修订版）',
-      category: '学习资料',
-      description: '中国共产党第二十次全国代表大会修订通过的《中国共产党章程》全文。',
-      fileName: '中国共产党章程_二十大修订版.pdf',
-      fileType: 'pdf',
-      fileSize: '4.8 MB',
+      title: "中国共产党章程（二十大修订版）",
+      category: "学习资料",
+      description: "中国共产党第二十次全国代表大会修订通过的《中国共产党章程》全文。",
+      fileName: "中国共产党章程_二十大修订版.pdf",
+      fileType: "pdf",
+      fileSize: "4.8 MB",
       downloadCount: 2356,
-      uploadTime: '2026-03-15',
-      uploader: '张书记',
-      uploaderRole: 'super_admin',
-      uploaderBranch: '计算机学院学生第一党支部',
+      uploadTime: "2026-03-15",
+      uploader: "张书记",
+      uploaderRole: "super_admin",
+      uploaderBranch: "计算机学院学生第一党支部",
     },
     {
       id: 6,
-      title: '习近平新时代中国特色社会主思想学习纲要',
-      category: '学习资料',
-      description: '《习近平新时代中国特色社会主义思想学习纲要》全文，包含核心要义和精神实质解读。',
-      fileName: '习近平新时代中国特色社会主义思想学习纲要.pdf',
-      fileType: 'pdf',
-      fileSize: '6.2 MB',
+      title: "习近平新时代中国特色社会主思想学习纲要",
+      category: "学习资料",
+      description: "《习近平新时代中国特色社会主义思想学习纲要》全文，包含核心要义和精神实质解读。",
+      fileName: "习近平新时代中国特色社会主义思想学习纲要.pdf",
+      fileType: "pdf",
+      fileSize: "6.2 MB",
       downloadCount: 1890,
-      uploadTime: '2026-04-01',
-      uploader: '张书记',
-      uploaderRole: 'super_admin',
-      uploaderBranch: '计算机学院学生第一党支部',
+      uploadTime: "2026-04-01",
+      uploader: "张书记",
+      uploaderRole: "super_admin",
+      uploaderBranch: "计算机学院学生第一党支部",
     },
     {
       id: 7,
-      title: '发展党员工作流程图解',
-      category: '学习资料',
-      description: '以流程图形式展示发展党员全过程各环节，包含时间节点要求和材料清单。',
-      fileName: '发展党员工作流程图解.png',
-      fileType: 'png',
-      fileSize: '1.8 MB',
+      title: "发展党员工作流程图解",
+      category: "学习资料",
+      description: "以流程图形式展示发展党员全过程各环节，包含时间节点要求和材料清单。",
+      fileName: "发展党员工作流程图解.png",
+      fileType: "png",
+      fileSize: "1.8 MB",
       downloadCount: 756,
-      uploadTime: '2026-05-10',
-      uploader: '李支委',
-      uploaderRole: 'party_secretary',
-      uploaderBranch: '计算机学院学生第一党支部',
+      uploadTime: "2026-05-10",
+      uploader: "李支委",
+      uploaderRole: "party_secretary",
+      uploaderBranch: "计算机学院学生第一党支部",
     },
     {
       id: 8,
-      title: '党员发展对象培养考察登记表',
-      category: '常用表格',
-      description: '发展对象培养考察期间使用的登记表格，需按季度填写培养考察情况。',
-      fileName: '培养考察登记表.xlsx',
-      fileType: 'xlsx',
-      fileSize: '512 KB',
+      title: "党员发展对象培养考察登记表",
+      category: "常用表格",
+      description: "发展对象培养考察期间使用的登记表格，需按季度填写培养考察情况。",
+      fileName: "培养考察登记表.xlsx",
+      fileType: "xlsx",
+      fileSize: "512 KB",
       downloadCount: 678,
-      uploadTime: '2026-06-20',
-      uploader: '张书记',
-      uploaderRole: 'super_admin',
-      uploaderBranch: '计算机学院学生第一党支部',
+      uploadTime: "2026-06-20",
+      uploader: "张书记",
+      uploaderRole: "super_admin",
+      uploaderBranch: "计算机学院学生第一党支部",
     },
     {
       id: 9,
-      title: '党支部活动签到表',
-      category: '常用表格',
-      description: '党支部组织活动签到用表，含姓名、学号、签到时间、备注等字段。',
-      fileName: '党支部活动签到表.xlsx',
-      fileType: 'xlsx',
-      fileSize: '328 KB',
+      title: "党支部活动签到表",
+      category: "常用表格",
+      description: "党支部组织活动签到用表，含姓名、学号、签到时间、备注等字段。",
+      fileName: "党支部活动签到表.xlsx",
+      fileType: "xlsx",
+      fileSize: "328 KB",
       downloadCount: 534,
-      uploadTime: '2026-06-25',
-      uploader: '赵支委',
-      uploaderRole: 'party_secretary',
-      uploaderBranch: '网络空间安全学院学生党支部',
+      uploadTime: "2026-06-25",
+      uploader: "赵支委",
+      uploaderRole: "party_secretary",
+      uploaderBranch: "网络空间安全学院学生党支部",
     },
     {
       id: 10,
-      title: '党员基本信息登记表',
-      category: '常用表格',
-      description: '党员基本信息采集登记表，用于建立和维护党员信息档案。',
-      fileName: '党员基本信息登记表.xls',
-      fileType: 'xls',
-      fileSize: '445 KB',
+      title: "党员基本信息登记表",
+      category: "常用表格",
+      description: "党员基本信息采集登记表，用于建立和维护党员信息档案。",
+      fileName: "党员基本信息登记表.xls",
+      fileType: "xls",
+      fileSize: "445 KB",
       downloadCount: 892,
-      uploadTime: '2026-05-05',
-      uploader: '张书记',
-      uploaderRole: 'super_admin',
-      uploaderBranch: '计算机学院学生第一党支部',
+      uploadTime: "2026-05-05",
+      uploader: "张书记",
+      uploaderRole: "super_admin",
+      uploaderBranch: "计算机学院学生第一党支部",
     },
     {
       id: 11,
-      title: '主题党日活动照片集锦',
-      category: '其他',
-      description: '2026年上半年各支部主题党日活动照片集锦，共收录60张精选照片。',
-      fileName: '主题党日活动照片集锦.jpg',
-      fileType: 'jpg',
-      fileSize: '8.5 MB',
+      title: "主题党日活动照片集锦",
+      category: "其他",
+      description: "2026年上半年各支部主题党日活动照片集锦，共收录60张精选照片。",
+      fileName: "主题党日活动照片集锦.jpg",
+      fileType: "jpg",
+      fileSize: "8.5 MB",
       downloadCount: 345,
-      uploadTime: '2026-07-15',
-      uploader: '宣传委员',
-      uploaderRole: 'party_secretary',
-      uploaderBranch: '人工智能学院学生党支部',
+      uploadTime: "2026-07-15",
+      uploader: "宣传委员",
+      uploaderRole: "party_secretary",
+      uploaderBranch: "人工智能学院学生党支部",
     },
     {
       id: 12,
-      title: '党校培训结业证书模板',
-      category: '其他',
-      description: '党校培训课程结业证书样式模板，适用于积极分子和发展对象培训结业使用。',
-      fileName: '党校培训结业证书模板.pdf',
-      fileType: 'pdf',
-      fileSize: '1.5 MB',
+      title: "党校培训结业证书模板",
+      category: "其他",
+      description: "党校培训课程结业证书样式模板，适用于积极分子和发展对象培训结业使用。",
+      fileName: "党校培训结业证书模板.pdf",
+      fileType: "pdf",
+      fileSize: "1.5 MB",
       downloadCount: 456,
-      uploadTime: '2026-04-20',
-      uploader: '张书记',
-      uploaderRole: 'super_admin',
-      uploaderBranch: '计算机学院学生第一党支部',
+      uploadTime: "2026-04-20",
+      uploader: "张书记",
+      uploaderRole: "super_admin",
+      uploaderBranch: "计算机学院学生第一党支部",
     },
     {
       id: 13,
-      title: '入党志愿书填写规范说明',
-      category: '申请书模板',
-      description: '《入党志愿书》逐项填写规范说明，确保填写内容完整、规范、准确。',
-      fileName: '入党志愿书填写规范说明.pdf',
-      fileType: 'pdf',
-      fileSize: '1.8 MB',
+      title: "入党志愿书填写规范说明",
+      category: "申请书模板",
+      description: "《入党志愿书》逐项填写规范说明，确保填写内容完整、规范、准确。",
+      fileName: "入党志愿书填写规范说明.pdf",
+      fileType: "pdf",
+      fileSize: "1.8 MB",
       downloadCount: 1123,
-      uploadTime: '2026-06-01',
-      uploader: '张书记',
-      uploaderRole: 'super_admin',
-      uploaderBranch: '计算机学院学生第一党支部',
+      uploadTime: "2026-06-01",
+      uploader: "张书记",
+      uploaderRole: "super_admin",
+      uploaderBranch: "计算机学院学生第一党支部",
     },
     {
       id: 14,
-      title: '党的二十大精神学习心得汇编',
-      category: '学习资料',
-      description: '各支部党员学习党的二十大精神心得体会汇编，共收录30篇优秀心得。',
-      fileName: '二十大精神学习心得汇编.docx',
-      fileType: 'docx',
-      fileSize: '4.2 MB',
+      title: "党的二十大精神学习心得汇编",
+      category: "学习资料",
+      description: "各支部党员学习党的二十大精神心得体会汇编，共收录30篇优秀心得。",
+      fileName: "二十大精神学习心得汇编.docx",
+      fileType: "docx",
+      fileSize: "4.2 MB",
       downloadCount: 1567,
-      uploadTime: '2026-03-28',
-      uploader: '李支委',
-      uploaderRole: 'party_secretary',
-      uploaderBranch: '计算机学院学生第一党支部',
+      uploadTime: "2026-03-28",
+      uploader: "李支委",
+      uploaderRole: "party_secretary",
+      uploaderBranch: "计算机学院学生第一党支部",
     },
-  ]
+  ];
 }
 
 // ============================================================
 // 响应式状态
 // ============================================================
 
-const loading = ref(true)
-const resources = ref<ResourceItem[]>([])
-const filteredResources = ref<ResourceItem[]>([])
+const loading = ref(true);
+const resources = ref<ResourceItem[]>([]);
+const filteredResources = ref<ResourceItem[]>([]);
 
 // ---- 搜索筛选 ----
-const filterCategory = ref<ResourceCategory | ''>('')
-const filterKeyword = ref('')
+const filterCategory = ref<ResourceCategory | "">("");
+const filterKeyword = ref("");
 
 // ---- 上传弹窗 ----
-const uploadDialogVisible = ref(false)
-const uploadFormRef = ref()
-const uploading = ref(false)
+const uploadDialogVisible = ref(false);
+const uploadFormRef = ref();
+const uploading = ref(false);
 const uploadFormData = reactive<UploadFormData>({
-  title: '',
-  category: '',
-  description: '',
-})
-const uploadedFile = ref<File | null>(null)
-const uploadedFileName = ref('')
+  title: "",
+  category: "",
+  description: "",
+});
+const uploadedFile = ref<File | null>(null);
+const uploadedFileName = ref("");
 
 const uploadFormRules = {
-  title: [{ required: true, message: '请输入文件标题', trigger: 'blur' }],
-  category: [{ required: true, message: '请选择分类', trigger: 'change' }],
-}
+  title: [{ required: true, message: "请输入文件标题", trigger: "blur" }],
+  category: [{ required: true, message: "请选择分类", trigger: "change" }],
+};
 
 // ---- 详情弹窗 ----
-const detailDialogVisible = ref(false)
-const currentDetail = ref<ResourceItem | null>(null)
+const detailDialogVisible = ref(false);
+const currentDetail = ref<ResourceItem | null>(null);
 
 // ---- 编辑弹窗（复用上传弹窗结构） ----
-const editDialogVisible = ref(false)
-const editingResource = ref<ResourceItem | null>(null)
-const editFormRef = ref()
-const saving = ref(false)
+const editDialogVisible = ref(false);
+const editingResource = ref<ResourceItem | null>(null);
+const editFormRef = ref();
+const saving = ref(false);
 const editFormData = reactive<UploadFormData>({
-  title: '',
-  category: '',
-  description: '',
-})
+  title: "",
+  category: "",
+  description: "",
+});
 
 // ============================================================
 // 计算属性
@@ -375,20 +376,20 @@ const editFormData = reactive<UploadFormData>({
 
 /** 获取分类标签颜色 */
 function getCategoryColor(category: ResourceCategory): string {
-  return CATEGORY_COLOR_MAP[category] || '#909399'
+  return CATEGORY_COLOR_MAP[category] || "#909399";
 }
 
 /** 判断当前用户是否可以编辑某条资源 */
 function canEditResource(item: ResourceItem): boolean {
-  if (isSuperAdmin.value) return true
+  if (isSuperAdmin.value) return true;
   // 支委可编辑本支部上传的资源
-  if (currentRole.value === 'party_secretary' && item.uploaderRole === 'party_secretary') return true
-  return false
+  if (currentRole.value === "party_secretary" && item.uploaderRole === "party_secretary") return true;
+  return false;
 }
 
 /** 判断当前用户是否可以删除某条资源 */
 function canDeleteResource(item: ResourceItem): boolean {
-  return canEditResource(item)
+  return canEditResource(item);
 }
 
 // ============================================================
@@ -396,32 +397,30 @@ function canDeleteResource(item: ResourceItem): boolean {
 // ============================================================
 
 function applyFilter(): void {
-  let result = [...resources.value]
+  let result = [...resources.value];
 
   if (filterCategory.value) {
-    result = result.filter((item) => item.category === filterCategory.value)
+    result = result.filter((item) => item.category === filterCategory.value);
   }
 
   if (filterKeyword.value.trim()) {
-    const keyword = filterKeyword.value.trim().toLowerCase()
+    const keyword = filterKeyword.value.trim().toLowerCase();
     result = result.filter(
-      (item) =>
-        item.title.toLowerCase().includes(keyword) ||
-        item.fileName.toLowerCase().includes(keyword)
-    )
+      (item) => item.title.toLowerCase().includes(keyword) || item.fileName.toLowerCase().includes(keyword),
+    );
   }
 
-  filteredResources.value = result
+  filteredResources.value = result;
 }
 
 function handleSearch(): void {
-  applyFilter()
+  applyFilter();
 }
 
 function handleReset(): void {
-  filterCategory.value = ''
-  filterKeyword.value = ''
-  applyFilter()
+  filterCategory.value = "";
+  filterKeyword.value = "";
+  applyFilter();
 }
 
 // ============================================================
@@ -429,66 +428,66 @@ function handleReset(): void {
 // ============================================================
 
 function handleOpenUploadDialog(): void {
-  uploadFormData.title = ''
-  uploadFormData.category = ''
-  uploadFormData.description = ''
-  uploadedFile.value = null
-  uploadedFileName.value = ''
-  uploadDialogVisible.value = true
+  uploadFormData.title = "";
+  uploadFormData.category = "";
+  uploadFormData.description = "";
+  uploadedFile.value = null;
+  uploadedFileName.value = "";
+  uploadDialogVisible.value = true;
   // 重置表单校验
-  setTimeout(() => uploadFormRef.value?.clearValidate(), 0)
+  setTimeout(() => uploadFormRef.value?.clearValidate(), 0);
 }
 
 function handleFileChange(file: UploadFile, _uploadFiles: UploadFiles): void {
-  uploadedFile.value = file.raw || null
-  uploadedFileName.value = file.name || ''
+  uploadedFile.value = file.raw || null;
+  uploadedFileName.value = file.name || "";
 }
 
 function handleFileRemove(): void {
-  uploadedFile.value = null
-  uploadedFileName.value = ''
+  uploadedFile.value = null;
+  uploadedFileName.value = "";
 }
 
 async function handleUploadSubmit(): Promise<void> {
-  const valid = await uploadFormRef.value?.validate().catch(() => false)
-  if (!valid) return
+  const valid = await uploadFormRef.value?.validate().catch(() => false);
+  if (!valid) return;
 
   if (!uploadedFile.value) {
-    ElMessage.warning('请选择要上传的文件')
-    return
+    ElMessage.warning("请选择要上传的文件");
+    return;
   }
 
-  uploading.value = true
+  uploading.value = true;
 
   // 模拟上传延迟
-  await new Promise((resolve) => setTimeout(resolve, 1000))
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 
   // 根据文件扩展名推断类型
-  const fileName = uploadedFile.value.name
-  const ext = fileName.split('.').pop()?.toLowerCase() || 'unknown'
-  const fileSizeMB = uploadedFile.value.size / (1024 * 1024)
+  const fileName = uploadedFile.value.name;
+  const ext = fileName.split(".").pop()?.toLowerCase() || "unknown";
+  const fileSizeMB = uploadedFile.value.size / (1024 * 1024);
 
   const newResource: ResourceItem = {
     id: Math.max(...resources.value.map((r) => r.id), 0) + 1,
     title: uploadFormData.title,
     category: uploadFormData.category as ResourceCategory,
-    description: uploadFormData.description || '暂无描述',
+    description: uploadFormData.description || "暂无描述",
     fileName,
     fileType: ext,
     fileSize: fileSizeMB >= 1 ? `${fileSizeMB.toFixed(1)} MB` : `${Math.round(uploadedFile.value.size / 1024)} KB`,
     downloadCount: 0,
-    uploadTime: new Date().toISOString().split('T')[0],
+    uploadTime: new Date().toISOString().split("T")[0],
     uploader: store.userInfo.name,
     uploaderRole: currentRole.value,
-    uploaderBranch: '当前用户所属支部', // TODO: 接入真实用户所属支部
-  }
+    uploaderBranch: "当前用户所属支部", // TODO: 接入真实用户所属支部
+  };
 
-  resources.value.unshift(newResource)
-  applyFilter()
-  uploading.value = false
-  uploadDialogVisible.value = false
+  resources.value.unshift(newResource);
+  applyFilter();
+  uploading.value = false;
+  uploadDialogVisible.value = false;
 
-  ElMessage.success(`文件"${fileName}"上传成功！`)
+  ElMessage.success(`文件"${fileName}"上传成功！`);
 }
 
 // ============================================================
@@ -496,36 +495,36 @@ async function handleUploadSubmit(): Promise<void> {
 // ============================================================
 
 function handleOpenEditDialog(item: ResourceItem): void {
-  editingResource.value = item
-  editFormData.title = item.title
-  editFormData.category = item.category
-  editFormData.description = item.description
-  editDialogVisible.value = true
-  setTimeout(() => editFormRef.value?.clearValidate(), 0)
+  editingResource.value = item;
+  editFormData.title = item.title;
+  editFormData.category = item.category;
+  editFormData.description = item.description;
+  editDialogVisible.value = true;
+  setTimeout(() => editFormRef.value?.clearValidate(), 0);
 }
 
 async function handleEditSubmit(): Promise<void> {
-  const valid = await editFormRef.value?.validate().catch(() => false)
-  if (!valid) return
+  const valid = await editFormRef.value?.validate().catch(() => false);
+  if (!valid) return;
 
-  if (!editingResource.value) return
+  if (!editingResource.value) return;
 
-  saving.value = true
+  saving.value = true;
   // 模拟保存延迟
-  await new Promise((resolve) => setTimeout(resolve, 600))
+  await new Promise((resolve) => setTimeout(resolve, 600));
 
-  const target = resources.value.find((r) => r.id === editingResource.value!.id)
+  const target = resources.value.find((r) => r.id === editingResource.value!.id);
   if (target) {
-    target.title = editFormData.title
-    target.category = editFormData.category as ResourceCategory
-    target.description = editFormData.description
+    target.title = editFormData.title;
+    target.category = editFormData.category as ResourceCategory;
+    target.description = editFormData.description;
   }
 
-  applyFilter()
-  saving.value = false
-  editDialogVisible.value = false
+  applyFilter();
+  saving.value = false;
+  editDialogVisible.value = false;
 
-  ElMessage.success('资源信息更新成功！')
+  ElMessage.success("资源信息更新成功！");
 }
 
 // ============================================================
@@ -534,20 +533,16 @@ async function handleEditSubmit(): Promise<void> {
 
 async function handleDelete(item: ResourceItem): Promise<void> {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除资源"${item.title}"吗？删除后不可恢复。`,
-      '删除确认',
-      {
-        confirmButtonText: '确认删除',
-        cancelButtonText: '取消',
-        type: 'warning',
-        confirmButtonClass: 'el-button--danger',
-      }
-    )
+    await ElMessageBox.confirm(`确定要删除资源"${item.title}"吗？删除后不可恢复。`, "删除确认", {
+      confirmButtonText: "确认删除",
+      cancelButtonText: "取消",
+      type: "warning",
+      confirmButtonClass: "el-button--danger",
+    });
 
-    resources.value = resources.value.filter((r) => r.id !== item.id)
-    applyFilter()
-    ElMessage.success(`资源"${item.title}"已删除`)
+    resources.value = resources.value.filter((r) => r.id !== item.id);
+    applyFilter();
+    ElMessage.success(`资源"${item.title}"已删除`);
   } catch {
     // 用户取消删除
   }
@@ -559,19 +554,19 @@ async function handleDelete(item: ResourceItem): Promise<void> {
 
 function handleDownload(item: ResourceItem): void {
   // 模拟下载
-  item.downloadCount++
-  ElMessage.success(`开始下载：${item.fileName}`)
+  item.downloadCount++;
+  ElMessage.success(`开始下载：${item.fileName}`);
   // TODO: 接入真实下载链接
 }
 
 function handleOpenDetail(item: ResourceItem): void {
-  currentDetail.value = item
-  detailDialogVisible.value = true
+  currentDetail.value = item;
+  detailDialogVisible.value = true;
 }
 
 function handleDownloadFromDetail(): void {
   if (currentDetail.value) {
-    handleDownload(currentDetail.value)
+    handleDownload(currentDetail.value);
   }
 }
 
@@ -582,11 +577,11 @@ function handleDownloadFromDetail(): void {
 onMounted(() => {
   // 模拟接口加载
   setTimeout(() => {
-    resources.value = generateMockResources()
-    filteredResources.value = [...resources.value]
-    loading.value = false
-  }, 600)
-})
+    resources.value = generateMockResources();
+    filteredResources.value = [...resources.value];
+    loading.value = false;
+  }, 600);
+});
 </script>
 
 <template>
@@ -617,18 +612,8 @@ onMounted(() => {
             <el-col :xs="24" :sm="12" :md="8" :lg="6">
               <div class="filter-item">
                 <label class="filter-label">资源分类</label>
-                <el-select
-                  v-model="filterCategory"
-                  placeholder="全部"
-                  clearable
-                  style="width: 100%"
-                >
-                  <el-option
-                    v-for="opt in CATEGORY_OPTIONS"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
+                <el-select v-model="filterCategory" placeholder="全部" clearable style="width: 100%">
+                  <el-option v-for="opt in CATEGORY_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
                 </el-select>
               </div>
             </el-col>
@@ -637,12 +622,7 @@ onMounted(() => {
             <el-col :xs="24" :sm="12" :md="8" :lg="6">
               <div class="filter-item">
                 <label class="filter-label">关键词搜索</label>
-                <el-input
-                  v-model="filterKeyword"
-                  placeholder="搜索标题或文件名"
-                  clearable
-                  @keyup.enter="handleSearch"
-                >
+                <el-input v-model="filterKeyword" placeholder="搜索标题或文件名" clearable @keyup.enter="handleSearch">
                   <template #prefix>
                     <el-icon><Search /></el-icon>
                   </template>
@@ -674,11 +654,7 @@ onMounted(() => {
 
         <!-- ==================== 资源卡片网格 ==================== -->
         <div v-if="filteredResources.length > 0" class="resource-grid">
-          <div
-            v-for="item in filteredResources"
-            :key="item.id"
-            class="resource-card"
-          >
+          <div v-for="item in filteredResources" :key="item.id" class="resource-card">
             <!-- 文件图标区域 -->
             <div class="card-icon" :style="{ background: getFileConfig(item.fileType).color + '12' }">
               <el-icon :size="40" :color="getFileConfig(item.fileType).color">
@@ -695,12 +671,7 @@ onMounted(() => {
                 {{ item.title }}
               </h3>
               <div class="card-meta">
-                <el-tag
-                  :color="getCategoryColor(item.category)"
-                  effect="dark"
-                  size="small"
-                  round
-                >
+                <el-tag :color="getCategoryColor(item.category)" effect="dark" size="small" round>
                   {{ item.category }}
                 </el-tag>
                 <span class="meta-downloads">
@@ -711,23 +682,10 @@ onMounted(() => {
               <div class="card-footer">
                 <span class="meta-time">{{ item.uploadTime }}</span>
                 <div class="card-actions">
-                  <el-button
-                    type="primary"
-                    size="small"
-                    :icon="Download"
-                    text
-                    @click="handleDownload(item)"
-                  >
+                  <el-button type="primary" size="small" :icon="Download" text @click="handleDownload(item)">
                     下载
                   </el-button>
-                  <el-button
-                    size="small"
-                    :icon="View"
-                    text
-                    @click="handleOpenDetail(item)"
-                  >
-                    详情
-                  </el-button>
+                  <el-button size="small" :icon="View" text @click="handleOpenDetail(item)"> 详情 </el-button>
                   <el-button
                     v-if="canEditResource(item)"
                     size="small"
@@ -754,11 +712,7 @@ onMounted(() => {
         </div>
 
         <!-- 空状态 -->
-        <el-empty
-          v-else
-          description="暂无符合条件的资源"
-          :image-size="120"
-        />
+        <el-empty v-else description="暂无符合条件的资源" :image-size="120" />
 
         <!-- 结果统计 -->
         <div v-if="!loading" class="table-footer">
@@ -783,19 +737,10 @@ onMounted(() => {
         label-position="right"
       >
         <el-form-item label="文件标题" prop="title">
-          <el-input
-            v-model="uploadFormData.title"
-            placeholder="请输入文件标题"
-            maxlength="100"
-            show-word-limit
-          />
+          <el-input v-model="uploadFormData.title" placeholder="请输入文件标题" maxlength="100" show-word-limit />
         </el-form-item>
         <el-form-item label="分类" prop="category">
-          <el-select
-            v-model="uploadFormData.category"
-            placeholder="请选择资源分类"
-            style="width: 100%"
-          >
+          <el-select v-model="uploadFormData.category" placeholder="请选择资源分类" style="width: 100%">
             <el-option
               v-for="opt in CATEGORY_OPTIONS.filter((o) => o.value !== '')"
               :key="opt.value"
@@ -824,13 +769,9 @@ onMounted(() => {
             drag
           >
             <el-icon class="el-icon--upload"><Upload /></el-icon>
-            <div class="el-upload__text">
-              将文件拖到此处，或<em>点击上传</em>
-            </div>
+            <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
             <template #tip>
-              <div class="el-upload__tip">
-                支持 PDF、Word、Excel、图片格式，单个文件不超过 20MB
-              </div>
+              <div class="el-upload__tip">支持 PDF、Word、Excel、图片格式，单个文件不超过 20MB</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -838,9 +779,7 @@ onMounted(() => {
 
       <template #footer>
         <el-button @click="uploadDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="uploading" @click="handleUploadSubmit">
-          确认上传
-        </el-button>
+        <el-button type="primary" :loading="uploading" @click="handleUploadSubmit"> 确认上传 </el-button>
       </template>
     </el-dialog>
 
@@ -878,12 +817,7 @@ onMounted(() => {
             <div class="detail-meta-grid">
               <div class="meta-item">
                 <span class="meta-label">分类</span>
-                <el-tag
-                  :color="getCategoryColor(currentDetail.category)"
-                  effect="dark"
-                  size="small"
-                  round
-                >
+                <el-tag :color="getCategoryColor(currentDetail.category)" effect="dark" size="small" round>
                   {{ currentDetail.category }}
                 </el-tag>
               </div>
@@ -911,7 +845,7 @@ onMounted(() => {
 
             <div class="detail-description">
               <h4>文件描述</h4>
-              <p>{{ currentDetail.description || '暂无描述' }}</p>
+              <p>{{ currentDetail.description || "暂无描述" }}</p>
             </div>
           </div>
         </div>
@@ -919,9 +853,7 @@ onMounted(() => {
 
       <template #footer>
         <el-button @click="detailDialogVisible = false">关闭</el-button>
-        <el-button type="primary" :icon="Download" @click="handleDownloadFromDetail">
-          下载文件
-        </el-button>
+        <el-button type="primary" :icon="Download" @click="handleDownloadFromDetail"> 下载文件 </el-button>
       </template>
     </el-dialog>
 
@@ -941,19 +873,10 @@ onMounted(() => {
         label-position="right"
       >
         <el-form-item label="文件标题" prop="title">
-          <el-input
-            v-model="editFormData.title"
-            placeholder="请输入文件标题"
-            maxlength="100"
-            show-word-limit
-          />
+          <el-input v-model="editFormData.title" placeholder="请输入文件标题" maxlength="100" show-word-limit />
         </el-form-item>
         <el-form-item label="分类" prop="category">
-          <el-select
-            v-model="editFormData.category"
-            placeholder="请选择资源分类"
-            style="width: 100%"
-          >
+          <el-select v-model="editFormData.category" placeholder="请选择资源分类" style="width: 100%">
             <el-option
               v-for="opt in CATEGORY_OPTIONS.filter((o) => o.value !== '')"
               :key="opt.value"
@@ -976,9 +899,7 @@ onMounted(() => {
 
       <template #footer>
         <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleEditSubmit">
-          保存修改
-        </el-button>
+        <el-button type="primary" :loading="saving" @click="handleEditSubmit"> 保存修改 </el-button>
       </template>
     </el-dialog>
   </div>
