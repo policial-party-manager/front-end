@@ -23,6 +23,16 @@ function goToNewsDetail(id: number): void {
 function goToNoticeDetail(id: number): void {
   router.push(`/notice/${id}`);
 }
+
+/** 点击"更多"按钮，跳转到新闻列表页 */
+function goToNewsList(): void {
+  router.push("/news");
+}
+
+/** 点击"更多"按钮，跳转到公告列表页 */
+function goToNoticeList(): void {
+  router.push("/notice");
+}
 </script>
 
 <template>
@@ -37,7 +47,7 @@ function goToNoticeDetail(id: number): void {
         </li>
       </ul>
       <div class="panel-footer">
-        <a href="javascript:void(0)" class="more-link">更多 &raquo;</a>
+        <a class="more-link" @click.prevent="goToNewsList">更多 &raquo;</a>
       </div>
     </div>
 
@@ -51,7 +61,7 @@ function goToNoticeDetail(id: number): void {
         </li>
       </ul>
       <div class="panel-footer">
-        <a href="javascript:void(0)" class="more-link">更多 &raquo;</a>
+        <a class="more-link" @click.prevent="goToNoticeList">更多 &raquo;</a>
       </div>
     </div>
   </div>
