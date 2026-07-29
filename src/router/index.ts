@@ -37,10 +37,22 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "批量调整身份 - 党建云平台" },
   },
   {
+    path: "/news",
+    name: "NewsList",
+    component: () => import("@/views/news/NewsList.vue"),
+    meta: { title: "党建新闻 - 党建云平台" },
+  },
+  {
     path: "/news/:id",
     name: "NewsDetail",
     component: () => import("@/views/ContentDetail.vue"),
     meta: { title: "新闻详情 - 党建云平台" },
+  },
+  {
+    path: "/notice",
+    name: "NoticeList",
+    component: () => import("@/views/notice/NoticeList.vue"),
+    meta: { title: "通知公告 - 党建云平台" },
   },
   {
     path: "/notice/:id",
