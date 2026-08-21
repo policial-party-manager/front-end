@@ -29,8 +29,9 @@ function handleNavClick(key: string): void {
 }
 
 function handleLogout(): void {
-  // 退出登录逻辑（待实现）
-  console.log("退出登录");
+  // 退出登录：清除登录态并跳转到登录页
+  store.logout();
+  router.push("/login");
 }
 </script>
 

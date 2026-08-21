@@ -228,6 +228,12 @@ export const useAppStore = defineStore("app", () => {
     role: "super_admin",
   });
 
+  // ============ 登录状态 ============
+  // 登录态持久化到 localStorage，刷新后保持登录。
+  // 后续替换为真实鉴权时，可改为 token 校验。
+  const LOGIN_KEY = "party_login_name";
+  const isLoggedIn = ref<boolean>(!!localStorage.getItem(LOGIN_KEY));
+
   // ============ Actions ============
   function setActiveNav(key: string): void {
     activeNav.value = key;
@@ -236,6 +242,21 @@ export const useAppStore = defineStore("app", () => {
   function switchRole(role: Role): void {
     currentRole.value = role;
     userInfo.value.role = role;
+  }
+
+  /** 登录（Mock）：写入用户信息并进行登录态持久化 */
+  function login(name: string, role: Role = "super_admin"): void {
+    userInfo.value.name = name || "张书记";
+    userInfo.value.role = role;
+    currentRole.value = role;
+    isLoggedIn.value = true;
+    localStorage.setItem(LOGIN_KEY, userInfo.value.name);
+  }
+
+  /** 退出登录：清除登录态与持久化数据 */
+  function logout(): void {
+    isLoggedIn.value = false;
+    localStorage.removeItem(LOGIN_KEY);
   }
 
   return {
@@ -250,7 +271,10 @@ export const useAppStore = defineStore("app", () => {
     banners,
     quickEntries,
     userInfo,
+    isLoggedIn,
     setActiveNav,
     switchRole,
+    login,
+    logout,
   };
 });

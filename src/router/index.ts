@@ -7,6 +7,12 @@ import { useAppStore } from "@/stores/app";
  */
 const routes: RouteRecordRaw[] = [
   {
+    path: "/login",
+    name: "Login",
+    component: () => import("@/views/Login.vue"),
+    meta: { title: "登录 - 党建云平台", public: true },
+  },
+  {
     path: "/",
     name: "Home",
     component: () => import("@/views/index.vue"),
@@ -103,12 +109,25 @@ const router = createRouter({
   routes,
 });
 
-// 路由守卫：设置页面标题 + 同步导航高亮状态
+// 路由守卫：设置页面标题 + 同步导航高亮状态 + 登录态控制
 router.beforeEach((to, _from, next) => {
+  const store = useAppStore();
+
+  // 未登录访问任何非公开页面 => 跳转到登录页
+  if (!to.meta.public && !store.isLoggedIn) {
+    next({ path: "/login", replace: true });
+    return;
+  }
+
   document.title = (to.meta.title as string) || "党建云平台";
 
+  // 登录页不参与导航高亮，直接放行
+  if (to.meta.public) {
+    next();
+    return;
+  }
+
   // 同步 TopNav 导航高亮：根据当前路径设置 activeNav
-  const store = useAppStore();
   const pathKeyMap: Record<string, string> = {
     "/": "home",
     "/members": "members",
