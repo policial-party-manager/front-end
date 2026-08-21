@@ -456,7 +456,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="content-detail-page" v-loading="loading" element-loading-text="正在加载...">
+  <div v-loading="loading" class="content-detail-page" element-loading-text="正在加载...">
     <div class="page-container">
       <!-- ==================== 空状态 ==================== -->
       <template v-if="!loading && !detail">
@@ -469,7 +469,7 @@ onMounted(() => {
       <template v-if="detail">
         <!-- 返回按钮 -->
         <div class="detail-topbar">
-          <el-button text @click="goBack" class="back-btn">
+          <el-button text class="back-btn" @click="goBack">
             <el-icon><ArrowLeft /></el-icon>
             返回列表
           </el-button>
