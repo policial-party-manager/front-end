@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
+import { getToken, getRefreshToken, setToken, setRefreshToken, clearToken } from "@/utils/token";
+import { logout as apiLogout, type LoginResult } from "@/api/auth";
 
 /** 角色类型 */
 export type Role = "super_admin" | "party_secretary" | "party_member" | "activist";
@@ -232,7 +234,7 @@ export const useAppStore = defineStore("app", () => {
   // 登录态持久化到 localStorage，刷新后保持登录。
   // 后续替换为真实鉴权时，可改为 token 校验。
   const LOGIN_KEY = "party_login_name";
-  const isLoggedIn = ref<boolean>(!!localStorage.getItem(LOGIN_KEY));
+  const isLoggedIn = ref<boolean>(!!getToken());
 
   // ============ Actions ============
   function setActiveNav(key: string): void {
@@ -253,8 +255,42 @@ export const useAppStore = defineStore("app", () => {
     localStorage.setItem(LOGIN_KEY, userInfo.value.name);
   }
 
-  /** 退出登录：清除登录态与持久化数据 */
-  function logout(): void {
+  /**
+   * 后端角色编码 → 前端角色
+   * 后端编码：super_admin / branch_admin / student；前端保留自身 4 角色体系（含 activist）。
+   * 后端未覆盖的首尾角色时，回退为 party_member。
+   */
+  function roleFromBackend(role: string): Role {
+    const map: Record<string, Role> = {
+      super_admin: "super_admin",
+      branch_admin: "party_secretary",
+      student: "party_member",
+    };
+    return map[role] || "party_member";
+  }
+
+  /** 登录成功：写入用户信息、同步当前角色并保存 token */
+  function setSession(user: LoginResult): void {
+    userInfo.value = {
+      name: user.realName || user.username,
+      avatar: "",
+      role: roleFromBackend(user.role),
+    };
+    currentRole.value = userInfo.value.role;
+    setToken(user.accessToken);
+    setRefreshToken(user.refreshToken);
+    isLoggedIn.value = true;
+  }
+
+  /** 退出登录：通知后端失效（尽力而为），随后清除本地登录态 */
+  async function logout(): Promise<void> {
+    const refreshToken = getRefreshToken();
+    try {
+      if (refreshToken) await apiLogout(refreshToken);
+    } catch {
+      // 后端退出失败不阻塞本地退出
+    }
+    clearToken();
     isLoggedIn.value = false;
     localStorage.removeItem(LOGIN_KEY);
   }
@@ -275,6 +311,7 @@ export const useAppStore = defineStore("app", () => {
     setActiveNav,
     switchRole,
     login,
+    setSession,
     logout,
   };
 });
