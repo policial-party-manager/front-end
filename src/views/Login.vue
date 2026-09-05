@@ -4,22 +4,21 @@
  *
  * 对标川农大一统一身份认证（川农e认证）的登录界面：
  * 全屏背景图 + 半透明黑色遮罩，中央白色登录卡片，左侧微信扫码面板，
- * 右侧表单（短信登录 / 密码登录 双 Tab）。
+ * 右侧表单（邮箱登录 / 密码登录 双 Tab）。
  * 品牌文案从「川农e认证 / 四川农业大学」替换为「党建云平台」。
- *
- * 说明：当前为 Mock 登录，提交后写入 store 并跳转首页，后续可替换为真实接口。
  */
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import QRCode from "qrcode";
 import { ElMessage } from "element-plus";
 import { useAppStore } from "@/stores/app";
+import { loginUserpass, loginEmail, sendVerifyCode } from "@/api/auth";
 
 const store = useAppStore();
 const router = useRouter();
 
-// 当前激活的 Tab：短信登录 / 密码登录
-const activeTab = ref<"sms" | "password">("sms");
+// 当前激活的 Tab：邮箱登录 / 密码登录
+const activeTab = ref<"email" | "password">("email");
 
 // 背景图与党徽（复用项目已有资源）
 const bgUrl = new URL("@/assets/images/Background/06f1a3dc430b143046aa95a6c411960a.jpg", import.meta.url).href;
@@ -28,40 +27,23 @@ const emblemUrl = new URL("@/assets/images/Party/党徽黄色1024X1024.png", imp
 // 扫码登录二维码（生成指向登录页的二维码占位，Mock）
 const qrUrl = ref("");
 
-// 短信登录字段
-const phone = ref("");
-const captchaInput = ref("");
-const smsCode = ref("");
+// 邮箱登录字段
+const email = ref("");
+const emailCode = ref("");
 
-// 图形验证码（Mock）：4 位字母数字
-const captchaText = ref("");
-const captchaChars = ref<{ ch: string; rot: number; dx: number; dy: number }[]>([]);
-
-// 短信验证码倒计时
+// 邮箱验证码倒计时
 const countdown = ref(0);
 let timer: ReturnType<typeof setInterval> | undefined;
 
 // 密码登录字段
 const account = ref("");
 const password = ref("");
+const showPwd = ref(false);
 
-function randomCaptcha(): void {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const list: { ch: string; rot: number; dx: number; dy: number }[] = [];
-  for (let i = 0; i < 4; i++) {
-    list.push({
-      ch: chars[Math.floor(Math.random() * chars.length)],
-      rot: Math.random() * 30 - 15,
-      dx: Math.random() * 6 - 3,
-      dy: Math.random() * 6 - 3,
-    });
-  }
-  captchaText.value = list.map((c) => c.ch).join("");
-  captchaChars.value = list;
-}
+// 邮箱格式校验（与后端 openapi 一致）
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 onMounted(async () => {
-  randomCaptcha();
   // 生成扫码登录二维码（指向本站登录页，Mock）
   qrUrl.value = await QRCode.toDataURL(`${window.location.origin}${window.location.pathname}#/login?scan=1`, {
     width: 120,
@@ -69,48 +51,59 @@ onMounted(async () => {
   });
 });
 
-function handleGetCode(): void {
-  if (!/^1\d{10}$/.test(phone.value)) {
-    ElMessage.warning("请输入正确的手机号");
+async function handleGetCode(): Promise<void> {
+  if (!EMAIL_RE.test(email.value)) {
+    ElMessage.warning("请输入正确的邮箱");
     return;
   }
   if (countdown.value > 0) return;
-  // Mock：模拟发送短信验证码
-  ElMessage.success("验证码已发送（Mock：123456）");
-  countdown.value = 60;
-  timer = setInterval(() => {
-    countdown.value -= 1;
-    if (countdown.value <= 0) {
-      if (timer) clearInterval(timer);
-    }
-  }, 1000);
+  try {
+    await sendVerifyCode({ email: email.value });
+    ElMessage.success("验证码已发送");
+    countdown.value = 60;
+    timer = setInterval(() => {
+      countdown.value -= 1;
+      if (countdown.value <= 0) {
+        if (timer) clearInterval(timer);
+      }
+    }, 1000);
+  } catch {
+    // 失败提示由请求层拦截器统一处理
+  }
 }
 
-function handleLogin(): void {
-  if (activeTab.value === "sms") {
-    if (!/^1\d{10}$/.test(phone.value)) {
-      ElMessage.warning("请输入正确的手机号");
+async function handleLogin(): Promise<void> {
+  if (activeTab.value === "email") {
+    if (!EMAIL_RE.test(email.value)) {
+      ElMessage.warning("请输入正确的邮箱");
       return;
     }
-    if (captchaInput.value.trim().toUpperCase() !== captchaText.value) {
-      ElMessage.warning("请输入正确的图形验证码");
-      randomCaptcha();
+    if (!emailCode.value.trim()) {
+      ElMessage.warning("请输入邮箱验证码");
       return;
     }
-    if (!smsCode.value.trim()) {
-      ElMessage.warning("请输入短信验证码");
-      return;
+    try {
+      const res = await loginEmail({ email: email.value, verifyCode: emailCode.value.trim() });
+      store.setSession(res);
+      ElMessage.success("登录成功");
+      router.push("/");
+    } catch {
+      // 失败提示由请求层拦截器统一处理
     }
-    store.login(phone.value, "super_admin");
   } else {
     if (!account.value.trim() || !password.value.trim()) {
       ElMessage.warning("请输入账号和密码");
       return;
     }
-    store.login(account.value.trim(), "super_admin");
+    try {
+      const res = await loginUserpass({ username: account.value.trim(), password: password.value });
+      store.setSession(res);
+      ElMessage.success("登录成功");
+      router.push("/");
+    } catch {
+      // 失败提示由请求层拦截器统一处理
+    }
   }
-  ElMessage.success("登录成功");
-  router.push("/");
 }
 </script>
 
@@ -146,36 +139,21 @@ function handleLogin(): void {
 
             <!-- Tab 切换 -->
             <ul class="login-tabs">
-              <li class="pctabs" :class="{ active: activeTab === 'sms' }" @click="activeTab = 'sms'">短信登录</li>
+              <li class="pctabs" :class="{ active: activeTab === 'email' }" @click="activeTab = 'email'">邮箱登录</li>
               <li class="pctabs" :class="{ active: activeTab === 'password' }" @click="activeTab = 'password'">
                 密码登录
               </li>
             </ul>
 
-            <!-- 短信登录 -->
-            <div v-show="activeTab === 'sms'" class="tab-pane">
-              <!-- 手机号 -->
+            <!-- 邮箱登录 -->
+            <div v-show="activeTab === 'email'" class="tab-pane">
+              <!-- 邮箱 -->
               <div class="field relative">
-                <span class="prefix">+86</span>
-                <input v-model="phone" type="tel" maxlength="11" class="input phone" placeholder="请输入手机号" />
+                <input v-model="email" type="email" class="input" placeholder="请输入邮箱" />
               </div>
-              <!-- 图形验证码 -->
+              <!-- 邮箱验证码 -->
               <div class="field relative">
-                <input v-model="captchaInput" type="text" class="input captcha" placeholder="请输入验证码" />
-                <div class="captcha-box" title="点击刷新" @click="randomCaptcha">
-                  <span
-                    v-for="(c, i) in captchaChars"
-                    :key="i"
-                    class="captcha-char"
-                    :style="{ transform: `rotate(${c.rot}deg) translate(${c.dx}px, ${c.dy}px)` }"
-                  >
-                    {{ c.ch }}
-                  </span>
-                </div>
-              </div>
-              <!-- 短信验证码 -->
-              <div class="field relative">
-                <input v-model="smsCode" type="tel" maxlength="6" class="input" placeholder="输入短信验证码" />
+                <input v-model="emailCode" type="text" maxlength="6" class="input" placeholder="输入邮箱验证码" />
                 <button class="get-code" type="button" @click="handleGetCode">
                   {{ countdown > 0 ? `${countdown}s` : "获取验证码" }}
                 </button>
@@ -192,7 +170,15 @@ function handleLogin(): void {
                 <input v-model="account" type="text" class="input" placeholder="请输入手机号 / 工号" />
               </div>
               <div class="field relative">
-                <input v-model="password" type="password" class="input" placeholder="请输入密码" />
+                <input
+                  v-model="password"
+                  :type="showPwd ? 'text' : 'password'"
+                  class="input pwd"
+                  placeholder="请输入密码"
+                />
+                <span class="pwd-toggle" @click="showPwd = !showPwd">
+                  <el-icon :size="16"><View v-if="showPwd" /><Hide v-else /></el-icon>
+                </span>
               </div>
               <div class="field-row">
                 <span class="activate-account">忘记密码</span>
@@ -418,6 +404,26 @@ function handleLogin(): void {
 
 .input.phone {
   padding-left: 48px;
+}
+
+.input.pwd {
+  padding-right: 38px;
+}
+
+.pwd-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #4b5563;
+  }
 }
 
 .input.captcha {
