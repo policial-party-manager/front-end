@@ -16,7 +16,6 @@ export interface HistoryItem {
   identity: string; // 身份名称
   reason: string; // 操作原因
   operator: string; // 操作人
-  contact?: string; // 培养联系人（可选）
   previousIdentity?: string; // 调整前身份（可选，用于详情）
   approver?: string; // 审批人（可选，用于详情）
   notes?: string; // 备注（可选，用于详情）
@@ -138,9 +137,6 @@ function toggleExpand(id: number): void {
             <div class="summary-bottom">
               <span class="meta-item">
                 <el-icon><User /></el-icon> {{ item.operator }}
-              </span>
-              <span v-if="item.contact" class="meta-item meta-contact">
-                <el-icon><Phone /></el-icon> {{ item.contact }}
               </span>
             </div>
           </div>
@@ -264,10 +260,6 @@ function toggleExpand(id: number): void {
   gap: 4px;
   font-size: 12px;
   color: var(--text-secondary, #909399);
-}
-
-.meta-contact {
-  color: var(--party-red, #c12c1f);
 }
 
 /* ---- 展开详情 ---- */

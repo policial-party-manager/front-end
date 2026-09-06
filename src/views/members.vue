@@ -33,7 +33,6 @@ interface Member {
   identity: PartyIdentity;
   phone: string;
   email: string;
-  contactPerson: string;
   status: number;
   remark: string;
   createTime: string;
@@ -53,7 +52,6 @@ interface MemberForm {
   identity: PartyIdentity;
   phone: string;
   email: string;
-  contactPerson: string;
   remark: string;
 }
 
@@ -81,7 +79,6 @@ const allMembers = ref([
     identity: "积极分子",
     phone: "13800001001",
     email: "zhangsan@edu.cn",
-    contactPerson: "李老师",
     status: 1,
     remark: "",
     createTime: "2025-09-01",
@@ -100,7 +97,6 @@ const allMembers = ref([
     identity: "发展对象",
     phone: "13800001002",
     email: "lisi@edu.cn",
-    contactPerson: "李老师",
     status: 1,
     remark: "",
     createTime: "2025-09-01",
@@ -119,7 +115,6 @@ const allMembers = ref([
     identity: "预备党员",
     phone: "13800001003",
     email: "wangwu@edu.cn",
-    contactPerson: "陈老师",
     status: 1,
     remark: "",
     createTime: "2025-09-01",
@@ -138,7 +133,6 @@ const allMembers = ref([
     identity: "正式党员",
     phone: "13800001004",
     email: "zhaoliu@edu.cn",
-    contactPerson: "周老师",
     status: 1,
     remark: "",
     createTime: "2025-09-01",
@@ -157,7 +151,6 @@ const allMembers = ref([
     identity: "入党申请人",
     phone: "13800001005",
     email: "sunqi@edu.cn",
-    contactPerson: "赵老师",
     status: 1,
     remark: "",
     createTime: "2025-09-01",
@@ -176,7 +169,6 @@ const allMembers = ref([
     identity: "积极分子",
     phone: "13800001006",
     email: "zhouba@edu.cn",
-    contactPerson: "江老师",
     status: 1,
     remark: "",
     createTime: "2025-09-01",
@@ -195,7 +187,6 @@ const allMembers = ref([
     identity: "普通学生",
     phone: "13800001007",
     email: "wujiu@edu.cn",
-    contactPerson: "赵老师",
     status: 1,
     remark: "",
     createTime: "2025-09-01",
@@ -214,7 +205,6 @@ const allMembers = ref([
     identity: "发展对象",
     phone: "13800001008",
     email: "zhengshi@edu.cn",
-    contactPerson: "周老师",
     status: 1,
     remark: "",
     createTime: "2025-09-01",
@@ -233,7 +223,6 @@ const allMembers = ref([
     identity: "正式党员",
     phone: "13800001009",
     email: "chenshiyi@edu.cn",
-    contactPerson: "李老师",
     status: 1,
     remark: "",
     createTime: "2024-09-01",
@@ -252,7 +241,6 @@ const allMembers = ref([
     identity: "预备党员",
     phone: "13800001010",
     email: "liushier@edu.cn",
-    contactPerson: "江老师",
     status: 1,
     remark: "",
     createTime: "2024-09-01",
@@ -271,7 +259,6 @@ const allMembers = ref([
     identity: "普通学生",
     phone: "13800001011",
     email: "huangshisan@edu.cn",
-    contactPerson: "赵老师",
     status: 1,
     remark: "",
     createTime: "2026-09-01",
@@ -290,7 +277,6 @@ const allMembers = ref([
     identity: "入党申请人",
     phone: "13800001012",
     email: "yangshisi@edu.cn",
-    contactPerson: "陈老师",
     status: 1,
     remark: "",
     createTime: "2026-09-01",
@@ -309,7 +295,6 @@ const allMembers = ref([
     identity: "入党申请人",
     phone: "13800001013",
     email: "maliu@edu.cn",
-    contactPerson: "李老师",
     status: 1,
     remark: "",
     createTime: "2024-09-01",
@@ -328,7 +313,6 @@ const allMembers = ref([
     identity: "预备党员",
     phone: "13800001014",
     email: "huqi@edu.cn",
-    contactPerson: "林老师",
     status: 1,
     remark: "",
     createTime: "2024-09-01",
@@ -347,7 +331,6 @@ const allMembers = ref([
     identity: "正式党员",
     phone: "13800001015",
     email: "linba@edu.cn",
-    contactPerson: "林老师",
     status: 1,
     remark: "",
     createTime: "2024-09-01",
@@ -366,7 +349,6 @@ const allMembers = ref([
     identity: "积极分子",
     phone: "13800001016",
     email: "hejiu@edu.cn",
-    contactPerson: "林老师",
     status: 1,
     remark: "",
     createTime: "2023-09-01",
@@ -385,7 +367,6 @@ const allMembers = ref([
     identity: "发展对象",
     phone: "13800001017",
     email: "luoshi@edu.cn",
-    contactPerson: "周老师",
     status: 1,
     remark: "",
     createTime: "2023-09-01",
@@ -404,7 +385,6 @@ const allMembers = ref([
     identity: "入党申请人",
     phone: "13800001018",
     email: "liangyi@edu.cn",
-    contactPerson: "何老师",
     status: 1,
     remark: "",
     createTime: "2023-09-01",
@@ -423,7 +403,6 @@ const allMembers = ref([
     identity: "正式党员",
     phone: "13800001019",
     email: "songer@edu.cn",
-    contactPerson: "周老师",
     status: 1,
     remark: "",
     createTime: "2022-09-01",
@@ -442,7 +421,6 @@ const allMembers = ref([
     identity: "正式党员",
     phone: "13800001020",
     email: "tangsan@edu.cn",
-    contactPerson: "何老师",
     status: 1,
     remark: "",
     createTime: "2022-09-01",
@@ -620,7 +598,6 @@ const formData = reactive<MemberForm>({
   identity: "普通学生",
   phone: "",
   email: "",
-  contactPerson: "",
   remark: "",
 });
 
@@ -661,7 +638,6 @@ function handleAdd(): void {
     identity: "普通学生",
     phone: "",
     email: "",
-    contactPerson: "",
     remark: "",
   });
   dialogVisible.value = true;
@@ -684,7 +660,6 @@ function handleEdit(row: Member): void {
     identity: row.identity,
     phone: row.phone,
     email: row.email,
-    contactPerson: row.contactPerson,
     remark: row.remark,
   });
   dialogVisible.value = true;
@@ -782,7 +757,6 @@ function handleExport(): void {
       "政治身份",
       "联系电话",
       "邮箱",
-      "培养联系人",
       "备注",
     ];
     const rows = filteredMembers.value.map((m) => [
@@ -797,7 +771,6 @@ function handleExport(): void {
       m.identity,
       m.phone,
       m.email,
-      m.contactPerson,
       m.remark,
     ]);
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
@@ -988,7 +961,6 @@ function handleExport(): void {
             </template>
           </el-table-column>
           <el-table-column prop="phone" label="联系电话" width="130" />
-          <el-table-column prop="contactPerson" label="培养联系人" width="110" />
           <el-table-column prop="updateTime" label="最后更新" width="120" sortable />
           <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
@@ -1106,11 +1078,6 @@ function handleExport(): void {
                   :value="opt.value"
                 />
               </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="培养联系人" prop="contactPerson">
-              <el-input v-model="formData.contactPerson" placeholder="请输入培养联系人" />
             </el-form-item>
           </el-col>
         </el-row>

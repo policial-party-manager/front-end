@@ -58,15 +58,6 @@ const identityTagType = computed(() => {
 });
 
 // ============================================================
-// Mock 数据：培养联系人
-// ============================================================
-const contactPerson = ref({
-  name: "李老师", // 联系人姓名
-  role: "党支部书记", // 联系人职务
-  phone: "139****5678",
-});
-
-// ============================================================
 // Mock 数据：培养记录（至少 1 条）
 // 字段：id, name(材料名称), uploadTime(上传时间), operator(操作人)
 // ============================================================
@@ -139,7 +130,6 @@ const activities = ref([
 // ============================================================
 // Mock 数据：身份历史（4-5 条，按时间倒序）
 // 字段：id, time(时间), identityName(身份名称), reason(操作原因),
-//       operator(操作人), contactPerson(培养联系人，如有)
 // ============================================================
 const identityHistory = ref([
   {
@@ -149,9 +139,7 @@ const identityHistory = ref([
     previousIdentity: "积极分子", // 调整前身份
     reason: "经支部委员会讨论，该同志表现突出，确定为发展对象",
     operator: "李老师",
-    approver: "王书记", // 审批人
-    contactPerson: "李老师",
-    notes: "该同志在积极分子期间表现优异，支部大会全票通过", // 备注
+    approver: "王书记", // 审批人    notes: "该同志在积极分子期间表现优异，支部大会全票通过", // 备注
   },
   {
     id: 4,
@@ -161,7 +149,6 @@ const identityHistory = ref([
     reason: "入党申请审核通过，经支部大会讨论确定为入党积极分子",
     operator: "王书记",
     approver: "王书记",
-    contactPerson: "赵老师",
     notes: "入党申请书材料齐全，团组织推优通过",
   },
   {
@@ -172,7 +159,6 @@ const identityHistory = ref([
     reason: "提交入党申请书，进入入党申请人考察阶段",
     operator: "王书记",
     approver: "王书记",
-    contactPerson: null, // 入党申请人阶段暂无培养联系人
     notes: null,
   },
   {
@@ -183,7 +169,6 @@ const identityHistory = ref([
     reason: "参加入党启蒙教育，表达入党意愿",
     operator: "系统",
     approver: null,
-    contactPerson: null,
     notes: "系统自动记录",
   },
   {
@@ -194,7 +179,6 @@ const identityHistory = ref([
     reason: "大一新生入学，团组织关系转入",
     operator: "系统",
     approver: null,
-    contactPerson: null,
     notes: "系统自动记录",
   },
 ]);
@@ -207,7 +191,6 @@ const timelineData = computed(() => {
     identity: item.identityName,
     reason: item.reason,
     operator: item.operator,
-    contact: item.contactPerson || "",
     previousIdentity: item.previousIdentity || "",
     approver: item.approver || "",
     notes: item.notes || "",
@@ -372,9 +355,6 @@ onMounted(() => {
               当前身份：<el-tag :type="identityTagType" size="large">
                 {{ memberInfo.currentIdentity }}
               </el-tag>
-            </span>
-            <span class="contact-info">
-              培养联系人：{{ contactPerson.name }}（{{ contactPerson.role }}） &nbsp;{{ contactPerson.phone }}
             </span>
           </div>
           <div class="top-bar-right">
@@ -606,11 +586,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.contact-info {
-  font-size: 14px;
-  color: var(--text-regular, #606266);
 }
 
 .top-bar-right {

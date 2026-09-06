@@ -3,7 +3,7 @@
  * AdjustIdentityDialog.vue - 调整身份弹窗组件
  *
  * 在成员培养主页点击【调整身份】按钮时弹出。
- * 支持选择目标身份、填写调整原因、指定培养联系人。
+ * 支持选择目标身份、填写调整原因。
  *
  * Props:
  *   visible    - 弹窗显隐（配合 v-model:visible 使用）
@@ -14,7 +14,7 @@
  *   success        - 调整成功后触发，通知父组件刷新数据
  */
 
-import { ref, computed, watch } from "vue";
+import { ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance } from "element-plus";
 
@@ -28,13 +28,6 @@ export interface MemberInfo {
   currentIdentity: string;
 }
 
-interface TeacherItem {
-  id: number;
-  name: string;
-  title: string;
-  department: string;
-}
-
 interface IdentityOption {
   value: string;
   label: string;
@@ -43,7 +36,6 @@ interface IdentityOption {
 interface FormData {
   targetIdentity: string;
   reason: string;
-  contactPersons: number[];
 }
 
 // ============================================================
@@ -82,22 +74,6 @@ const identityTagMap: Record<string, string> = {
 };
 
 // ============================================================
-// Mock 数据：党支部内教师名单（培养联系人候选）
-// 字段：id, name, title(职务), department(所属部门)
-// TODO: 替换为接口获取的党支部教师列表
-// const res = await api.getPartyTeachers(partyBranchId)
-// teacherList.value = res.data
-// ============================================================
-const teacherList = ref<TeacherItem[]>([
-  { id: 1, name: "李老师", title: "党支部书记", department: "计算机学院" },
-  { id: 2, name: "赵老师", title: "组织委员", department: "计算机学院" },
-  { id: 3, name: "陈老师", title: "宣传委员", department: "计算机学院" },
-  { id: 4, name: "周老师", title: "辅导员", department: "计算机学院" },
-  { id: 5, name: "王书记", title: "党委副书记", department: "计算机学院" },
-  { id: 6, name: "刘老师", title: "支部委员", department: "计算机学院" },
-]);
-
-// ============================================================
 // 表单相关
 // ============================================================
 const formRef = ref<FormInstance | null>(null);
@@ -106,7 +82,6 @@ const formRef = ref<FormInstance | null>(null);
 const formData = ref<FormData>({
   targetIdentity: "", // 目标身份
   reason: "", // 调整原因
-  contactPersons: [], // 培养联系人（多选，最多 2 人）
 });
 
 // 表单校验规则
@@ -120,13 +95,6 @@ const formRules = {
 
 // 提交加载状态
 const submitting = ref(false);
-
-// ============================================================
-// 计算属性：可选的培养联系人数是否已达上限
-// ============================================================
-const contactMaxReached = computed(() => {
-  return formData.value.contactPersons.length >= 2;
-});
 
 // ============================================================
 // 监听弹窗打开，重置表单
@@ -147,7 +115,6 @@ function resetForm(): void {
   formData.value = {
     targetIdentity: "",
     reason: "",
-    contactPersons: [],
   };
   // 清除表单校验状态
   if (formRef.value) {
@@ -185,9 +152,7 @@ async function handleConfirm(): Promise<void> {
     // await api.adjustIdentity({
     //   memberId: props.memberInfo.id,
     //   targetIdentity: formData.value.targetIdentity,
-    //   reason: formData.value.reason,
-    //   contactPersons: formData.value.contactPersons,
-    // })
+    //   reason: formData.value.reason,    // })
 
     // 模拟接口延迟
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -209,17 +174,6 @@ async function confirmAdjust(): Promise<void> {
   const targetLabel =
     identityOptions.find((i) => i.value === formData.value.targetIdentity)?.label || formData.value.targetIdentity;
   const currentIdentity = props.memberInfo.currentIdentity || "未知";
-  const contactNames =
-    formData.value.contactPersons.length > 0
-      ? formData.value.contactPersons
-          .map((id: number) => {
-            const t = teacherList.value.find((item) => item.id === id);
-            return t ? t.name : "";
-          })
-          .filter(Boolean)
-          .join("、")
-      : "未指定";
-
   const message = `
     <div style="line-height: 2; font-size: 14px;">
       <p><strong>成员姓名：</strong>${props.memberInfo.name || "-"}</p>
@@ -227,7 +181,6 @@ async function confirmAdjust(): Promise<void> {
       <p><strong>当前身份：</strong>${currentIdentity}</p>
       <p><strong>目标身份：</strong><span style="color: #C12C1F; font-weight: 600;">${targetLabel}</span></p>
       <p><strong>调整原因：</strong>${formData.value.reason}</p>
-      <p><strong>培养联系人：</strong>${contactNames}</p>
     </div>
   `;
 
@@ -305,32 +258,6 @@ async function confirmAdjust(): Promise<void> {
           show-word-limit
           placeholder="请填写调整身份的原因（至少 10 个字）"
         />
-      </el-form-item>
-
-      <!-- 培养联系人 -->
-      <el-form-item label="培养联系人">
-        <el-select
-          v-model="formData.contactPersons"
-          placeholder="请选择培养联系人（选填，最多 2 人）"
-          multiple
-          style="width: 100%"
-          :disabled="contactMaxReached && formData.contactPersons.length >= 2"
-        >
-          <el-option
-            v-for="teacher in teacherList"
-            :key="teacher.id"
-            :label="`${teacher.name}（${teacher.title}）`"
-            :value="teacher.id"
-            :disabled="!formData.contactPersons.includes(teacher.id) && contactMaxReached"
-          >
-            <div class="teacher-option">
-              <span>{{ teacher.name }}</span>
-              <span class="teacher-title">{{ teacher.title }}</span>
-              <span class="teacher-dept">{{ teacher.department }}</span>
-            </div>
-          </el-option>
-        </el-select>
-        <p class="form-tip">培养联系人最多选择 2 人，如不选择则沿用现有联系人</p>
       </el-form-item>
     </el-form>
 
