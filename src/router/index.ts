@@ -114,13 +114,7 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   const store = useAppStore();
 
-  // 开发免登录模式不显示登录页，直接回到首页。
-  if (isDevSkipLoginEnabled && to.path === "/login") {
-    next({ path: "/", replace: true });
-    return;
-  }
-
-  // 未登录访问任何非公开页面 => 跳转到登录页
+  // 正常模式下，未登录访问非公开页面时跳转登录；开发免登录模式允许直接访问已注册页面。
   if (!isDevSkipLoginEnabled && !to.meta.public && !store.isLoggedIn) {
     next({ path: "/login", replace: true });
     return;
