@@ -21,7 +21,7 @@
       </div>
       <div class="footer-info">
         <p>Copyright &copy; 2026 党建云平台. All Rights Reserved.</p>
-        <p>XX大学XX学院党支部 版权所有 | 技术支持：党建云技术团队</p>
+        <p>四川农业大学信息工程学院党支部 版权所有 | 技术支持：党建云技术团队</p>
         <p class="footer-icp">ICP备案号：京ICP备XXXXXXXX号-1 | 公安机关备案号：XXXXXXXXXX</p>
       </div>
     </div>

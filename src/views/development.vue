@@ -41,7 +41,6 @@ const canAdjust = computed(() => {
 //   gender          - 性别
 //   partyBranch     - 所属党支部
 //   currentIdentity - 当前党员身份
-//   contactPerson   - 培养联系人
 //   updateTime      - 最后更新时间
 // ============================================================
 const allMembers = ref([
@@ -52,7 +51,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "计算机学院学生第一党支部",
     currentIdentity: "发展对象",
-    contactPerson: "李老师",
     updateTime: "2026-07-20",
   },
   {
@@ -62,7 +60,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "计算机学院学生第一党支部",
     currentIdentity: "积极分子",
-    contactPerson: "赵老师",
     updateTime: "2026-07-18",
   },
   {
@@ -72,7 +69,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "计算机学院学生第二党支部",
     currentIdentity: "预备党员",
-    contactPerson: "陈老师",
     updateTime: "2026-07-15",
   },
   {
@@ -82,7 +78,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "计算机学院学生第一党支部",
     currentIdentity: "入党申请人",
-    contactPerson: "李老师",
     updateTime: "2026-07-12",
   },
   {
@@ -92,7 +87,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "计算机学院学生第二党支部",
     currentIdentity: "积极分子",
-    contactPerson: "周老师",
     updateTime: "2026-07-10",
   },
   {
@@ -102,7 +96,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "计算机学院学生第一党支部",
     currentIdentity: "正式党员",
-    contactPerson: "李老师",
     updateTime: "2026-07-08",
   },
   {
@@ -112,7 +105,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "计算机学院学生第二党支部",
     currentIdentity: "发展对象",
-    contactPerson: "刘老师",
     updateTime: "2026-07-06",
   },
   {
@@ -122,7 +114,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "计算机学院学生第二党支部",
     currentIdentity: "积极分子",
-    contactPerson: "周老师",
     updateTime: "2026-07-04",
   },
   {
@@ -132,7 +123,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "软件学院学生党支部",
     currentIdentity: "入党申请人",
-    contactPerson: "江老师",
     updateTime: "2026-07-02",
   },
   {
@@ -142,7 +132,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "软件学院学生党支部",
     currentIdentity: "正式党员",
-    contactPerson: "江老师",
     updateTime: "2026-06-28",
   },
   {
@@ -152,7 +141,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "软件学院学生党支部",
     currentIdentity: "积极分子",
-    contactPerson: "何老师",
     updateTime: "2026-06-25",
   },
   {
@@ -162,7 +150,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "软件学院学生党支部",
     currentIdentity: "发展对象",
-    contactPerson: "江老师",
     updateTime: "2026-06-22",
   },
   {
@@ -172,7 +159,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "软件学院学生党支部",
     currentIdentity: "预备党员",
-    contactPerson: "何老师",
     updateTime: "2026-06-20",
   },
   {
@@ -182,7 +168,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "计算机学院学生第一党支部",
     currentIdentity: "入党申请人",
-    contactPerson: "李老师",
     updateTime: "2026-06-18",
   },
   {
@@ -192,7 +177,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "网络空间安全学院学生党支部",
     currentIdentity: "预备党员",
-    contactPerson: "林老师",
     updateTime: "2026-06-15",
   },
   {
@@ -202,7 +186,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "网络空间安全学院学生党支部",
     currentIdentity: "正式党员",
-    contactPerson: "林老师",
     updateTime: "2026-06-12",
   },
   {
@@ -212,7 +195,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "网络空间安全学院学生党支部",
     currentIdentity: "积极分子",
-    contactPerson: "林老师",
     updateTime: "2026-06-10",
   },
   {
@@ -222,7 +204,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "网络空间安全学院学生党支部",
     currentIdentity: "发展对象",
-    contactPerson: "林老师",
     updateTime: "2026-06-08",
   },
   {
@@ -232,7 +213,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "网络空间安全学院学生党支部",
     currentIdentity: "入党申请人",
-    contactPerson: "林老师",
     updateTime: "2026-06-05",
   },
   {
@@ -242,7 +222,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "计算机学院学生第二党支部",
     currentIdentity: "正式党员",
-    contactPerson: "周老师",
     updateTime: "2026-06-01",
   },
   {
@@ -252,7 +231,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "计算机学院学生第二党支部",
     currentIdentity: "入党申请人",
-    contactPerson: "周老师",
     updateTime: "2026-05-28",
   },
   {
@@ -262,7 +240,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "计算机学院学生第一党支部",
     currentIdentity: "积极分子",
-    contactPerson: "赵老师",
     updateTime: "2026-05-25",
   },
   {
@@ -272,7 +249,6 @@ const allMembers = ref([
     gender: "男",
     partyBranch: "软件学院学生党支部",
     currentIdentity: "正式党员",
-    contactPerson: "何老师",
     updateTime: "2026-05-20",
   },
   {
@@ -282,7 +258,6 @@ const allMembers = ref([
     gender: "女",
     partyBranch: "网络空间安全学院学生党支部",
     currentIdentity: "入党申请人",
-    contactPerson: "林老师",
     updateTime: "2026-05-18",
   },
 ]);
@@ -571,7 +546,6 @@ function goDetail(id: number): void {
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="contactPerson" label="培养联系人" width="120" />
           <el-table-column prop="updateTime" label="最后更新" width="140" />
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">

@@ -11,7 +11,7 @@
  *
  * 操作流程：
  *   第一步：勾选目标成员（支持筛选 + 分页）
- *   第二步：设置目标身份 + 调整原因 + 培养联系人
+ *   第二步：设置目标身份 + 调整原因
  *   第三步：确认执行 → 二次确认 → 跳转回列表
  */
 import { ref, computed, onMounted } from "vue";
@@ -291,19 +291,6 @@ const identityTagMap: Record<string, string> = {
 };
 
 // ============================================================
-// Mock 数据：培养联系人候选（同 AdjustIdentityDialog）
-// TODO: 替换为接口获取
-// ============================================================
-const teacherList = ref([
-  { id: 1, name: "李老师", title: "党支部书记" },
-  { id: 2, name: "赵老师", title: "组织委员" },
-  { id: 3, name: "陈老师", title: "宣传委员" },
-  { id: 4, name: "周老师", title: "辅导员" },
-  { id: 5, name: "王书记", title: "党委副书记" },
-  { id: 6, name: "刘老师", title: "支部委员" },
-]);
-
-// ============================================================
 // 表格选中相关
 // ============================================================
 const selectedIds = ref<number[]>([]); // 已选成员 ID 列表
@@ -326,9 +313,6 @@ const pageSize = ref(10);
 // ============================================================
 const targetIdentity = ref(""); // 目标身份
 const adjustReason = ref(""); // 调整原因
-const contactPersonIds = ref<number[]>([]); // 培养联系人 ID 列表
-
-const contactMaxReached = computed(() => contactPersonIds.value.length >= 2);
 
 // ============================================================
 // 提交状态
@@ -378,9 +362,7 @@ async function handleConfirm(): Promise<void> {
     // await api.batchAdjustIdentity({
     //   memberIds: selectedIds.value,
     //   targetIdentity: targetIdentity.value,
-    //   reason: adjustReason.value,
-    //   contactPersons: contactPersonIds.value,
-    // })
+    //   reason: adjustReason.value,    // })
 
     // 模拟接口延迟
     await new Promise((resolve) => setTimeout(resolve, 800));
@@ -401,24 +383,12 @@ async function handleConfirm(): Promise<void> {
 async function confirmBatchAdjust(): Promise<void> {
   const count = selectedIds.value.length;
   const names = selectedMembers.value.map((m) => m.name).join("、");
-  const contactNames =
-    contactPersonIds.value.length > 0
-      ? contactPersonIds.value
-          .map((id) => {
-            const t = teacherList.value.find((item) => item.id === id);
-            return t ? t.name : "";
-          })
-          .filter(Boolean)
-          .join("、")
-      : "未指定（沿用现有联系人）";
-
   const message = `
     <div style="line-height: 2.2; font-size: 14px;">
       <p>即将将 <strong style="color: #C12C1F; font-size: 16px;">${count}</strong> 位成员
          调整为 <strong style="color: #C12C1F; font-size: 16px;">【${targetIdentity.value}】</strong></p>
       <p><strong>成员列表：</strong>${names}</p>
       <p><strong>调整原因：</strong>${adjustReason.value}</p>
-      <p><strong>培养联系人：</strong>${contactNames}</p>
       <p style="margin-top: 12px; color: var(--text-secondary);">请仔细核对以上信息，确认后不可撤销。</p>
     </div>
   `;
@@ -581,25 +551,6 @@ onMounted(() => {
               placeholder="请填写调整原因（至少 10 个字），如：经支部大会讨论，确定该批同志为发展对象"
               style="width: 560px"
             />
-          </div>
-
-          <div class="form-row">
-            <label class="form-label">培养联系人</label>
-            <el-select
-              v-model="contactPersonIds"
-              placeholder="请选择培养联系人（选填，最多 2 人）"
-              multiple
-              style="width: 400px"
-            >
-              <el-option
-                v-for="teacher in teacherList"
-                :key="teacher.id"
-                :label="`${teacher.name}（${teacher.title}）`"
-                :value="teacher.id"
-                :disabled="!contactPersonIds.includes(teacher.id) && contactMaxReached"
-              />
-            </el-select>
-            <span class="form-hint">最多选择 2 人，留空则沿用各成员现有联系人</span>
           </div>
         </div>
       </div>
