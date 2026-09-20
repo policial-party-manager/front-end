@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { getToken, getRefreshToken, setToken, setRefreshToken, clearToken } from "@/utils/token";
 import { logout as apiLogout, type LoginResult } from "@/api/auth";
+import { isDevSkipLoginEnabled } from "@/utils/authMode";
 
 /** 角色类型 */
 export type Role = "super_admin" | "party_secretary" | "party_member" | "activist";
@@ -234,7 +235,8 @@ export const useAppStore = defineStore("app", () => {
   // 登录态持久化到 localStorage，刷新后保持登录。
   // 后续替换为真实鉴权时，可改为 token 校验。
   const LOGIN_KEY = "party_login_name";
-  const isLoggedIn = ref<boolean>(!!getToken());
+  // 开发免登录只开放前端页面，不生成或伪造后端 token。
+  const isLoggedIn = ref<boolean>(!!getToken() || isDevSkipLoginEnabled);
 
   // ============ Actions ============
   function setActiveNav(key: string): void {

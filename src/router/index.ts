@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
 import { useAppStore } from "@/stores/app";
+import { isDevSkipLoginEnabled } from "@/utils/authMode";
 
 /**
  * 路由配置
@@ -113,8 +114,14 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   const store = useAppStore();
 
+  // 开发免登录模式不显示登录页，直接回到首页。
+  if (isDevSkipLoginEnabled && to.path === "/login") {
+    next({ path: "/", replace: true });
+    return;
+  }
+
   // 未登录访问任何非公开页面 => 跳转到登录页
-  if (!to.meta.public && !store.isLoggedIn) {
+  if (!isDevSkipLoginEnabled && !to.meta.public && !store.isLoggedIn) {
     next({ path: "/login", replace: true });
     return;
   }

@@ -2,6 +2,7 @@ import axios from "axios";
 import type { AxiosRequestConfig } from "axios";
 import { ElMessage } from "element-plus";
 import { getToken, getRefreshToken, setToken, setRefreshToken, clearToken } from "@/utils/token";
+import { isDevSkipLoginEnabled } from "@/utils/authMode";
 
 /**
  * 前端请求层封装
@@ -78,9 +79,10 @@ service.interceptors.response.use(
   async (error) => {
     const config = (error.config ?? {}) as RetryConfig;
     const status = error.response?.status;
+    const isPreviewWithoutToken = isDevSkipLoginEnabled && !getToken();
 
     // 401：尝试刷新 token 后重放一次
-    if (status === 401 && !config._retry) {
+    if (status === 401 && !config._retry && !isPreviewWithoutToken) {
       config._retry = true;
       // 登录类接口 401 不该走 refresh，直接跳登录页
       if (config.url?.includes("/auth/")) {
