@@ -1,17 +1,18 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { getToken, getRefreshToken, setToken, setRefreshToken, clearToken } from "@/utils/token";
+import { getRefreshToken } from "@/utils/token";
 import { logout as apiLogout, type LoginResult } from "@/api/auth";
-import { isDevSkipLoginEnabled } from "@/utils/authMode";
+import { hasPermission, type Permission, type Role } from "@/config/permissions";
+import { applySession, clearSession, sessionLoggedIn, sessionUser, type SessionUser } from "@/utils/session";
 
-/** 角色类型 */
-export type Role = "super_admin" | "party_secretary" | "party_member" | "activist";
+export type { Role } from "@/config/permissions";
 
 /** 导航菜单项 */
 export interface NavItem {
   key: string;
   label: string;
   path: string;
+  permission: Permission;
 }
 
 /** 新闻/通知条目 */
@@ -48,11 +49,7 @@ export interface StatData {
 }
 
 /** 用户信息 */
-export interface UserInfo {
-  name: string;
-  avatar: string;
-  role: Role;
-}
+export type UserInfo = SessionUser;
 
 /**
  * 全局应用状态管理
@@ -63,11 +60,12 @@ export interface UserInfo {
  * - party_member: 普通党员，仅查看个人相关数据
  * - activist: 积极分子，受限视图
  *
- * 角色切换入口在 TopNav 组件右上角用户下拉菜单中
+ * 当前角色由登录接口返回并随会话保存，不允许在前端自行切换。
  */
 export const useAppStore = defineStore("app", () => {
   // ============ 当前角色 ============
-  const currentRole = ref<Role>("super_admin");
+  // 登录信息缺失或角色异常时按最低权限角色处理，避免刷新后意外获得管理员视图。
+  const currentRole = computed<Role>(() => sessionUser.value.role);
 
   // 角色名称映射
   const roleLabels: Record<Role, string> = {
@@ -114,14 +112,15 @@ export const useAppStore = defineStore("app", () => {
   });
 
   // ============ 导航菜单项 ============
-  const navItems: NavItem[] = [
-    { key: "home", label: "首页", path: "/" },
-    { key: "members", label: "成员管理", path: "/members" },
-    { key: "development", label: "党员发展", path: "/development" },
-    { key: "activities", label: "活动中心", path: "/activity" },
-    { key: "statistics", label: "数据统计", path: "/statistics" },
-    { key: "downloads", label: "下载专区", path: "/resources" },
+  const allNavItems: NavItem[] = [
+    { key: "home", label: "首页", path: "/", permission: "home:view" },
+    { key: "members", label: "成员管理", path: "/members", permission: "member:manage" },
+    { key: "development", label: "党员发展", path: "/development", permission: "development:manage" },
+    { key: "activities", label: "活动中心", path: "/activity", permission: "activity:view" },
+    { key: "statistics", label: "数据统计", path: "/statistics", permission: "statistics:view" },
+    { key: "downloads", label: "下载专区", path: "/resources", permission: "resource:view" },
   ];
+  const navItems = computed(() => allNavItems.filter((item) => hasPermission(currentRole.value, item.permission)));
 
   // ============ Mock 新闻数据 ============
   const newsList = ref<NewsItem[]>([
@@ -224,77 +223,32 @@ export const useAppStore = defineStore("app", () => {
     { key: "archive", label: "培养档案", icon: "FolderOpened", color: "#B8302A" },
   ];
 
-  // ============ 用户信息（Mock） ============
-  const userInfo = ref<UserInfo>({
-    name: "张书记",
-    avatar: "",
-    role: "super_admin",
-  });
+  // ============ 用户信息 ============
+  const userInfo = sessionUser;
 
   // ============ 登录状态 ============
-  // 登录态持久化到 localStorage，刷新后保持登录。
-  // 后续替换为真实鉴权时，可改为 token 校验。
-  const LOGIN_KEY = "party_login_name";
-  // 开发免登录只开放前端页面，不生成或伪造后端 token。
-  const isLoggedIn = ref<boolean>(!!getToken() || isDevSkipLoginEnabled);
+  // 登录态与 Token、持久化用户信息由统一会话模块同步维护。
+  const isLoggedIn = sessionLoggedIn;
 
   // ============ Actions ============
   function setActiveNav(key: string): void {
     activeNav.value = key;
   }
 
-  function switchRole(role: Role): void {
-    currentRole.value = role;
-    userInfo.value.role = role;
-  }
-
-  /** 登录（Mock）：写入用户信息并进行登录态持久化 */
-  function login(name: string, role: Role = "super_admin"): void {
-    userInfo.value.name = name || "张书记";
-    userInfo.value.role = role;
-    currentRole.value = role;
-    isLoggedIn.value = true;
-    localStorage.setItem(LOGIN_KEY, userInfo.value.name);
-  }
-
-  /**
-   * 后端角色编码 → 前端角色
-   * 后端编码：super_admin / branch_admin / student；前端保留自身 4 角色体系（含 activist）。
-   * 后端未覆盖的首尾角色时，回退为 party_member。
-   */
-  function roleFromBackend(role: string): Role {
-    const map: Record<string, Role> = {
-      super_admin: "super_admin",
-      branch_admin: "party_secretary",
-      student: "party_member",
-    };
-    return map[role] || "party_member";
-  }
-
   /** 登录成功：写入用户信息、同步当前角色并保存 token */
   function setSession(user: LoginResult): void {
-    userInfo.value = {
-      name: user.realName || user.username,
-      avatar: "",
-      role: roleFromBackend(user.role),
-    };
-    currentRole.value = userInfo.value.role;
-    setToken(user.accessToken);
-    setRefreshToken(user.refreshToken);
-    isLoggedIn.value = true;
+    applySession(user);
   }
 
-  /** 退出登录：通知后端失效（尽力而为），随后清除本地登录态 */
+  /** 退出登录：先使本地会话立即失效，再尽力通知后端。 */
   async function logout(): Promise<void> {
     const refreshToken = getRefreshToken();
+    clearSession();
     try {
       if (refreshToken) await apiLogout(refreshToken);
     } catch {
       // 后端退出失败不阻塞本地退出
     }
-    clearToken();
-    isLoggedIn.value = false;
-    localStorage.removeItem(LOGIN_KEY);
   }
 
   return {
@@ -311,8 +265,6 @@ export const useAppStore = defineStore("app", () => {
     userInfo,
     isLoggedIn,
     setActiveNav,
-    switchRole,
-    login,
     setSession,
     logout,
   };

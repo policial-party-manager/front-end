@@ -1,7 +1,17 @@
 import axios from "axios";
 import type { AxiosRequestConfig } from "axios";
 import { ElMessage } from "element-plus";
-import { getToken, getRefreshToken, setToken, setRefreshToken, clearToken } from "@/utils/token";
+import { getToken } from "@/utils/token";
+import { shouldSkipUnauthorizedRefresh } from "@/config/auth-mode";
+import {
+  applyRefreshedSession,
+  captureSession,
+  clearSession,
+  isAccessTokenCurrent,
+  isSessionCurrent,
+  type SessionPayload,
+} from "@/utils/session";
+import { sessionFence, type SessionSnapshot } from "@/config/session-fence";
 import { isDevSkipLoginEnabled } from "@/utils/authMode";
 
 /**
@@ -43,22 +53,37 @@ const refreshService = axios.create({
   timeout: 15000,
 });
 
-async function refreshAccessToken(): Promise<string> {
-  const refreshToken = getRefreshToken();
-  const { data } = await refreshService.post<ApiResponse<{ accessToken: string; refreshToken: string }>>(
-    "/v1/auth/refresh",
-    { refreshToken },
-  );
-  if (data.code !== 200 || !data.data) {
-    throw new Error(data.message || "登录态已失效");
+let refreshOperation: { snapshot: SessionSnapshot; promise: Promise<string> } | undefined;
+
+function refreshAccessToken(snapshot: SessionSnapshot): Promise<string> {
+  if (refreshOperation && sessionFence.same(refreshOperation.snapshot, snapshot)) {
+    return refreshOperation.promise;
   }
-  setToken(data.data.accessToken);
-  setRefreshToken(data.data.refreshToken);
-  return data.data.accessToken;
+
+  const promise = Promise.resolve().then(async () => {
+    const { data } = await refreshService.post<ApiResponse<SessionPayload>>("/v1/auth/refresh", {
+      refreshToken: snapshot.refreshToken,
+    });
+    if (data.code !== 200 || !data.data) {
+      throw new Error(data.message || "登录态已失效");
+    }
+    if (!applyRefreshedSession(data.data, snapshot)) {
+      throw new Error("登录状态已变更");
+    }
+    return data.data.accessToken;
+  });
+  const operation = { snapshot, promise };
+  refreshOperation = operation;
+  void operation.promise
+    .finally(() => {
+      if (refreshOperation === operation) refreshOperation = undefined;
+    })
+    .catch(() => undefined);
+  return operation.promise;
 }
 
 function redirectToLogin(): void {
-  clearToken();
+  clearSession();
   if (window.location.pathname !== "/login") {
     window.location.href = "/login";
   }
@@ -79,26 +104,37 @@ service.interceptors.response.use(
   async (error) => {
     const config = (error.config ?? {}) as RetryConfig;
     const status = error.response?.status;
-    const isPreviewWithoutToken = isDevSkipLoginEnabled && !getToken();
 
-    // 401：尝试刷新 token 后重放一次
-    if (status === 401 && !config._retry && !isPreviewWithoutToken) {
-      config._retry = true;
-      // 登录类接口 401 不该走 refresh，直接跳登录页
+    // 401：只处理由当前 Token 发出的请求，防止旧请求影响新会话。
+    if (status === 401 && !shouldSkipUnauthorizedRefresh(isDevSkipLoginEnabled, !!getToken())) {
       if (config.url?.includes("/auth/")) {
+        const message = (error.response?.data as ApiResponse)?.message || "登录失败";
+        ElMessage.error(message);
+        return Promise.reject(error);
+      }
+
+      const authorization = config.headers?.Authorization;
+      const requestToken = typeof authorization === "string" ? authorization.replace(/^Bearer\s+/i, "") : "";
+      if (!requestToken || requestToken !== getToken()) return Promise.reject(error);
+
+      if (config._retry) {
         redirectToLogin();
         return Promise.reject(error);
       }
+
+      config._retry = true;
+      const snapshot = captureSession();
+      let newToken: string;
       try {
-        const newToken = await refreshAccessToken();
-        if (config.headers) {
-          config.headers.Authorization = `Bearer ${newToken}`;
-        }
-        return service(config);
+        newToken = await refreshAccessToken(snapshot);
       } catch {
-        redirectToLogin();
+        if (isSessionCurrent(snapshot)) redirectToLogin();
         return Promise.reject(error);
       }
+
+      if (!isAccessTokenCurrent(newToken)) return Promise.reject(error);
+      if (config.headers) config.headers.Authorization = `Bearer ${newToken}`;
+      return service(config);
     }
 
     const msg = (error.response?.data as ApiResponse)?.message || error.message || "网络请求失败";
