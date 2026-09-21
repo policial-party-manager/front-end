@@ -22,7 +22,7 @@ export interface LoginResult {
   role: string;
   branchId: number | null;
   branchName: string;
-  menus: MenuItem[];
+  menus?: MenuItem[];
 }
 
 /** 认证相关请求体（各登录/验证码/刷新复用同一结构，按需传字段） */

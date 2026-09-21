@@ -8,7 +8,7 @@ import { useAppStore } from "@/stores/app";
  *
  * 红色背景，左侧党徽 + 平台名称，中间导航菜单，右侧用户信息
  * 导航菜单支持高亮切换（当前页为"首页"）
- * 用户下拉菜单中预留角色切换入口（仅UI，功能待实现）
+ * 用户下拉菜单展示当前登录身份并提供退出入口
  */
 
 const store = useAppStore();
@@ -69,28 +69,8 @@ function handleLogout(): void {
 
           <template #dropdown>
             <el-dropdown-menu>
-              <!--
-                角色切换入口说明：
-                以下角色选项为 UI 预留，当前仅展示，不实现实际切换逻辑。
-                不同角色可见的数据已在 store/app.js 的 statData 中定义：
-                - 超级管理员：全部数据
-                - 党支部书记：本支部数据
-                - 普通党员：个人相关数据
-                - 积极分子：受限视图
-              -->
               <el-dropdown-item disabled class="role-group-title">
-                <strong>切换角色（功能预留）</strong>
-              </el-dropdown-item>
-              <el-dropdown-item
-                v-for="(label, role) in store.roleLabels"
-                :key="role"
-                :class="{ 'is-active-role': store.currentRole === role }"
-                @click="store.switchRole(role)"
-              >
-                <span v-if="store.currentRole === role" class="role-check">✓</span>
-                <span :style="{ marginLeft: store.currentRole === role ? '0' : '20px' }">
-                  {{ label }}
-                </span>
+                <strong>当前身份：{{ store.currentRoleLabel }}</strong>
               </el-dropdown-item>
               <el-dropdown-item divided @click="handleLogout">
                 <el-icon><SwitchButton /></el-icon>
@@ -217,16 +197,6 @@ function handleLogout(): void {
 .role-group-title {
   pointer-events: none;
   color: var(--text-secondary) !important;
-}
-
-.is-active-role {
-  color: var(--party-red) !important;
-  font-weight: 600;
-}
-
-.role-check {
-  color: var(--party-red);
-  font-weight: 700;
 }
 
 /* 响应式：小屏幕隐藏部分导航文字 */

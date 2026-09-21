@@ -39,14 +39,6 @@ const isLoginPage = computed(() => route.path === "/login");
 </template>
 
 <style lang="scss">
-/* 全局 Element Plus 样式覆盖 */
-.el-dropdown-menu__item {
-  &.is-active-role {
-    color: var(--party-red) !important;
-    font-weight: 600;
-  }
-}
-
 /* 全局布局：flex 纵向排列，保证 footer 始终在页面底部 */
 .app-layout {
   min-height: 100vh;
