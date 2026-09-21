@@ -75,7 +75,7 @@ VITE_API_BASE_URL=/api
 
 ```text
 .
-├── .github/workflows/ci.yml       # GitHub Actions：格式、Lint、类型检查、构建
+├── .github/workflows/ci.yml       # GitHub Actions：CI 检查与 PR 自动合并
 ├── docs/
 │   └── 前端开发计划与策略.md      # 前端功能规划、角色权限与协作策略
 ├── public/                        # 公共 SVG 资源
@@ -234,9 +234,9 @@ Element Plus 及其全部图标在 `src/main.ts` 全局注册。`ElMessage`、`E
 - `@` 指向 `src`；脚本中的图片通常通过 `new URL("@/assets/...", import.meta.url).href` 引用。
 - 主要响应式断点为 1200px、992px、768px 和 576px。
 
-## 持续集成
+## 持续集成与自动合并
 
-GitHub Actions 在推送到 `main`、`feature/**`、`fix/**`，以及面向 `main` 的 Pull Request 时运行：
+GitHub Actions 在推送到 `main`、`feature/**`、`fix/**`，以及面向 `main` 的 Pull Request 时运行 CI：
 
 1. `npm ci`
 2. `npm run format:check`
@@ -244,4 +244,15 @@ GitHub Actions 在推送到 `main`、`feature/**`、`fix/**`，以及面向 `mai
 4. `npm run typecheck`
 5. `npm run build`
 
-`main` 分支推送构建成功后会上传 `dist/` 为 Pages 构建产物，但工作流当前未包含实际部署步骤。
+面向 `main` 的非草稿 PR 在上述检查全部通过后，会自动开启 GitHub Auto-merge，并使用 squash 合并；合并后删除 PR 分支。自动化只处理本仓库内的分支 PR，来自 fork 的 PR 仍需手动处理。Auto-merge 会继续遵守 `main` 的分支保护规则，例如必需检查和审查要求。
+
+启用此流程前，请在 GitHub 仓库设置中完成以下配置：
+
+- 在 **Settings → General → Pull Requests** 中开启 **Allow auto-merge** 和 **Allow squash merging**。
+- 为 `main` 创建分支保护规则，要求 PR 通过以下状态检查：
+  - `代码检查（Lint）`
+  - `TypeScript 类型检查`
+  - `生产构建`
+- 可按团队协作要求设置 PR 审批人数，并决定是否要求分支先更新到最新的 `main`。
+
+`main` 分支推送构建成功后会上传 `dist/` 为 Pages 构建产物；工作流当前未包含实际部署步骤。

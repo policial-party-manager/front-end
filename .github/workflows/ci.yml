@@ -5,6 +5,7 @@ on:
     branches: [main, "feature/**", "fix/**"]
   pull_request:
     branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
 
 jobs:
   lint:
@@ -73,3 +74,21 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist/
+
+  enable-auto-merge:
+    name: 开启自动合并
+    needs: [lint, typecheck, build]
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: 等待必需检查和审查后合并
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge "$PR_URL" --auto --squash --delete-branch
