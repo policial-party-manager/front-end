@@ -70,7 +70,7 @@ export type UserInfo = SessionUser;
  * - party_member: 普通党员，仅查看个人相关数据
  * - activist: 积极分子，受限视图
  *
- * 当前角色由登录接口返回并随会话保存，不允许在前端自行切换。
+ * 真实会话角色由登录接口返回并随会话保存；开发免登录预览可临时切换身份。
  */
 export const useAppStore = defineStore("app", () => {
   // ============ 当前角色 ============
