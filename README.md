@@ -76,6 +76,8 @@ VITE_API_BASE_URL=/api
 ```text
 .
 ├── .github/workflows/ci.yml       # GitHub Actions：格式、Lint、类型检查、构建
+├── docs/
+│   └── 前端开发计划与策略.md      # 前端功能规划、角色权限与协作策略
 ├── public/                        # 公共 SVG 资源
 ├── src/
 │   ├── api/
