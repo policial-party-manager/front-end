@@ -40,6 +40,11 @@ export function isRole(value: unknown): value is Role {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(rolePermissions, value);
 }
 
+/** 仅在允许切换的开发预览中接受有效角色，否则保留当前身份。 */
+export function resolvePreviewRole(currentRole: Role, candidate: unknown, canSwitch: boolean): Role {
+  return canSwitch && isRole(candidate) ? candidate : currentRole;
+}
+
 /** 后端角色编码转换为前端角色；未知编码按最低权限角色处理。 */
 export function roleFromBackend(role: string): Role {
   const roleMap: Record<string, Role> = {

@@ -1,12 +1,12 @@
-const ACCESS_TOKEN_KEY = "party_access_token";
+export const ACCESS_TOKEN_STORAGE_KEY = "party_access_token";
 const REFRESH_TOKEN_KEY = "party_refresh_token";
 
 export function getToken(): string {
-  return localStorage.getItem(ACCESS_TOKEN_KEY) || "";
+  return localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) || "";
 }
 
 export function setToken(token: string): void {
-  localStorage.setItem(ACCESS_TOKEN_KEY, token);
+  localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
 }
 
 export function getRefreshToken(): string {
@@ -18,6 +18,6 @@ export function setRefreshToken(token: string): void {
 }
 
 export function clearToken(): void {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }

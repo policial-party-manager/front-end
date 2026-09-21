@@ -3,7 +3,17 @@ import { ref, computed } from "vue";
 import { getRefreshToken } from "@/utils/token";
 import { logout as apiLogout, type LoginResult } from "@/api/auth";
 import { hasPermission, type Permission, type Role } from "@/config/permissions";
-import { applySession, clearSession, sessionLoggedIn, sessionUser, type SessionUser } from "@/utils/session";
+import { canSwitchPreviewRole as canSwitchPreviewRolePolicy } from "@/config/auth-mode";
+import { isDevSkipLoginEnabled } from "@/utils/authMode";
+import {
+  applySession,
+  clearSession,
+  sessionHasAccessToken,
+  sessionLoggedIn,
+  sessionUser,
+  setPreviewRole as savePreviewRole,
+  type SessionUser,
+} from "@/utils/session";
 
 export type { Role } from "@/config/permissions";
 
@@ -60,12 +70,15 @@ export type UserInfo = SessionUser;
  * - party_member: 普通党员，仅查看个人相关数据
  * - activist: 积极分子，受限视图
  *
- * 当前角色由登录接口返回并随会话保存，不允许在前端自行切换。
+ * 真实会话角色由登录接口返回并随会话保存；开发免登录预览可临时切换身份。
  */
 export const useAppStore = defineStore("app", () => {
   // ============ 当前角色 ============
-  // 登录信息缺失或角色异常时按最低权限角色处理，避免刷新后意外获得管理员视图。
+  // 真实登录角色由后端返回；无 Token 的开发预览允许临时切换身份。
   const currentRole = computed<Role>(() => sessionUser.value.role);
+  const canSwitchPreviewIdentity = computed(() =>
+    canSwitchPreviewRolePolicy(isDevSkipLoginEnabled, sessionHasAccessToken.value),
+  );
 
   // 角色名称映射
   const roleLabels: Record<Role, string> = {
@@ -235,6 +248,10 @@ export const useAppStore = defineStore("app", () => {
     activeNav.value = key;
   }
 
+  function setPreviewRole(role: Role): boolean {
+    return savePreviewRole(role);
+  }
+
   /** 登录成功：写入用户信息、同步当前角色并保存 token */
   function setSession(user: LoginResult): void {
     applySession(user);
@@ -254,6 +271,7 @@ export const useAppStore = defineStore("app", () => {
   return {
     currentRole,
     currentRoleLabel,
+    canSwitchPreviewIdentity,
     roleLabels,
     activeNav,
     navItems,
@@ -265,6 +283,7 @@ export const useAppStore = defineStore("app", () => {
     userInfo,
     isLoggedIn,
     setActiveNav,
+    setPreviewRole,
     setSession,
     logout,
   };
