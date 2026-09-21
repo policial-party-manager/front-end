@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
+import { hasPermission, type Permission, type Role } from "@/config/permissions";
 
 /**
  * TopNav - 顶部导航栏组件
@@ -13,6 +14,7 @@ import { useAppStore } from "@/stores/app";
 
 const store = useAppStore();
 const router = useRouter();
+const previewRoles = Object.keys(store.roleLabels) as Role[];
 
 // 党徽图标路径
 // 用途：顶部导航栏左侧品牌标识
@@ -32,6 +34,15 @@ function handleLogout(): void {
   // 退出登录：清除登录态并跳转到登录页
   store.logout();
   router.push("/login");
+}
+
+function handlePreviewRoleChange(role: Role): void {
+  if (!store.setPreviewRole(role)) return;
+
+  const permission = router.currentRoute.value.meta.permission as Permission | undefined;
+  if (permission && !hasPermission(role, permission)) {
+    router.replace("/");
+  }
 }
 </script>
 
@@ -72,6 +83,19 @@ function handleLogout(): void {
               <el-dropdown-item disabled class="role-group-title">
                 <strong>当前身份：{{ store.currentRoleLabel }}</strong>
               </el-dropdown-item>
+              <template v-if="store.canSwitchPreviewIdentity">
+                <el-dropdown-item divided disabled class="role-group-title">
+                  <strong>开发预览：切换身份</strong>
+                </el-dropdown-item>
+                <el-dropdown-item
+                  v-for="role in previewRoles"
+                  :key="role"
+                  :disabled="role === store.currentRole"
+                  @click="handlePreviewRoleChange(role)"
+                >
+                  {{ store.roleLabels[role] }}<span v-if="role === store.currentRole">（当前）</span>
+                </el-dropdown-item>
+              </template>
               <el-dropdown-item divided @click="handleLogout">
                 <el-icon><SwitchButton /></el-icon>
                 退出登录

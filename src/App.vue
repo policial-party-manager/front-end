@@ -12,11 +12,14 @@ import { useRoute } from "vue-router";
 import TopNav from "@/components/TopNav.vue";
 import FooterBar from "@/components/FooterBar.vue";
 import SmartAssistant from "@/components/SmartAssistant.vue";
+import { useAppStore } from "@/stores/app";
 
 const route = useRoute();
+const store = useAppStore();
 
 // 登录页隐藏全局外壳，保持全屏居中
 const isLoginPage = computed(() => route.path === "/login");
+const routeViewKey = computed(() => `${route.fullPath}:${store.currentRole}`);
 </script>
 
 <template>
@@ -26,7 +29,9 @@ const isLoginPage = computed(() => route.path === "/login");
 
     <!-- 页面主体 -->
     <main class="app-main">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <component :is="Component" :key="routeViewKey" />
+      </router-view>
     </main>
 
     <!-- 底部版权信息 -->
