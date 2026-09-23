@@ -20,9 +20,9 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // 开发环境将 /api 转发到后端（target 需按后端实际地址调整）
+      // 开发环境将 /api 转发到本地后端
       "/api": {
-        target: "http://192.168.1.105:8080",
+        target: "http://127.0.0.1:8080",
         changeOrigin: true,
       },
     },

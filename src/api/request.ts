@@ -91,7 +91,16 @@ function redirectToLogin(): void {
 
 // 响应拦截：统一解包 + 异常处理
 service.interceptors.response.use(
-  (response) => {
+  async (response) => {
+    if (response.config.responseType === "blob") {
+      const blob = response.data as Blob;
+      if (blob.type.includes("json")) {
+        const result = JSON.parse(await blob.text()) as ApiResponse;
+        ElMessage.error(result.message || "文件下载失败");
+        return Promise.reject(new Error(result.message || "文件下载失败"));
+      }
+      return blob as never;
+    }
     const res = response.data as ApiResponse;
     // 后端约定：成功 code=200；失败 code=400（如"用户名不存在"）
     if (res.code !== 200) {

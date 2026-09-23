@@ -1,1368 +1,607 @@
 <script setup lang="ts">
-/**
- * members.vue - 成员管理模块
- *
- * 党员成员信息管理 - 支持搜索筛选、分页浏览、增删改查、批量导入导出
- */
-import { ref, reactive, computed, watch } from "vue";
-import { useAppStore } from "@/stores/app";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
-import { Plus, Upload, Download } from "@element-plus/icons-vue";
+import { Download, Plus, Upload } from "@element-plus/icons-vue";
+import { useAppStore } from "@/stores/app";
+import { sessionHasAccessToken } from "@/utils/session";
+import {
+  createMember,
+  downloadMemberTemplate,
+  getMember,
+  importMembers,
+  listBranches,
+  listRoles,
+  pageMembers,
+  updateMember,
+  updateMemberStatus,
+  type ImportResult,
+  type MemberFilters,
+  type UserSaveRequest,
+  type UserVo,
+} from "@/api/members";
 
 const store = useAppStore();
-
-// ============================================================
-// 类型定义
-// ============================================================
-
-/** 政治身份 */
-type PartyIdentity = "普通学生" | "入党申请人" | "积极分子" | "发展对象" | "预备党员" | "正式党员";
-
-/** 成员信息 */
-interface Member {
-  id: number;
-  studentNo: string;
-  name: string;
-  gender: "男" | "女";
-  college: string;
-  grade: string;
-  major: string;
-  className: string;
-  branchName: string;
-  identity: PartyIdentity;
-  phone: string;
-  email: string;
-  status: number;
-  remark: string;
-  createTime: string;
-  updateTime: string;
-}
-
-/** 新增/编辑成员表单 */
-interface MemberForm {
-  studentNo: string;
-  name: string;
-  gender: "男" | "女";
-  college: string;
-  grade: string;
-  major: string;
-  className: string;
-  branchName: string;
-  identity: PartyIdentity;
-  phone: string;
-  email: string;
-  remark: string;
-}
-
-// ============================================================
-// 权限
-// ============================================================
-const isSuperAdmin = computed(() => store.currentRole === "super_admin");
-const canEdit = computed(() => isSuperAdmin.value);
-const secretaryBranch = "计算机学院学生第一党支部";
-
-// ============================================================
-// Mock 数据 - 20条成员数据
-// ============================================================
-const allMembers = ref([
-  {
-    id: 1,
-    studentNo: "20240001",
-    name: "张三",
-    gender: "男",
-    college: "信息工程学院",
-    grade: "2024级",
-    major: "计算机科学与技术",
-    className: "计科202401",
-    branchName: "计算机学院学生第一党支部",
-    identity: "积极分子",
-    phone: "13800001001",
-    email: "zhangsan@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2025-09-01",
-    updateTime: "2026-07-20",
-  },
-  {
-    id: 2,
-    studentNo: "20240002",
-    name: "李四",
-    gender: "女",
-    college: "信息工程学院",
-    grade: "2024级",
-    major: "数据科学与大数据技术",
-    className: "大数据202401",
-    branchName: "计算机学院学生第一党支部",
-    identity: "发展对象",
-    phone: "13800001002",
-    email: "lisi@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2025-09-01",
-    updateTime: "2026-07-18",
-  },
-  {
-    id: 3,
-    studentNo: "20240003",
-    name: "王五",
-    gender: "男",
-    college: "信息工程学院",
-    grade: "2024级",
-    major: "软件工程",
-    className: "软工202401",
-    branchName: "计算机学院学生第二党支部",
-    identity: "预备党员",
-    phone: "13800001003",
-    email: "wangwu@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2025-09-01",
-    updateTime: "2026-07-15",
-  },
-  {
-    id: 4,
-    studentNo: "20240004",
-    name: "赵六",
-    gender: "女",
-    college: "信息工程学院",
-    grade: "2024级",
-    major: "计算机科学与技术",
-    className: "计科202402",
-    branchName: "计算机学院学生第二党支部",
-    identity: "正式党员",
-    phone: "13800001004",
-    email: "zhaoliu@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2025-09-01",
-    updateTime: "2026-07-10",
-  },
-  {
-    id: 5,
-    studentNo: "20240005",
-    name: "孙七",
-    gender: "男",
-    college: "信息工程学院",
-    grade: "2024级",
-    major: "人工智能",
-    className: "人工智能202401",
-    branchName: "计算机学院学生第一党支部",
-    identity: "入党申请人",
-    phone: "13800001005",
-    email: "sunqi@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2025-09-01",
-    updateTime: "2026-07-08",
-  },
-  {
-    id: 6,
-    studentNo: "20240006",
-    name: "周八",
-    gender: "女",
-    college: "信息工程学院",
-    grade: "2024级",
-    major: "计算机科学与技术",
-    className: "计科202401",
-    branchName: "软件学院学生党支部",
-    identity: "积极分子",
-    phone: "13800001006",
-    email: "zhouba@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2025-09-01",
-    updateTime: "2026-07-05",
-  },
-  {
-    id: 7,
-    studentNo: "20240007",
-    name: "吴九",
-    gender: "男",
-    college: "信息工程学院",
-    grade: "2024级",
-    major: "网络工程",
-    className: "网工202401",
-    branchName: "计算机学院学生第一党支部",
-    identity: "普通学生",
-    phone: "13800001007",
-    email: "wujiu@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2025-09-01",
-    updateTime: "2026-07-01",
-  },
-  {
-    id: 8,
-    studentNo: "20240008",
-    name: "郑十",
-    gender: "女",
-    college: "信息工程学院",
-    grade: "2024级",
-    major: "计算机科学与技术",
-    className: "计科202403",
-    branchName: "计算机学院学生第二党支部",
-    identity: "发展对象",
-    phone: "13800001008",
-    email: "zhengshi@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2025-09-01",
-    updateTime: "2026-06-28",
-  },
-  {
-    id: 9,
-    studentNo: "20240009",
-    name: "陈十一",
-    gender: "男",
-    college: "信息工程学院",
-    grade: "2023级",
-    major: "软件工程",
-    className: "软工202301",
-    branchName: "计算机学院学生第一党支部",
-    identity: "正式党员",
-    phone: "13800001009",
-    email: "chenshiyi@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2024-09-01",
-    updateTime: "2026-06-20",
-  },
-  {
-    id: 10,
-    studentNo: "20240010",
-    name: "刘十二",
-    gender: "女",
-    college: "信息工程学院",
-    grade: "2023级",
-    major: "数据科学与大数据技术",
-    className: "大数据202301",
-    branchName: "软件学院学生党支部",
-    identity: "预备党员",
-    phone: "13800001010",
-    email: "liushier@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2024-09-01",
-    updateTime: "2026-06-15",
-  },
-  {
-    id: 11,
-    studentNo: "20240011",
-    name: "黄十三",
-    gender: "男",
-    college: "信息工程学院",
-    grade: "2025级",
-    major: "计算机科学与技术",
-    className: "计科202501",
-    branchName: "计算机学院学生第一党支部",
-    identity: "普通学生",
-    phone: "13800001011",
-    email: "huangshisan@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2026-09-01",
-    updateTime: "2026-09-01",
-  },
-  {
-    id: 12,
-    studentNo: "20240012",
-    name: "杨十四",
-    gender: "女",
-    college: "信息工程学院",
-    grade: "2025级",
-    major: "人工智能",
-    className: "人工智能202501",
-    branchName: "计算机学院学生第二党支部",
-    identity: "入党申请人",
-    phone: "13800001012",
-    email: "yangshisi@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2026-09-01",
-    updateTime: "2026-06-10",
-  },
-  {
-    id: 13,
-    studentNo: "20230001",
-    name: "马六",
-    gender: "女",
-    college: "信息工程学院",
-    grade: "2023级",
-    major: "计算机科学与技术",
-    className: "计科202301",
-    branchName: "计算机学院学生第一党支部",
-    identity: "入党申请人",
-    phone: "13800001013",
-    email: "maliu@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2024-09-01",
-    updateTime: "2026-06-05",
-  },
-  {
-    id: 14,
-    studentNo: "20230002",
-    name: "胡七",
-    gender: "男",
-    college: "信息工程学院",
-    grade: "2023级",
-    major: "软件工程",
-    className: "软工202302",
-    branchName: "网络空间安全学院学生党支部",
-    identity: "预备党员",
-    phone: "13800001014",
-    email: "huqi@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2024-09-01",
-    updateTime: "2026-06-01",
-  },
-  {
-    id: 15,
-    studentNo: "20230003",
-    name: "林八",
-    gender: "女",
-    college: "信息工程学院",
-    grade: "2023级",
-    major: "网络空间安全",
-    className: "网安202301",
-    branchName: "网络空间安全学院学生党支部",
-    identity: "正式党员",
-    phone: "13800001015",
-    email: "linba@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2024-09-01",
-    updateTime: "2026-05-28",
-  },
-  {
-    id: 16,
-    studentNo: "20220001",
-    name: "何九",
-    gender: "男",
-    college: "信息工程学院",
-    grade: "2022级",
-    major: "网络空间安全",
-    className: "网安202201",
-    branchName: "网络空间安全学院学生党支部",
-    identity: "积极分子",
-    phone: "13800001016",
-    email: "hejiu@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2023-09-01",
-    updateTime: "2026-05-20",
-  },
-  {
-    id: 17,
-    studentNo: "20220002",
-    name: "罗十",
-    gender: "女",
-    college: "信息工程学院",
-    grade: "2022级",
-    major: "计算机科学与技术",
-    className: "计科202201",
-    branchName: "计算机学院学生第二党支部",
-    identity: "发展对象",
-    phone: "13800001017",
-    email: "luoshi@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2023-09-01",
-    updateTime: "2026-05-15",
-  },
-  {
-    id: 18,
-    studentNo: "20220003",
-    name: "梁一",
-    gender: "男",
-    college: "信息工程学院",
-    grade: "2022级",
-    major: "软件工程",
-    className: "软工202201",
-    branchName: "软件学院学生党支部",
-    identity: "入党申请人",
-    phone: "13800001018",
-    email: "liangyi@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2023-09-01",
-    updateTime: "2026-05-10",
-  },
-  {
-    id: 19,
-    studentNo: "20210001",
-    name: "宋二",
-    gender: "女",
-    college: "信息工程学院",
-    grade: "2021级",
-    major: "计算机科学与技术",
-    className: "计科202101",
-    branchName: "计算机学院学生第二党支部",
-    identity: "正式党员",
-    phone: "13800001019",
-    email: "songer@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2022-09-01",
-    updateTime: "2026-05-05",
-  },
-  {
-    id: 20,
-    studentNo: "20210002",
-    name: "唐三",
-    gender: "男",
-    college: "信息工程学院",
-    grade: "2021级",
-    major: "软件工程",
-    className: "软工202101",
-    branchName: "软件学院学生党支部",
-    identity: "正式党员",
-    phone: "13800001020",
-    email: "tangsan@edu.cn",
-    status: 1,
-    remark: "",
-    createTime: "2022-09-01",
-    updateTime: "2026-04-28",
-  },
-]);
-// ============================================================
-// 身份标签配置
-// ============================================================
-const identityTagMap: Record<string, string> = {
-  普通学生: "info",
-  入党申请人: "",
-  积极分子: "warning",
-  发展对象: "primary",
-  预备党员: "success",
-  正式党员: "danger",
-};
-
-const identityColorMap: Record<string, string> = {
-  普通学生: "#909399",
-  入党申请人: "#409EFF",
-  积极分子: "#E6A23C",
-  发展对象: "#C9973B",
-  预备党员: "#67C23A",
-  正式党员: "#C12C1F",
-};
-
-const identityOptions = [
-  { value: "", label: "全部" },
-  { value: "普通学生", label: "普通学生" },
-  { value: "入党申请人", label: "入党申请人" },
-  { value: "积极分子", label: "积极分子" },
-  { value: "发展对象", label: "发展对象" },
-  { value: "预备党员", label: "预备党员" },
-  { value: "正式党员", label: "正式党员" },
-];
-
-// ============================================================
-// 从数据提取筛选项
-// ============================================================
-const branchOptions = computed(() => {
-  const branches = [...new Set(allMembers.value.map((m) => m.branchName))];
-  return [{ value: "", label: "全部" }, ...branches.map((b) => ({ value: b, label: b }))];
-});
-
-// ============================================================
-// 权限过滤：支委只看本支部
-// ============================================================
-const membersByRole = computed(() => {
-  if (isSuperAdmin.value) return allMembers.value;
-  return allMembers.value.filter((m) => m.branchName === secretaryBranch);
-});
-
-// ============================================================
-// 筛选状态（用户输入 - 未应用）
-// ============================================================
-const filterBranch = ref("");
-const filterIdentity = ref("");
-const filterKeyword = ref("");
-
-// 已应用的筛选条件
-const appliedBranch = ref("");
-const appliedIdentity = ref("");
-const appliedKeyword = ref("");
-
-// ============================================================
-// 加载 & 分页
-// ============================================================
+const canManage = computed(() => store.currentRole === "super_admin" && sessionHasAccessToken.value);
+const rows = ref<UserVo[]>([]);
+const branches = ref<{ id: number; branchName: string }[]>([]);
+const roles = ref<{ id: number; roleCode: string }[]>([]);
 const loading = ref(false);
-const currentPage = ref(1);
-const pageSize = ref(10);
-
-// ============================================================
-// 筛选后的数据
-// ============================================================
-const filteredMembers = computed(() => {
-  let list = membersByRole.value;
-  if (appliedBranch.value) list = list.filter((m) => m.branchName === appliedBranch.value);
-  if (appliedIdentity.value) list = list.filter((m) => m.identity === appliedIdentity.value);
-  if (appliedKeyword.value.trim()) {
-    const kw = appliedKeyword.value.trim().toLowerCase();
-    list = list.filter(
-      (m) =>
-        m.name.toLowerCase().includes(kw) ||
-        m.studentNo.toLowerCase().includes(kw) ||
-        m.major.toLowerCase().includes(kw) ||
-        m.className.toLowerCase().includes(kw),
-    );
-  }
-  return list;
+const loadError = ref(false);
+const total = ref(0);
+const page = ref(1);
+const size = ref(10);
+const filters = reactive({
+  keyword: "",
+  branchId: undefined as number | undefined,
+  status: undefined as number | undefined,
 });
+const applied = ref<MemberFilters>({});
+const roleLabel = (role: string | null) =>
+  ({ super_admin: "超级管理员", branch_admin: "支部管理员", student: "普通成员" })[role || ""] || role || "—";
+const dateLabel = (date: string | null) => (date ? date.replace("T", " ").slice(0, 16) : "—");
 
-const totalFiltered = computed(() => filteredMembers.value.length);
-
-const pagedMembers = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value;
-  return filteredMembers.value.slice(start, start + pageSize.value);
-});
-
-// ============================================================
-// 统计概览
-// ============================================================
-const statsData = computed(() => ({
-  total: membersByRole.value.length,
-  applicants: membersByRole.value.filter((m) => m.identity === "入党申请人").length,
-  activists: membersByRole.value.filter((m) => m.identity === "积极分子").length,
-  developmentTargets: membersByRole.value.filter((m) => m.identity === "发展对象").length,
-  probationary: membersByRole.value.filter((m) => m.identity === "预备党员").length,
-  fullMembers: membersByRole.value.filter((m) => m.identity === "正式党员").length,
-}));
-
-// ============================================================
-// 筛选变化时重置页码
-// ============================================================
-watch([appliedBranch, appliedIdentity, appliedKeyword], () => {
-  currentPage.value = 1;
-});
-// ============================================================
-// 搜索
-// ============================================================
-async function handleSearch(): Promise<void> {
+let requestSequence = 0;
+async function loadMembers() {
+  const sequence = ++requestSequence;
   loading.value = true;
+  loadError.value = false;
   try {
-    // TODO: 替换为真实 API 调用
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    appliedBranch.value = filterBranch.value;
-    appliedIdentity.value = filterIdentity.value;
-    appliedKeyword.value = filterKeyword.value;
+    const result = await pageMembers({ page: page.value, size: size.value, ...applied.value });
+    if (sequence !== requestSequence) return;
+    rows.value = result.records;
+    total.value = result.total;
+  } catch {
+    if (sequence === requestSequence) {
+      rows.value = [];
+      total.value = 0;
+      loadError.value = true;
+    }
   } finally {
-    loading.value = false;
+    if (sequence === requestSequence) loading.value = false;
   }
 }
-
-// ============================================================
-// 重置
-// ============================================================
-function handleReset(): void {
-  filterBranch.value = "";
-  filterIdentity.value = "";
-  filterKeyword.value = "";
-  appliedBranch.value = "";
-  appliedIdentity.value = "";
-  appliedKeyword.value = "";
+function search() {
+  applied.value = { keyword: filters.keyword.trim() || undefined, branchId: filters.branchId, status: filters.status };
+  page.value = 1;
+  void loadMembers();
 }
-
-// ============================================================
-// 分页
-// ============================================================
-function handlePageChange(page: number): void {
-  currentPage.value = page;
+function reset() {
+  filters.keyword = "";
+  filters.branchId = undefined;
+  filters.status = undefined;
+  search();
 }
-function handleSizeChange(size: number): void {
-  pageSize.value = size;
-  currentPage.value = 1;
+function changePage(value: number) {
+  page.value = value;
+  void loadMembers();
 }
-
-// ============================================================
-// 新增/编辑对话框
-// ============================================================
-const dialogVisible = ref(false);
-const dialogTitle = ref("新增成员");
-const isEdit = ref(false);
-const editingId = ref<number | null>(null);
-const formRef = ref<FormInstance>();
-
-const formData = reactive<MemberForm>({
-  studentNo: "",
-  name: "",
-  gender: "男",
-  college: "信息工程学院",
-  grade: "",
-  major: "",
-  className: "",
-  branchName: "",
-  identity: "普通学生",
-  phone: "",
-  email: "",
-  remark: "",
+function changeSize(value: number) {
+  size.value = value;
+  page.value = 1;
+  void loadMembers();
+}
+async function loadOptions() {
+  try {
+    [branches.value, roles.value] = await Promise.all([listBranches(), listRoles()]);
+  } catch {
+    ElMessage.warning("支部或角色选项加载失败，请刷新页面重试");
+  }
+}
+onMounted(() => {
+  if (canManage.value) {
+    void loadMembers();
+    void loadOptions();
+  }
+});
+watch(canManage, (enabled) => {
+  rows.value = [];
+  total.value = 0;
+  if (enabled) {
+    void loadMembers();
+    void loadOptions();
+  }
 });
 
-const formRules: FormRules = {
-  studentNo: [{ required: true, message: "请输入学号", trigger: "blur" }],
-  name: [{ required: true, message: "请输入姓名", trigger: "blur" }],
-  gender: [{ required: true, message: "请选择性别", trigger: "change" }],
-  college: [{ required: true, message: "请输入学院", trigger: "blur" }],
-  grade: [{ required: true, message: "请输入年级", trigger: "blur" }],
-  major: [{ required: true, message: "请输入专业", trigger: "blur" }],
-  className: [{ required: true, message: "请输入班级", trigger: "blur" }],
-  branchName: [{ required: true, message: "请选择所属支部", trigger: "change" }],
-  identity: [{ required: true, message: "请选择政治身份", trigger: "change" }],
-  phone: [
-    {
-      pattern: /^1[3-9]\d{9}$/,
-      message: "请输入正确的手机号",
-      trigger: "blur",
-    },
-  ],
-  email: [{ type: "email", message: "请输入正确的邮箱", trigger: "blur" }],
-};
-
-// 打开新增对话框
-function handleAdd(): void {
-  dialogTitle.value = "新增成员";
-  isEdit.value = false;
-  editingId.value = null;
-  Object.assign(formData, {
-    studentNo: "",
-    name: "",
-    gender: "男",
-    college: "信息工程学院",
+const detailVisible = ref(false);
+const detail = ref<UserVo | null>(null);
+async function viewMember(row: UserVo) {
+  try {
+    detail.value = await getMember(row.id);
+    detailVisible.value = true;
+  } catch {
+    /* 请求层提示错误 */
+  }
+}
+function emptyForm(): UserSaveRequest {
+  return {
+    username: "",
+    realName: "",
+    studentId: "",
+    gender: "",
+    college: "",
     grade: "",
     major: "",
     className: "",
-    branchName: "",
-    identity: "普通学生",
+    branchId: null,
+    roleId: null,
     phone: "",
     email: "",
+    contactPerson: "",
     remark: "",
-  });
-  dialogVisible.value = true;
+  };
 }
-
-// 打开编辑对话框
-function handleEdit(row: Member): void {
-  dialogTitle.value = "编辑成员";
-  isEdit.value = true;
-  editingId.value = row.id;
-  Object.assign(formData, {
-    studentNo: row.studentNo,
-    name: row.name,
-    gender: row.gender,
-    college: row.college,
-    grade: row.grade,
-    major: row.major,
-    className: row.className,
-    branchName: row.branchName,
-    identity: row.identity,
-    phone: row.phone,
-    email: row.email,
-    remark: row.remark,
-  });
-  dialogVisible.value = true;
+const form = reactive<UserSaveRequest>(emptyForm());
+const formRef = ref<FormInstance>();
+const formVisible = ref(false);
+const editingId = ref<number | null>(null);
+const saving = ref(false);
+const rules: FormRules = {
+  username: [{ required: true, message: "请输入登录账号", trigger: "blur" }],
+  realName: [{ required: true, message: "请输入姓名", trigger: "blur" }],
+  studentId: [{ required: true, message: "请输入学号", trigger: "blur" }],
+  phone: [{ pattern: /^1\d{10}$/, message: "手机号格式不正确", trigger: "blur" }],
+  email: [{ type: "email", message: "邮箱格式不正确", trigger: "blur" }],
+};
+function addMember() {
+  editingId.value = null;
+  Object.assign(form, emptyForm());
+  formVisible.value = true;
 }
-
-// 提交表单
-async function handleSubmit(formEl: FormInstance | undefined): Promise<void> {
-  if (!formEl) return;
-  await formEl.validate(async (valid) => {
-    if (valid) {
-      try {
-        // TODO: 替换为真实 API 调用
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        if (isEdit.value && editingId.value) {
-          const idx = allMembers.value.findIndex((m) => m.id === editingId.value);
-          if (idx !== -1) {
-            const member = allMembers.value[idx];
-            Object.assign(member, formData);
-            member.updateTime = new Date().toISOString().slice(0, 10);
-            ElMessage.success("成员信息更新成功");
-          }
-        } else {
-          const newMember: Member = {
-            id: Math.max(...allMembers.value.map((m) => m.id)) + 1,
-            ...formData,
-            status: 1,
-            createTime: new Date().toISOString().slice(0, 10),
-            updateTime: new Date().toISOString().slice(0, 10),
-          };
-          allMembers.value.unshift(newMember);
-          ElMessage.success("成员添加成功");
-        }
-        dialogVisible.value = false;
-      } catch {
-        ElMessage.error("操作失败，请重试");
-      }
-    }
-  });
-}
-
-// 关闭对话框
-function handleDialogClose(): void {
-  formRef.value?.resetFields();
-}
-// ============================================================
-// 删除
-// ============================================================
-async function handleDelete(row: Member): Promise<void> {
+async function editMember(row: UserVo) {
   try {
-    await ElMessageBox.confirm(`确定要删除成员「${row.name}」(${row.studentNo}) 吗？此操作不可恢复。`, "删除确认", {
-      confirmButtonText: "确定删除",
-      cancelButtonText: "取消",
+    const value = await getMember(row.id);
+    editingId.value = row.id;
+    Object.assign(form, {
+      username: value.username,
+      realName: value.realName || "",
+      studentId: value.studentId || "",
+      gender: value.gender || "",
+      college: value.college || "",
+      grade: value.grade || "",
+      major: value.major || "",
+      className: value.className || "",
+      branchId: value.branchId,
+      roleId: value.roleId,
+      phone: value.phone || "",
+      email: value.email || "",
+      contactPerson: value.contactPerson || "",
+      remark: value.remark || "",
+    });
+    formVisible.value = true;
+  } catch {
+    /* 请求层提示错误 */
+  }
+}
+async function saveMember() {
+  if (!formRef.value || !(await formRef.value.validate().catch(() => false))) return;
+  saving.value = true;
+  try {
+    const payload = { ...form };
+    if (editingId.value !== null) {
+      delete payload.username;
+      await updateMember(editingId.value, payload);
+    } else await createMember(payload);
+    ElMessage.success(editingId.value === null ? "成员添加成功" : "成员信息已更新");
+    formVisible.value = false;
+    await loadMembers();
+  } catch {
+    /* 保留表单，便于修改 */
+  } finally {
+    saving.value = false;
+  }
+}
+async function changeStatus(row: UserVo) {
+  const next = row.status === 1 ? 2 : 1;
+  const action = next === 2 ? "停用" : "启用";
+  try {
+    await ElMessageBox.confirm(`确定${action}成员「${row.realName || row.username}」吗？`, `${action}确认`, {
       type: "warning",
+      confirmButtonText: `确定${action}`,
+      cancelButtonText: "取消",
     });
-    // TODO: 替换为真实 API 调用
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const idx = allMembers.value.findIndex((m) => m.id === row.id);
-    if (idx !== -1) allMembers.value.splice(idx, 1);
-    ElMessage.success("成员已删除");
   } catch {
-    // 用户取消
+    return;
   }
-}
-
-// ============================================================
-// 查看详情 - 跳转到党员发展详情页
-// ============================================================
-function handleView(row: Member): void {
-  // TODO: 可跳转至成员详情页
-  ElMessage.info(`查看成员「${row.name}」的详细信息`);
-}
-
-// ============================================================
-// Excel 导入
-// ============================================================
-function handleImport(): void {
-  // TODO: 实现 Excel 批量导入功能
-  ElMessage.info("Excel 导入功能开发中...");
-}
-
-// ============================================================
-// 导出
-// ============================================================
-function handleExport(): void {
   try {
-    const headers = [
-      "学号",
-      "姓名",
-      "性别",
-      "学院",
-      "年级",
-      "专业",
-      "班级",
-      "所属支部",
-      "政治身份",
-      "联系电话",
-      "邮箱",
-      "备注",
-    ];
-    const rows = filteredMembers.value.map((m) => [
-      m.studentNo,
-      m.name,
-      m.gender,
-      m.college,
-      m.grade,
-      m.major,
-      m.className,
-      m.branchName,
-      m.identity,
-      m.phone,
-      m.email,
-      m.remark,
-    ]);
-    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const BOM = "\uFEFF";
-    const blob = new Blob([BOM + csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `成员数据导出_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    ElMessage.success("导出成功");
+    await updateMemberStatus(row.id, next);
+    ElMessage.success(`已${action}`);
+    await loadMembers();
   } catch {
-    ElMessage.error("导出失败");
+    /* 请求层提示错误 */
   }
+}
+
+function saveFile(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+async function downloadTemplate() {
+  try {
+    saveFile(await downloadMemberTemplate(), "用户导入模板.xlsx");
+  } catch {
+    /* 请求层提示错误 */
+  }
+}
+const importVisible = ref(false);
+const importFile = ref<File | null>(null);
+const importing = ref(false);
+const importProgress = ref(0);
+const importResult = ref<ImportResult | null>(null);
+function chooseFile(event: Event) {
+  importFile.value = (event.target as HTMLInputElement).files?.[0] || null;
+  importResult.value = null;
+}
+async function submitImport() {
+  const file = importFile.value;
+  if (!file) {
+    ElMessage.warning("请选择 Excel 文件");
+    return;
+  }
+  if (!/\.xlsx$/i.test(file.name)) {
+    ElMessage.warning("请上传 .xlsx 格式文件");
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.warning("文件不能超过 10 MB");
+    return;
+  }
+  importing.value = true;
+  importProgress.value = 0;
+  try {
+    importResult.value = await importMembers(file, (percent) => {
+      importProgress.value = percent;
+    });
+    ElMessage.success(`导入完成：成功 ${importResult.value.successCount} 条，失败 ${importResult.value.failCount} 条`);
+    page.value = 1;
+    await loadMembers();
+  } catch {
+    /* 文件保留供重试 */
+  } finally {
+    importing.value = false;
+  }
+}
+function downloadErrors() {
+  if (!importResult.value) return;
+  const lines = [
+    "行号,失败原因",
+    ...importResult.value.errors.map(({ row, reason }) => `${row},"${reason.replace(/"/g, '""')}"`),
+  ];
+  saveFile(new Blob(["\uFEFF", lines.join("\r\n")], { type: "text/csv;charset=utf-8" }), "成员导入错误报告.csv");
 }
 </script>
 
 <template>
-  <div class="members-page">
-    <div class="page-container">
-      <!-- 页头 -->
-      <div class="page-header">
-        <h2 class="section-title">成员管理</h2>
-        <p class="page-desc">管理学院全体党员成员基础信息，支持增删改查、批量导入导出</p>
-      </div>
-
-      <!-- 统计概览 -->
-      <div class="stats-grid">
-        <div class="stat-card stat-total">
-          <div class="stat-icon icon-total">
-            <el-icon :size="24"><UserFilled /></el-icon>
-          </div>
-          <div class="stat-body">
-            <span class="stat-num num-total">{{ statsData.total }}</span>
-            <span class="stat-label">成员总数</span>
-          </div>
+  <div class="members-page page-container">
+    <div class="page-header">
+      <h2 class="section-title">成员管理</h2>
+      <p>查看和维护成员基础信息，支持 Excel 批量导入。</p>
+    </div>
+    <el-alert v-if="!sessionHasAccessToken" title="成员管理需要登录" type="warning" show-icon :closable="false">
+      <template #default>
+        <p>当前是开发预览身份，没有后端登录令牌。请使用超级管理员账号登录后再访问成员管理。</p>
+        <el-button type="primary" @click="$router.push('/login')">前往登录</el-button>
+      </template>
+    </el-alert>
+    <el-alert
+      v-else-if="!canManage"
+      title="当前账号没有成员管理权限，请使用超级管理员账号登录"
+      type="warning"
+      show-icon
+      :closable="false"
+    />
+    <div v-else class="content-card">
+      <div class="card-header">
+        <div>
+          <strong>成员列表</strong><span class="total-label">共 {{ total }} 条</span>
         </div>
-        <div class="stat-card stat-applicant">
-          <div class="stat-icon icon-applicant">
-            <el-icon :size="24"><EditPen /></el-icon>
-          </div>
-          <div class="stat-body">
-            <span class="stat-num num-applicant">{{ statsData.applicants }}</span>
-            <span class="stat-label">入党申请人</span>
-          </div>
-        </div>
-        <div class="stat-card stat-activist">
-          <div class="stat-icon icon-activist">
-            <el-icon :size="24"><StarFilled /></el-icon>
-          </div>
-          <div class="stat-body">
-            <span class="stat-num num-activist">{{ statsData.activists }}</span>
-            <span class="stat-label">积极分子</span>
-          </div>
-        </div>
-        <div class="stat-card stat-development">
-          <div class="stat-icon icon-development">
-            <el-icon :size="24"><TrendCharts /></el-icon>
-          </div>
-          <div class="stat-body">
-            <span class="stat-num num-development">{{ statsData.developmentTargets }}</span>
-            <span class="stat-label">发展对象</span>
-          </div>
-        </div>
-        <div class="stat-card stat-probationary">
-          <div class="stat-icon icon-probationary">
-            <el-icon :size="24"><CircleCheckFilled /></el-icon>
-          </div>
-          <div class="stat-body">
-            <span class="stat-num num-probationary">{{ statsData.probationary }}</span>
-            <span class="stat-label">预备党员</span>
-          </div>
-        </div>
-        <div class="stat-card stat-full">
-          <div class="stat-icon icon-full">
-            <el-icon :size="24"><Medal /></el-icon>
-          </div>
-          <div class="stat-body">
-            <span class="stat-num num-full">{{ statsData.fullMembers }}</span>
-            <span class="stat-label">正式党员</span>
-          </div>
+        <div class="actions">
+          <el-button :icon="Download" @click="downloadTemplate">下载导入模板</el-button
+          ><el-button :icon="Upload" @click="importVisible = true">Excel 导入</el-button
+          ><el-button type="primary" :icon="Plus" @click="addMember">新增成员</el-button>
         </div>
       </div>
-
-      <!-- 成员列表卡片 -->
-      <div v-loading="loading" class="content-card">
-        <!-- 卡片标题栏 -->
-        <div class="card-header">
-          <span class="card-title">成员列表</span>
-          <div class="card-actions">
-            <el-button v-if="canEdit" type="primary" :icon="Plus" @click="handleAdd"> 新增成员 </el-button>
-            <el-button v-if="canEdit" :icon="Upload" @click="handleImport"> Excel导入 </el-button>
-            <el-button :icon="Download" @click="handleExport"> 导出数据 </el-button>
-          </div>
-        </div>
-
-        <!-- 搜索筛选栏 -->
-        <div class="filter-bar">
-          <el-row :gutter="16" class="filter-row">
-            <!-- 所属支部：仅超级管理员可见 -->
-            <el-col v-if="isSuperAdmin" :xs="24" :sm="12" :md="8" :lg="6">
-              <div class="filter-item">
-                <label class="filter-label">所属支部</label>
-                <el-select v-model="filterBranch" placeholder="全部" clearable style="width: 100%">
-                  <el-option v-for="item in branchOptions" :key="item.value" :label="item.label" :value="item.value" />
-                </el-select>
-              </div>
-            </el-col>
-
-            <!-- 政治身份 -->
-            <el-col :xs="24" :sm="12" :md="8" :lg="6">
-              <div class="filter-item">
-                <label class="filter-label">政治身份</label>
-                <el-select v-model="filterIdentity" placeholder="全部" clearable style="width: 100%">
-                  <el-option
-                    v-for="item in identityOptions"
-                    :key="item.value"
-                    :label="item.label"
-                    :value="item.value"
-                  />
-                </el-select>
-              </div>
-            </el-col>
-
-            <!-- 关键词搜索 -->
-            <el-col :xs="24" :sm="12" :md="8" :lg="6">
-              <div class="filter-item">
-                <label class="filter-label">关键词搜索</label>
-                <el-input
-                  v-model="filterKeyword"
-                  placeholder="姓名 / 学号 / 专业 / 班级"
-                  clearable
-                  @keyup.enter="handleSearch"
-                >
-                  <template #prefix>
-                    <el-icon><Search /></el-icon>
-                  </template>
-                </el-input>
-              </div>
-            </el-col>
-
-            <!-- 操作按钮 -->
-            <el-col :xs="24" :sm="12" :md="8" :lg="6">
-              <div class="filter-item filter-actions">
-                <label class="filter-label">&nbsp;</label>
-                <div class="btn-group">
-                  <el-button type="primary" @click="handleSearch">
-                    <el-icon><Search /></el-icon> 搜索
-                  </el-button>
-                  <el-button @click="handleReset">重置</el-button>
-                  <span v-if="appliedBranch || appliedIdentity || appliedKeyword" class="result-count">
-                    {{ totalFiltered }} 条结果
-                  </span>
-                </div>
-              </div>
-            </el-col>
-          </el-row>
-        </div>
-        <!-- 数据表格 -->
-        <el-table
-          v-if="pagedMembers.length > 0"
-          :data="pagedMembers"
-          style="width: 100%"
-          stripe
-          :default-sort="{ prop: 'updateTime', order: 'descending' }"
+      <div class="filters">
+        <el-input
+          v-model="filters.keyword"
+          clearable
+          placeholder="姓名 / 用户名 / 学号 / 手机 / 邮箱"
+          @keyup.enter="search"
+        />
+        <el-select v-model="filters.branchId" clearable placeholder="全部支部"
+          ><el-option v-for="branch in branches" :key="branch.id" :label="branch.branchName" :value="branch.id"
+        /></el-select>
+        <el-select v-model="filters.status" clearable placeholder="全部状态"
+          ><el-option label="启用" :value="1" /><el-option label="停用" :value="2"
+        /></el-select>
+        <el-button type="primary" @click="search">搜索</el-button><el-button @click="reset">重置</el-button>
+      </div>
+      <el-alert v-if="loadError" title="成员数据加载失败" type="error" show-icon :closable="false" class="load-error"
+        ><template #default><el-button link type="primary" @click="loadMembers">重试</el-button></template></el-alert
+      >
+      <el-table
+        v-loading="loading"
+        :data="rows"
+        stripe
+        style="width: 100%"
+        class="members-table"
+        empty-text="暂无成员数据"
+      >
+        <el-table-column prop="studentId" label="学号" min-width="120" /><el-table-column
+          prop="realName"
+          label="姓名"
+          min-width="100"
+        /><el-table-column prop="username" label="登录账号" min-width="120" />
+        <el-table-column prop="college" label="学院" min-width="130" /><el-table-column
+          prop="major"
+          label="专业"
+          min-width="130"
+        /><el-table-column prop="className" label="班级" min-width="110" /><el-table-column
+          prop="branchName"
+          label="所属支部"
+          min-width="170"
+        />
+        <el-table-column label="角色" min-width="110"
+          ><template #default="{ row }">{{ roleLabel(row.role) }}</template></el-table-column
         >
-          <el-table-column prop="studentNo" label="学号" width="130" sortable />
-          <el-table-column prop="name" label="姓名" width="100" sortable />
-          <el-table-column prop="gender" label="性别" width="70" />
-          <el-table-column prop="college" label="学院" min-width="140" />
-          <el-table-column prop="grade" label="年级" width="90" sortable />
-          <el-table-column prop="major" label="专业" min-width="160" />
-          <el-table-column prop="className" label="班级" min-width="130" />
-          <el-table-column prop="branchName" label="所属支部" min-width="200" />
-          <el-table-column label="政治身份" width="120">
-            <template #default="{ row }">
-              <el-tag
-                :type="identityTagMap[row.identity] || 'info'"
-                size="small"
-                :color="identityColorMap[row.identity]"
-                effect="dark"
-              >
-                {{ row.identity }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="phone" label="联系电话" width="130" />
-          <el-table-column prop="updateTime" label="最后更新" width="120" sortable />
-          <el-table-column label="操作" width="180" fixed="right">
-            <template #default="{ row }">
-              <div class="table-actions">
-                <el-button type="primary" link size="small" @click="handleView(row)"> 查看 </el-button>
-                <el-button v-if="canEdit" type="warning" link size="small" @click="handleEdit(row)"> 编辑 </el-button>
-                <el-button v-if="canEdit" type="danger" link size="small" @click="handleDelete(row)"> 删除 </el-button>
-              </div>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <!-- 空状态 -->
-        <el-empty v-else description="暂无匹配的成员数据" :image-size="100" />
-
-        <!-- 分页 -->
-        <div v-if="totalFiltered > 0" class="table-footer">
-          <span class="total-info">共 {{ totalFiltered }} 条记录</span>
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50]"
-            :total="totalFiltered"
-            layout="sizes, prev, pager, next, jumper"
-            background
-            small
-            @current-change="handlePageChange"
-            @size-change="handleSizeChange"
-          />
-        </div>
-      </div>
+        <el-table-column label="状态" width="80"
+          ><template #default="{ row }"
+            ><el-tag :type="row.status === 1 ? 'success' : 'info'">{{
+              row.status === 1 ? "启用" : "停用"
+            }}</el-tag></template
+          ></el-table-column
+        >
+        <el-table-column
+          label="创建时间"
+          width="172"
+          class-name="created-at-column"
+          label-class-name="created-at-header"
+          ><template #default="{ row }">{{ dateLabel(row.createTime) }}</template></el-table-column
+        >
+        <el-table-column label="操作" width="180" fixed="right"
+          ><template #default="{ row }"
+            ><div class="row-actions">
+              <el-button link type="primary" @click="viewMember(row)">查看</el-button
+              ><el-button link type="primary" @click="editMember(row)">编辑</el-button
+              ><el-button link :type="row.status === 1 ? 'danger' : 'success'" @click="changeStatus(row)">{{
+                row.status === 1 ? "停用" : "启用"
+              }}</el-button>
+            </div></template
+          ></el-table-column
+        >
+      </el-table>
+      <el-pagination
+        v-if="total"
+        :current-page="page"
+        :page-size="size"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="sizes, prev, pager, next, jumper"
+        class="pagination"
+        @current-change="changePage"
+        @size-change="changeSize"
+      />
     </div>
 
-    <!-- 新增 / 编辑对话框 -->
     <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="680px"
+      v-model="formVisible"
+      :title="editingId === null ? '新增成员' : '编辑成员'"
+      width="720px"
       :close-on-click-modal="false"
-      @closed="handleDialogClose"
+      @closed="formRef?.clearValidate()"
     >
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="100px" label-position="right">
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="学号" prop="studentNo">
-              <el-input v-model="formData.studentNo" placeholder="请输入学号" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="姓名" prop="name">
-              <el-input v-model="formData.name" placeholder="请输入姓名" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="性别" prop="gender">
-              <el-select v-model="formData.gender" style="width: 100%">
-                <el-option label="男" value="男" />
-                <el-option label="女" value="女" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="政治身份" prop="identity">
-              <el-select v-model="formData.identity" style="width: 100%">
-                <el-option
-                  v-for="opt in identityOptions.filter((o) => o.value !== '')"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="学院" prop="college">
-              <el-input v-model="formData.college" placeholder="请输入学院" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="年级" prop="grade">
-              <el-select v-model="formData.grade" style="width: 100%" placeholder="请选择">
-                <el-option label="2025级" value="2025级" />
-                <el-option label="2024级" value="2024级" />
-                <el-option label="2023级" value="2023级" />
-                <el-option label="2022级" value="2022级" />
-                <el-option label="2021级" value="2021级" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="专业" prop="major">
-              <el-input v-model="formData.major" placeholder="请输入专业" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="班级" prop="className">
-              <el-input v-model="formData.className" placeholder="请输入班级" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="所属支部" prop="branchName">
-              <el-select v-model="formData.branchName" style="width: 100%" placeholder="请选择">
-                <el-option
-                  v-for="opt in branchOptions.filter((o) => o.value !== '')"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="手机号" prop="phone">
-              <el-input v-model="formData.phone" placeholder="请输入手机号" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="邮箱" prop="email">
-              <el-input v-model="formData.email" placeholder="请输入邮箱" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="formData.remark" type="textarea" :rows="3" placeholder="可选，填写备注信息" />
-        </el-form-item>
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" class="member-form">
+        <el-form-item label="登录账号" prop="username"
+          ><el-input v-model="form.username" :disabled="editingId !== null" placeholder="建议使用学号"
+        /></el-form-item>
+        <el-form-item label="姓名" prop="realName"><el-input v-model="form.realName" /></el-form-item
+        ><el-form-item label="学号" prop="studentId"><el-input v-model="form.studentId" /></el-form-item>
+        <el-form-item label="性别"
+          ><el-select v-model="form.gender" clearable
+            ><el-option label="男" value="男" /><el-option label="女" value="女" /></el-select
+        ></el-form-item>
+        <el-form-item label="学院"><el-input v-model="form.college" /></el-form-item
+        ><el-form-item label="年级"><el-input v-model="form.grade" placeholder="例如 2024" /></el-form-item>
+        <el-form-item label="专业"><el-input v-model="form.major" /></el-form-item
+        ><el-form-item label="班级"><el-input v-model="form.className" /></el-form-item>
+        <el-form-item label="所属支部"
+          ><el-select v-model="form.branchId" clearable placeholder="请选择"
+            ><el-option
+              v-for="branch in branches"
+              :key="branch.id"
+              :label="branch.branchName"
+              :value="branch.id" /></el-select
+        ></el-form-item>
+        <el-form-item label="角色"
+          ><el-select v-model="form.roleId" clearable placeholder="默认普通成员"
+            ><el-option
+              v-for="role in roles"
+              :key="role.id"
+              :label="roleLabel(role.roleCode)"
+              :value="role.id" /></el-select
+        ></el-form-item>
+        <el-form-item label="手机号" prop="phone"><el-input v-model="form.phone" /></el-form-item
+        ><el-form-item label="邮箱" prop="email"><el-input v-model="form.email" /></el-form-item>
+        <el-form-item label="紧急联系人"><el-input v-model="form.contactPerson" /></el-form-item
+        ><el-form-item label="备注" class="full-row"
+          ><el-input v-model="form.remark" type="textarea" :rows="2"
+        /></el-form-item>
       </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit(formRef)">
-            {{ isEdit ? "保存修改" : "确认添加" }}
-          </el-button>
-        </div>
-      </template>
+      <template #footer
+        ><el-button @click="formVisible = false">取消</el-button
+        ><el-button type="primary" :loading="saving" @click="saveMember">保存</el-button></template
+      >
+    </el-dialog>
+
+    <el-dialog v-model="detailVisible" title="成员详情" width="620px"
+      ><el-descriptions v-if="detail" :column="2" border>
+        <el-descriptions-item label="姓名">{{ detail.realName || "—" }}</el-descriptions-item
+        ><el-descriptions-item label="学号">{{ detail.studentId || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="登录账号">{{ detail.username }}</el-descriptions-item
+        ><el-descriptions-item label="角色">{{ roleLabel(detail.role) }}</el-descriptions-item>
+        <el-descriptions-item label="性别">{{ detail.gender || "—" }}</el-descriptions-item
+        ><el-descriptions-item label="状态">{{ detail.status === 1 ? "启用" : "停用" }}</el-descriptions-item>
+        <el-descriptions-item label="学院">{{ detail.college || "—" }}</el-descriptions-item
+        ><el-descriptions-item label="年级">{{ detail.grade || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="专业">{{ detail.major || "—" }}</el-descriptions-item
+        ><el-descriptions-item label="班级">{{ detail.className || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="所属支部">{{ detail.branchName || "—" }}</el-descriptions-item
+        ><el-descriptions-item label="手机号">{{ detail.phone || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="邮箱">{{ detail.email || "—" }}</el-descriptions-item
+        ><el-descriptions-item label="紧急联系人">{{ detail.contactPerson || "—" }}</el-descriptions-item>
+        <el-descriptions-item label="备注" :span="2">{{ detail.remark || "—" }}</el-descriptions-item>
+      </el-descriptions></el-dialog
+    >
+
+    <el-dialog
+      v-model="importVisible"
+      title="Excel 导入成员"
+      width="620px"
+      :close-on-click-modal="!importing"
+      :show-close="!importing"
+    >
+      <p class="import-hint">请先下载系统模板，填写后上传 .xlsx 文件。导入会逐行处理，失败行可下载错误报告。</p>
+      <el-button :icon="Download" @click="downloadTemplate">下载导入模板</el-button>
+      <input class="file-input" type="file" accept=".xlsx" :disabled="importing" @change="chooseFile" />
+      <el-progress v-if="importing" :percentage="importProgress" class="progress" />
+      <div v-if="importResult" class="import-result">
+        <el-alert
+          :title="`共 ${importResult.total} 行，成功 ${importResult.successCount} 行，失败 ${importResult.failCount} 行`"
+          :type="importResult.failCount ? 'warning' : 'success'"
+          show-icon
+          :closable="false"
+        />
+        <template v-if="importResult.errors?.length"
+          ><el-table :data="importResult.errors" max-height="240" stripe
+            ><el-table-column prop="row" label="Excel 行号" width="110" /><el-table-column
+              prop="reason"
+              label="失败原因" /></el-table
+          ><el-button :icon="Download" @click="downloadErrors">下载错误报告</el-button></template
+        >
+      </div>
+      <template #footer
+        ><el-button :disabled="importing" @click="importVisible = false">关闭</el-button
+        ><el-button type="primary" :loading="importing" @click="submitImport">开始导入</el-button></template
+      >
     </el-dialog>
   </div>
 </template>
 
-<style lang="scss" scoped>
-/* ============================================================
- * members.vue 样式
- * 遵循项目设计规范，使用 SCSS + CSS 自定义属性
- * ============================================================ */
-
+<style scoped lang="scss">
 .members-page {
   padding: 24px 0 40px;
 }
-
+.members-page.page-container {
+  width: min(calc(100% - 32px), 1728px);
+  max-width: none;
+  padding-inline: 16px;
+}
 .page-header {
   margin-bottom: 24px;
-}
-
-.page-desc {
-  color: var(--text-secondary, #909399);
-  font-size: 14px;
-  margin-top: 4px;
-}
-
-/* ---- 统计卡片网格 ---- */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.stat-card {
-  background: var(--bg-white, #fff);
-  border-radius: var(--radius-lg, 12px);
-  box-shadow: var(--shadow-card, 0 2px 12px rgba(0, 0, 0, 0.06));
-  padding: 20px 16px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  transition: all 0.3s ease;
-  cursor: default;
-
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-hover, 0 4px 20px rgba(0, 0, 0, 0.12));
+  p {
+    color: var(--text-secondary);
+    margin-top: 4px;
   }
 }
-
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-base, 8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--party-red, #c12c1f);
-}
-
-/* 各身份图标背景色 */
-.icon-total {
-  background: rgba(193, 44, 31, 0.1);
-}
-.icon-applicant {
-  background: rgba(64, 158, 255, 0.1);
-}
-.icon-activist {
-  background: rgba(230, 162, 60, 0.1);
-}
-.icon-development {
-  background: rgba(114, 46, 209, 0.1);
-}
-.icon-probationary {
-  background: rgba(103, 194, 58, 0.1);
-}
-.icon-full {
-  background: rgba(193, 44, 31, 0.1);
-}
-
-.stat-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.stat-num {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--party-red, #c12c1f);
-  line-height: 1.2;
-}
-
-/* 各身份统计数字颜色 */
-.num-applicant {
-  color: #409eff;
-}
-.num-activist {
-  color: #e6a23c;
-}
-.num-development {
-  color: #722ed1;
-}
-.num-probationary {
-  color: #67c23a;
-}
-.num-full {
-  color: var(--party-red, #c12c1f);
-}
-
-.stat-label {
-  font-size: 13px;
-  color: var(--text-secondary, #909399);
-  margin-top: 2px;
-  white-space: nowrap;
-}
-
-/* ---- 卡片标题栏 ---- */
 .card-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 12px;
 }
-
-.card-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary, #2c3e50);
-
-  &::before {
-    content: "";
-    display: inline-block;
-    width: 4px;
-    height: 18px;
-    background: var(--party-red, #c12c1f);
-    border-radius: 2px;
-    margin-right: 10px;
-    vertical-align: middle;
-    position: relative;
-    top: -1px;
-  }
-}
-
-.card-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* ---- 搜索筛选栏 ---- */
-.filter-bar {
-  margin-bottom: 20px;
-  padding: 16px 20px;
-  background: var(--bg-page, #f5f6fa);
-  border-radius: var(--radius-base, 8px);
-}
-
-.filter-row {
-  align-items: flex-end;
-}
-
-.filter-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.filter-label {
-  font-size: 14px;
-  color: var(--text-regular, #606266);
-  font-weight: 500;
-}
-
-.filter-actions {
-  .btn-group {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-}
-
-.result-count {
+.total-label {
+  color: var(--text-secondary);
   font-size: 13px;
-  color: var(--party-red, #c12c1f);
+  margin-left: 12px;
+}
+.actions,
+.filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.actions .el-button + .el-button {
+  margin-left: 0;
+}
+.filters {
+  padding: 16px;
+  background: var(--bg-page);
+  margin-bottom: 18px;
+  border-radius: var(--radius-base);
+}
+.filters .el-input {
+  width: 280px;
+}
+.filters .el-select {
+  width: 170px;
+}
+.load-error {
+  margin-bottom: 16px;
+}
+.members-table :deep(.created-at-column .cell),
+.members-table :deep(.created-at-header .cell) {
   white-space: nowrap;
 }
-
-/* ---- 表格操作列 ---- */
-.table-actions {
+.row-actions {
   display: flex;
-  gap: 4px;
-  flex-wrap: nowrap;
-}
-
-/* ---- 表格底部 ---- */
-.table-footer {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-top: 16px;
-  flex-wrap: wrap;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 4px;
+  white-space: nowrap;
 }
-
-.total-info {
-  font-size: 13px;
-  color: var(--text-secondary, #909399);
+.row-actions .el-button + .el-button {
+  margin-left: 0;
 }
-
-/* ---- 对话框底部 ---- */
-.dialog-footer {
-  display: flex;
+.pagination {
   justify-content: flex-end;
-  gap: 8px;
+  margin-top: 20px;
 }
-
-/* ---- Element Plus 内部样式覆盖 ---- */
-:deep(.el-table) {
-  th.el-table__cell {
-    background: var(--bg-page, #f5f6fa);
-    color: var(--text-secondary, #909399);
-    font-weight: 600;
-  }
+.member-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
 }
-
-:deep(.el-tag--dark) {
-  border: none;
+.member-form .el-select {
+  width: 100%;
 }
-
-/* ---- 响应式 ---- */
-@media (max-width: 1400px) {
-  .stats-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
+.full-row {
+  grid-column: 1 / -1;
 }
-
+.import-hint {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.file-input {
+  display: block;
+  margin: 18px 0;
+  max-width: 100%;
+}
+.progress,
+.import-result {
+  margin-top: 18px;
+}
+.import-result .el-table {
+  margin: 12px 0;
+}
 @media (max-width: 768px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .members-page.page-container {
+    width: 100%;
   }
-
-  .filter-bar {
-    padding: 12px;
-  }
-
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-
-@media (max-width: 480px) {
-  .stats-grid {
+  .member-form {
     grid-template-columns: 1fr;
+  }
+  .filters .el-input,
+  .filters .el-select {
+    width: 100%;
   }
 }
 </style>
