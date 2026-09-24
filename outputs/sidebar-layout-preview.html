@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>党建云平台 · 侧边导航布局预览</title>
+    <style>
+      :root { --red:#b92e25; --red-deep:#8e211d; --ink:#24343d; --muted:#78858d; --line:#e8e8e2; --paper:#fff; --ground:#f5f5f1; --gold:#b88743; --side:242px; }
+      * { box-sizing:border-box; }
+      html,body { margin:0; min-height:100%; }
+      body { color:var(--ink); background:var(--ground); font-family:"Microsoft YaHei","PingFang SC",sans-serif; font-size:14px; }
+      button { font:inherit; cursor:pointer; }
+      button:focus-visible { outline:3px solid #d7a155; outline-offset:3px; }
+      .masthead { height:66px; background:var(--red-deep); color:#fff; display:flex; align-items:center; justify-content:space-between; padding:0 32px 0 26px; position:sticky; top:0; z-index:10; box-shadow:0 3px 16px #45161417; }
+      .brand { display:flex; align-items:center; gap:11px; min-width:210px; }
+      .brand img { width:39px; height:39px; object-fit:contain; }
+      .brand b { font-size:20px; letter-spacing:2px; }
+      .masthead-center { font-size:12px; color:#f5dfd8; letter-spacing:2px; border-left:1px solid #ffffff40; padding-left:20px; margin-right:auto; }
+      .head-actions { display:flex; align-items:center; gap:14px; }
+      .preview-pill { border:1px solid #ffffff55; border-radius:99px; padding:5px 11px; color:#f9e8e0; font-size:12px; }
+      .role-select { color:#fff; background:#ffffff17; border:1px solid #ffffff52; border-radius:6px; padding:8px 10px; }
+      .role-select option { color:#222; }
+      .avatar { width:32px; height:32px; border-radius:50%; background:#fff2; display:grid; place-items:center; font-weight:700; }
+      .shell { min-height:calc(100vh - 66px); display:grid; grid-template-columns:var(--side) minmax(0,1fr); }
+      .sidebar { background:#fff; border-right:1px solid var(--line); display:flex; flex-direction:column; position:sticky; top:66px; height:calc(100vh - 66px); overflow-y:auto; }
+      .scope { padding:27px 23px 21px; border-bottom:1px solid var(--line); }
+      .eyebrow { color:var(--red); font-size:11px; font-weight:700; letter-spacing:2px; }
+      .scope strong { display:block; margin-top:8px; font-family:serif; font-size:20px; letter-spacing:1px; }
+      .scope small { display:block; margin-top:5px; color:var(--muted); font-size:12px; }
+      .nav-caption { color:#a2a9a9; font-size:11px; font-weight:700; letter-spacing:2px; padding:22px 24px 10px; }
+      .side-nav { padding:0 10px; display:grid; gap:4px; }
+      .nav-btn { height:47px; width:100%; border:0; background:transparent; color:#58636b; display:flex; align-items:center; gap:12px; text-align:left; padding:0 14px; border-radius:5px; position:relative; }
+      .nav-btn:hover { background:#f8f1ee; color:var(--red-deep); }
+      .nav-btn.active { background:#f8ece8; color:var(--red-deep); font-weight:700; }
+      .nav-btn.active::before { content:""; width:3px; height:23px; background:var(--red); position:absolute; left:0; top:12px; border-radius:4px; }
+      .icon { width:19px; height:19px; display:inline-grid; place-items:center; flex:none; }
+      .icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+      .nav-btn .arrow { margin-left:auto; color:#b7bdbd; }
+      .sidebar-bottom { margin-top:auto; padding:17px 18px 24px; border-top:1px solid var(--line); }
+      .side-note { color:#8c9698; font-size:11px; line-height:1.7; padding:0 9px 12px; }
+      .main { min-width:0; padding:31px clamp(22px,3vw,48px) 70px; max-width:1580px; width:100%; margin:auto; }
+      .breadcrumbs { color:#9aa3a5; font-size:12px; margin-bottom:18px; }
+      .breadcrumbs span { color:var(--red); }
+      .page-head { display:flex; align-items:end; justify-content:space-between; gap:16px; margin-bottom:27px; }
+      .page-head h1 { margin:0 0 8px; font-family:"Songti SC","SimSun",serif; font-size:31px; font-weight:700; letter-spacing:1px; }
+      .page-head p { margin:0; color:var(--muted); line-height:1.6; }
+      .date { color:#849095; font-size:12px; white-space:nowrap; padding-bottom:4px; }
+      .dashboard { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(280px,.9fr); gap:18px; }
+      .hero { min-height:208px; border-radius:9px; color:#fff; background:linear-gradient(105deg,#8f251f 0%,#ab322a 58%,#c14a37 100%); padding:27px 31px; position:relative; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; }
+      .hero::after { content:""; position:absolute; width:330px; height:330px; right:-90px; top:-100px; border:1px solid #ffffff48; border-radius:50%; box-shadow:0 0 0 42px #ffffff0a,0 0 0 92px #ffffff09; }
+      .hero::before { content:""; position:absolute; width:130px; height:130px; border:1px solid #ffffff30; right:105px; bottom:-75px; transform:rotate(45deg); }
+      .hero > * { position:relative; z-index:1; }
+      .hero .kicker { color:#ffe0b0; font-size:12px; letter-spacing:3px; }
+      .hero h2 { font-family:"Songti SC","SimSun",serif; font-size:29px; line-height:1.35; margin:13px 0 6px; }
+      .hero p { color:#ffebe8; margin:0; font-size:13px; }
+      .hero-foot { display:flex; gap:18px; align-items:center; color:#ffe9e5; font-size:12px; }
+      .hero-foot b { font-size:17px; color:#fff; }
+      .panel { background:var(--paper); border:1px solid var(--line); border-radius:9px; }
+      .todo { padding:22px 24px 18px; }
+      .panel-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+      .panel-head h2 { font-size:17px; margin:0; font-weight:700; }
+      .panel-head h2::before { content:""; display:inline-block; height:16px; width:3px; background:var(--red); border-radius:3px; vertical-align:-2px; margin-right:10px; }
+      .mini-link { border:0; background:none; color:var(--red); font-size:12px; padding:4px; }
+      .todo-item { display:flex; justify-content:space-between; gap:12px; padding:12px 0; border-top:1px solid #f0f0ed; align-items:center; }
+      .todo-item:first-child { border-top:0; }
+      .todo-item span { font-size:13px; }
+      .todo-item strong { min-width:28px; height:24px; border-radius:4px; background:#faece8; color:var(--red); display:grid; place-items:center; font-size:12px; }
+      .todo-item strong.soft { background:#f7f2e9; color:#a77939; }
+      .stats { grid-column:1/-1; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+      .stat { padding:20px 22px 18px; min-height:127px; position:relative; overflow:hidden; }
+      .stat small { color:#7f898e; font-size:12px; }
+      .stat strong { display:block; font-family:Georgia,"Songti SC",serif; font-size:31px; line-height:1.25; margin:10px 0 3px; color:#27343b; font-weight:600; }
+      .stat .unit { font:12px "Microsoft YaHei",sans-serif; color:#879196; margin-left:4px; }
+      .stat .trend { color:#b68957; font-size:11px; }
+      .stat::after { content:""; position:absolute; right:-26px; bottom:-48px; width:105px; height:105px; border:1px solid #eddcd7; border-radius:50%; }
+      .stat:nth-child(even)::after { border-color:#ece9df; }
+      .content-grid { grid-column:1/-1; display:grid; grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr); gap:18px; }
+      .content-grid .panel { padding:21px 24px 20px; min-width:0; }
+      .tab-row { display:flex; gap:23px; border-bottom:1px solid var(--line); margin-top:2px; }
+      .content-tab { border:0; background:none; padding:0 0 12px; color:#7c888c; position:relative; font-size:13px; }
+      .content-tab.active { color:var(--red); font-weight:700; }
+      .content-tab.active::after { content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--red); }
+      .news-list { list-style:none; padding:0; margin:3px 0 0; }
+      .news-list li { border-bottom:1px solid #f1f1ee; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 0; }
+      .news-list li:last-child { border:0; }
+      .news-list .title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .news-list time { color:#a1abad; font-size:11px; flex:none; }
+      .quick-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+      .quick { min-height:74px; border:1px solid #eaeae4; background:#fcfcfa; border-radius:5px; text-align:left; padding:12px 14px; display:flex; align-items:center; gap:11px; color:var(--ink); }
+      .quick:hover { border-color:#d6b4a8; background:#fff9f6; }
+      .quick i { font-style:normal; color:var(--red); font-size:19px; background:#faece8; width:34px; height:34px; display:grid; place-items:center; border-radius:4px; flex:none; }
+      .quick span { font-size:12px; font-weight:700; }
+      .quick small { color:#9aa4a4; display:block; font-weight:400; margin-top:3px; }
+      .notice-bar { grid-column:1/-1; color:#778287; font-size:12px; border-top:1px solid #e6e6df; padding:13px 3px; }
+      .module { padding:30px; min-height:490px; display:none; }
+      .module-label { color:var(--red); font-weight:700; letter-spacing:2px; font-size:11px; }
+      .module h2 { font-family:"Songti SC","SimSun",serif; font-size:27px; margin:14px 0 8px; }
+      .module p { color:#718088; line-height:1.8; max-width:690px; }
+      .module-features { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:35px; }
+      .feature { background:#fafaf8; border:1px solid #e9e9e3; border-radius:6px; padding:21px; min-height:112px; }
+      .feature b { display:block; margin-bottom:11px; }
+      .feature small { color:#929c9f; line-height:1.6; }
+      .mobile-menu { display:none; border:0; color:#fff; background:transparent; font-size:23px; }
+      @media(max-width:1100px) { .dashboard,.content-grid { grid-template-columns:1fr; } .stats { grid-column:auto; } .content-grid,.notice-bar { grid-column:auto; } .stats { grid-template-columns:repeat(2,1fr); } }
+      @media(max-width:800px) { :root { --side:220px; } .masthead { padding:0 16px; } .masthead-center { display:none; } .head-actions { gap:8px; } .preview-pill { display:none; } .brand b { font-size:16px; } }
+      @media(max-width:680px) { .shell { display:block; } .mobile-menu { display:block; } .brand { min-width:0; } .brand img { width:31px; height:31px; } .brand b { font-size:15px; letter-spacing:0; } .sidebar { position:fixed; z-index:9; left:0; top:66px; width:min(300px,85vw); transform:translateX(-105%); transition:transform .2s; box-shadow:8px 15px 30px #17232924; } .sidebar.open { transform:none; } .main { padding:23px 16px 44px; } .page-head { align-items:start; } .date { display:none; } .page-head h1 { font-size:27px; } .hero { min-height:205px; } .hero h2 { font-size:25px; } .stats { gap:9px; } .stat { padding:17px; min-height:112px; } .stat strong { font-size:27px; } .content-grid .panel { padding:18px; } .module-features { grid-template-columns:1fr; } .role-select { max-width:108px; } }
+      @media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
+    </style>
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="brand"><button class="mobile-menu" id="mobileMenu" aria-label="打开导航菜单" aria-expanded="false">☰</button><img src="../src/assets/images/Party/党徽黄色1024X1024.png" alt="党徽" /><b>党建云平台</b></div>
+      <div class="masthead-center">党员发展全过程管理系统</div>
+      <div class="head-actions"><span class="preview-pill">布局概念预览 · 示例数据</span><select class="role-select" id="roleSelect" aria-label="预览系统角色"><option value="super">超级管理员</option><option value="branch">支部管理员</option><option value="member">普通成员</option></select><span class="avatar" aria-hidden="true">管</span></div>
+    </header>
+    <div class="shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="scope"><span class="eyebrow">WORKSPACE / 工作台</span><strong id="scopeName">全院工作台</strong><small id="scopeDetail">面向全院的业务概览与待办</small></div>
+        <div class="nav-caption">业务导航</div><nav class="side-nav" id="sideNav" aria-label="业务导航"></nav>
+        <div class="sidebar-bottom"><div class="side-note">左侧项目按系统角色展示。发展身份是业务信息，不作为菜单权限角色。</div><nav class="side-nav" id="bottomNav" aria-label="个人菜单"></nav></div>
+      </aside>
+      <main class="main">
+        <div class="breadcrumbs">工作台 / <span id="crumb">首页</span></div>
+        <div class="page-head"><div><h1 id="pageTitle">早上好，管理员</h1><p id="pageIntro">从待办事项开始，快速掌握全院党员发展与活动情况。</p></div><span class="date">2026 年 9 月 · 布局预览</span></div>
+        <div class="dashboard" id="dashboard">
+          <section class="hero"><div><div class="kicker">党员发展 · 工作总览</div><h2 id="heroTitle">把重点工作，放在首页第一屏</h2><p id="heroText">全院数据、待办事项与常用业务一目了然</p></div><div class="hero-foot"><span>当前范围 <b id="heroScope">全院</b></span><span>待处理事项 <b id="heroTodo">12</b></span></div></section>
+          <section class="panel todo"><div class="panel-head"><h2>待办事项</h2><span class="mini-link">按当前角色显示</span></div><div id="todoList"></div></section>
+          <section class="stats" id="stats"></section>
+          <div class="content-grid"><section class="panel"><div class="panel-head"><h2>资讯公告</h2><span class="mini-link">查看列表 →</span></div><div class="tab-row" role="tablist" aria-label="资讯类型"><button class="content-tab active" data-news="news" role="tab" aria-selected="true">党建新闻</button><button class="content-tab" data-news="notice" role="tab" aria-selected="false">通知公告</button></div><ul class="news-list" id="newsList"></ul></section><section class="panel"><div class="panel-head"><h2>常用入口</h2><span class="mini-link">角色相关</span></div><div class="quick-grid" id="quickGrid"></div></section></div>
+          <div class="notice-bar">设计预览中的数字和待办均为示例数据；正式页面应按登录角色与服务端返回的数据范围展示。</div>
+        </div>
+        <section class="panel module" id="module" aria-live="polite"><span class="module-label">SIDEBAR NAVIGATION / 板块预览</span><h2 id="moduleTitle"></h2><p id="moduleDesc"></p><div class="module-features" id="moduleFeatures"></div></section>
+      </main>
+    </div>
+    <script>
+      const icons = {
+        home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/>',
+        members:'<circle cx="8" cy="8" r="3"/><path d="M2.5 21v-2a5.5 5.5 0 0 1 11 0v2M17 5a3 3 0 0 1 0 6m1 4a5 5 0 0 1 3.5 5"/>',
+        growth:'<path d="M12 21V9M5 15c0 4 3 6 7 6M19 15c0 4-3 6-7 6M12 10c-4 0-6-3-6-7 4 0 6 2 6 7Zm0 0c4 0 6-3 6-7-4 0-6 2-6 7Z"/>',
+        activity:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-13 5h3"/>',
+        content:'<path d="M4 3h13l3 3v15H4zM17 3v4h3M8 11h8M8 15h8M8 19h6"/>',
+        resource:'<path d="M4 3h16v18H4zM8 8h8m-8 4h8m-8 4h5"/>',
+        statistics:'<path d="M4 20V12m5 8V6m5 14v-9m5 9V3M2 21h20"/>',
+        settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9 7 7m10 10 2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/>',
+        user:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>'
+      };
+      const modules = {
+        home:{label:'首页'}, members:{label:'成员与支部',desc:'成员查询、支部信息与培养联系人维护。页面操作需按角色与所属支部授权。',features:['成员列表与筛选','支部信息','导入与批量操作']},
+        growth:{label:'党员发展',desc:'集中展示发展阶段、培养记录、材料和身份历史。普通成员的同一业务域显示为“我的培养”。',features:['培养档案','身份历史','思想汇报与材料']},
+        activity:{label:'活动与签到',desc:'围绕活动创建、参与、签到、统计和归档组织页面。',features:['活动列表','签到记录','活动统计']},
+        content:{label:'资讯公告',desc:'新闻和公告统一归口，阅读与发布管理按权限区分。',features:['党建新闻','通知公告','发布管理']},
+        resource:{label:'资源中心',desc:'按资源分类浏览与下载。上传和管理入口由权限及接口开放情况决定。',features:['申请书模板','思想汇报','学习资料']},
+        statistics:{label:'数据统计',desc:'全院或本支部的成员、培养阶段与活动统计。普通成员不设置独立统计入口。',features:['成员分布','发展阶段','活动参与']},
+        settings:{label:'系统管理',desc:'超级管理员专属扩展板块，承载角色权限和操作日志。',features:['角色权限','操作日志','基础配置']},
+        user:{label:'个人中心',desc:'查看本人资料、培养档案与活动记录。认证来源字段只读。',features:['个人资料','培养档案','活动记录']}
+      };
+      const roles = {
+        super:{scope:'全院工作台',detail:'面向全院的业务概览与待办',title:'早上好，管理员',intro:'从待办事项开始，快速掌握全院党员发展与活动情况。',range:'全院',todo:'12',nav:['home','members','growth','activity','content','resource','statistics','settings'],todos:[['待审核的身份调整','5'],['待处理的培养材料','4'],['即将开展的活动','3']],stats:[['在册成员','156','人'],['积极分子','48','人'],['发展对象','23','人'],['本月活动','8','场']],quick:[['成员与支部','成员管理','members'],['党员发展','培养档案','growth'],['活动与签到','活动管理','activity'],['数据统计','全院概览','statistics']]},
+        branch:{scope:'支部工作台',detail:'仅展示所属党支部数据',title:'早上好，支部管理员',intro:'关注本支部的培养进度、活动安排与待办事项。',range:'本支部',todo:'5',nav:['home','members','growth','activity','content','resource','statistics'],todos:[['待补充的培养记录','2'],['待核对的活动记录','2'],['即将开展的支部活动','1']],stats:[['支部成员','52','人'],['积极分子','16','人'],['发展对象','8','人'],['本月活动','3','场']],quick:[['成员与支部','本支部成员','members'],['党员发展','培养记录','growth'],['活动与签到','支部活动','activity'],['资源中心','共享资料','resource']]},
+        member:{scope:'个人工作台',detail:'围绕个人培养与活动参与',title:'你好，张同学',intro:'查看你的培养进度、待办材料、活动和最新通知。',range:'本人',todo:'3',nav:['home','growth','activity','content','resource'],todos:[['待提交的思想汇报','1'],['即将参加的活动','1'],['未读通知','1']],stats:[['当前阶段','积极分子',''],['培养材料','6','份'],['参与活动','8','场'],['未读通知','1','条']],quick:[['我的培养','进度与档案','growth'],['活动与签到','我的活动','activity'],['资讯公告','最新通知','content'],['资源中心','下载资料','resource']]}
+      };
+      const news = {news:[['学校召开 2026 年党建工作会议，部署下半年重点工作','07-18'],['我院举办“学习二十大精神”主题党日活动','07-15'],['党支部标准化规范化建设经验交流会举行','07-05']],notice:[['关于开展第三季度思想汇报提交工作的通知','07-20'],['关于组织观看党风廉政教育专题片的通知','07-17'],['本周三下午召开支部委员会会议','07-16']]};
+      const $ = (id) => document.getElementById(id);
+      let role = 'super', active = 'home', newsType = 'news';
+      function icon(key){ return `<span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24">${icons[key]}</svg></span>`; }
+      function renderNews(){ $('newsList').innerHTML = news[newsType].map(([title,date])=>`<li><span class="title">${title}</span><time>2026-${date}</time></li>`).join(''); document.querySelectorAll('.content-tab').forEach(el=>{const selected=el.dataset.news===newsType;el.classList.toggle('active',selected);el.setAttribute('aria-selected',String(selected));}); }
+      function render(){ const r=roles[role]; if(!r.nav.includes(active)&&active!=='user') active='home'; $('scopeName').textContent=r.scope; $('scopeDetail').textContent=r.detail; $('sideNav').innerHTML=r.nav.map(key=>`<button class="nav-btn ${active===key?'active':''}" data-page="${key}" ${active===key?'aria-current="page"':''}>${icon(key)}<span>${key==='growth'&&role==='member'?'我的培养':modules[key].label}</span><span class="arrow" aria-hidden="true">›</span></button>`).join(''); $('bottomNav').innerHTML=`<button class="nav-btn ${active==='user'?'active':''}" data-page="user">${icon('user')}<span>个人中心</span><span class="arrow" aria-hidden="true">›</span></button>`; $('crumb').textContent=active==='growth'&&role==='member'?'我的培养':modules[active].label; $('dashboard').style.display=active==='home'?'grid':'none'; $('module').style.display=active==='home'?'none':'block'; if(active==='home'){ $('pageTitle').textContent=r.title; $('pageIntro').textContent=r.intro; $('heroScope').textContent=r.range; $('heroTodo').textContent=r.todo; $('heroTitle').textContent=role==='member'?'每一步成长，都看得见':'把重点工作，放在首页第一屏'; $('heroText').textContent=role==='member'?'个人进度、活动与材料集中查看':`${r.range}数据、待办事项与常用业务一目了然`; $('todoList').innerHTML=r.todos.map(([name,count],i)=>`<div class="todo-item"><span>${name}</span><strong class="${i===2?'soft':''}">${count}</strong></div>`).join(''); $('stats').innerHTML=r.stats.map(([name,value,unit])=>`<article class="panel stat"><small>${name}</small><strong>${value}<span class="unit">${unit}</span></strong><span class="trend">${r.range}范围 · 示例</span></article>`).join(''); $('quickGrid').innerHTML=r.quick.map(([name,detail,key])=>`<button class="quick" data-page="${key}"><i aria-hidden="true">→</i><span>${name}<small>${detail}</small></span></button>`).join(''); renderNews(); } else { const m=modules[active]; const label=active==='growth'&&role==='member'?'我的培养':m.label; $('pageTitle').textContent=label; $('pageIntro').textContent=`${r.range}范围 · 板块布局示意`; $('moduleTitle').textContent=label; $('moduleDesc').textContent=m.desc; $('moduleFeatures').innerHTML=m.features.map(item=>`<div class="feature"><b>${item}</b><small>该区域为信息架构示意，正式能力以页面与接口实现为准。</small></div>`).join(''); } }
+      document.addEventListener('click',e=>{const target=e.target.closest('[data-page]'); if(target){active=target.dataset.page;render();$('sidebar').classList.remove('open');$('mobileMenu').setAttribute('aria-expanded','false'); window.scrollTo({top:0,behavior:'smooth'});} const tab=e.target.closest('[data-news]'); if(tab){newsType=tab.dataset.news;renderNews();}});
+      $('roleSelect').addEventListener('change',e=>{role=e.target.value;active='home';render();});
+      $('mobileMenu').addEventListener('click',()=>{const open=$('sidebar').classList.toggle('open');$('mobileMenu').setAttribute('aria-expanded',String(open));});
+      render();
+    </script>
+  </body>
+</html>

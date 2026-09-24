@@ -235,7 +235,7 @@ async function fetchMemberDetail(): Promise<void> {
     // 当前使用组件内 Mock 数据，模拟加载延迟
     await new Promise((resolve) => setTimeout(resolve, 300));
     console.log(`[Mock] 获取成员 ${memberId} 的培养详情数据`);
-  } catch (error) {
+  } catch {
     ElMessage.error("获取成员详情失败");
   } finally {
     loading.value = false;

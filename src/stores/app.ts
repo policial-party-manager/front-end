@@ -92,6 +92,7 @@ export const useAppStore = defineStore("app", () => {
 
   // ============ 当前激活的导航菜单 ============
   const activeNav = ref<string>("home");
+  const sidebarCollapsed = ref(false);
 
   // ============ Mock 统计数据 ============
   const statData = computed<StatData>(() => {
@@ -127,13 +128,28 @@ export const useAppStore = defineStore("app", () => {
   // ============ 导航菜单项 ============
   const allNavItems: NavItem[] = [
     { key: "home", label: "首页", path: "/", permission: "home:view" },
-    { key: "members", label: "成员管理", path: "/members", permission: "member:manage" },
+    { key: "members", label: "成员与支部", path: "/members", permission: "member:manage" },
     { key: "development", label: "党员发展", path: "/development", permission: "development:manage" },
-    { key: "activities", label: "活动中心", path: "/activity", permission: "activity:view" },
+    { key: "activities", label: "活动与签到", path: "/activity", permission: "activity:view" },
+    { key: "content", label: "资讯公告", path: "/content", permission: "content:view" },
+    { key: "resources", label: "资源中心", path: "/resources", permission: "resource:view" },
     { key: "statistics", label: "数据统计", path: "/statistics", permission: "statistics:view" },
-    { key: "downloads", label: "下载专区", path: "/resources", permission: "resource:view" },
   ];
-  const navItems = computed(() => allNavItems.filter((item) => hasPermission(currentRole.value, item.permission)));
+  const navItems = computed(() => {
+    const role = currentRole.value;
+    const items = allNavItems.filter((item) => hasPermission(role, item.permission)).map((item) => ({ ...item }));
+    if (role === "party_secretary") {
+      const members = items.find((item) => item.key === "members");
+      if (members) members.path = "/members/branch";
+    }
+    if (role === "party_member" || role === "activist") {
+      items.splice(1, 0, { key: "development", label: "我的培养", path: "/my-development", permission: "home:view" });
+    }
+    if (role === "super_admin") {
+      items.push({ key: "system", label: "系统管理", path: "/system", permission: "home:view" });
+    }
+    return items;
+  });
 
   // ============ Mock 新闻数据 ============
   const newsList = ref<NewsItem[]>([
@@ -248,6 +264,10 @@ export const useAppStore = defineStore("app", () => {
     activeNav.value = key;
   }
 
+  function toggleSidebarCollapsed(): void {
+    sidebarCollapsed.value = !sidebarCollapsed.value;
+  }
+
   function setPreviewRole(role: Role): boolean {
     return savePreviewRole(role);
   }
@@ -274,6 +294,7 @@ export const useAppStore = defineStore("app", () => {
     canSwitchPreviewIdentity,
     roleLabels,
     activeNav,
+    sidebarCollapsed,
     navItems,
     statData,
     newsList,
@@ -283,6 +304,7 @@ export const useAppStore = defineStore("app", () => {
     userInfo,
     isLoggedIn,
     setActiveNav,
+    toggleSidebarCollapsed,
     setPreviewRole,
     setSession,
     logout,

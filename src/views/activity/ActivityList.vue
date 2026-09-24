@@ -45,7 +45,6 @@ interface Activity {
 const isSuperAdmin = computed(() => store.currentRole === "super_admin");
 const isSecretary = computed(() => store.currentRole === "party_secretary");
 const isAdmin = computed(() => isSuperAdmin.value || isSecretary.value);
-const isRegularMember = computed(() => store.currentRole === "party_member" || store.currentRole === "activist");
 
 // 支委所属支部（Mock 模拟）
 // TODO: 接入真实接口后，从用户信息中获取所属支部

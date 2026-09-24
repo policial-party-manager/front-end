@@ -16,7 +16,7 @@ import { ref, reactive, computed, watch, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import { ElMessage, ElMessageBox } from "element-plus";
-import type { FormInstance, FormRules, UploadFile, UploadFiles } from "element-plus";
+import type { FormInstance, FormRules, UploadFile } from "element-plus";
 import { Plus, ArrowLeft } from "@element-plus/icons-vue";
 
 const route = useRoute();
@@ -32,7 +32,6 @@ const editId = computed(() => (isEditMode.value ? Number(route.params.id) : null
 // ============================================================
 // 角色权限
 // ============================================================
-const isSuperAdmin = computed(() => store.currentRole === "super_admin");
 const isSecretary = computed(() => store.currentRole === "party_secretary");
 
 // 支委所属支部（Mock 模拟）
@@ -122,7 +121,7 @@ if (isSecretary.value) {
 const coverFileList = ref<UploadFile[]>([]);
 
 /** el-upload change 事件：读取文件生成本地预览 */
-function handleCoverChange(file: UploadFile, files: UploadFiles): void {
+function handleCoverChange(file: UploadFile): void {
   // 限制只能上传一张
   coverFileList.value = [file];
   if (file.raw) {
@@ -218,7 +217,7 @@ watch(
 // ============================================================
 
 /** 校验活动结束时间 > 活动开始时间 */
-function validateActivityEndTime(_rule: any, value: string, callback: (error?: Error) => void): void {
+function validateActivityEndTime(_rule: unknown, value: string, callback: (error?: Error) => void): void {
   if (!value) {
     callback(new Error("请选择活动结束时间"));
     return;
@@ -231,7 +230,7 @@ function validateActivityEndTime(_rule: any, value: string, callback: (error?: E
 }
 
 /** 校验签到截止时间 > 签到开始时间 */
-function validateSignInEndTime(_rule: any, value: string, callback: (error?: Error) => void): void {
+function validateSignInEndTime(_rule: unknown, value: string, callback: (error?: Error) => void): void {
   if (!value) {
     callback(new Error("请选择签到截止时间"));
     return;
@@ -458,7 +457,7 @@ async function handlePublish(): Promise<void> {
     ElMessage.success(isEditMode.value ? "活动已更新" : "活动发布成功");
 
     // 模拟新建时使用一个随机 ID 跳转
-    const targetId = isEditMode.value ? editId.value! : Date.now();
+    const targetId = isEditMode.value && editId.value !== null ? editId.value : Date.now();
     console.log("[Mock] 发布活动：", { id: targetId, ...formData });
 
     router.push(`/activity/${targetId}`);

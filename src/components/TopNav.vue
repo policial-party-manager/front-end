@@ -2,258 +2,166 @@
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
-import { hasPermission, type Permission, type Role } from "@/config/permissions";
+import type { Role } from "@/config/permissions";
 
-/**
- * TopNav - 顶部导航栏组件
- *
- * 红色背景，左侧党徽 + 平台名称，中间导航菜单，右侧用户信息
- * 导航菜单支持高亮切换（当前页为"首页"）
- * 用户下拉菜单展示当前登录身份并提供退出入口
- */
+defineEmits<{ toggleMenu: [] }>();
 
 const store = useAppStore();
 const router = useRouter();
 const previewRoles = Object.keys(store.roleLabels) as Role[];
+const emblemUrl = computed(() => new URL("@/assets/images/Party/党徽黄色1024X1024.png", import.meta.url).href);
 
-// 党徽图标路径
-// 用途：顶部导航栏左侧品牌标识
-// 使用项目中已有的黄色党徽图片
-const emblemUrl = computed(() => {
-  return new URL("@/assets/images/Party/党徽黄色1024X1024.png", import.meta.url).href;
-});
-
-function handleNavClick(key: string): void {
-  store.setActiveNav(key);
-  // 根据导航 key 跳转到对应路由
-  const item = store.navItems.find((n) => n.key === key);
-  if (item) router.push(item.path);
+function handlePreviewRoleChange(role: Role): void {
+  if (store.setPreviewRole(role)) router.replace("/");
 }
 
 function handleLogout(): void {
-  // 退出登录：清除登录态并跳转到登录页
-  store.logout();
+  void store.logout();
   router.push("/login");
-}
-
-function handlePreviewRoleChange(role: Role): void {
-  if (!store.setPreviewRole(role)) return;
-
-  const permission = router.currentRoute.value.meta.permission as Permission | undefined;
-  if (permission && !hasPermission(role, permission)) {
-    router.replace("/");
-  }
 }
 </script>
 
 <template>
   <header class="top-nav">
-    <div class="nav-inner">
-      <!-- 左侧：品牌标识 -->
-      <div class="nav-brand">
-        <img :src="emblemUrl" alt="党徽" class="brand-emblem" />
-        <span class="brand-name">党建云平台</span>
-      </div>
-
-      <!-- 中间：导航菜单 -->
-      <nav class="nav-menu">
-        <a
-          v-for="item in store.navItems"
-          :key="item.key"
-          class="nav-item"
-          :class="{ active: store.activeNav === item.key }"
-          href="javascript:void(0)"
-          @click="handleNavClick(item.key)"
-        >
-          {{ item.label }}
-        </a>
-      </nav>
-
-      <!-- 右侧：用户信息 -->
-      <div class="nav-user">
-        <el-dropdown trigger="click" placement="bottom-end">
-          <div class="user-trigger">
-            <el-avatar :size="32" icon="UserFilled" class="user-avatar" />
-            <span class="user-name">{{ store.userInfo.name }}</span>
-            <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
-          </div>
-
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item disabled class="role-group-title">
-                <strong>当前身份：{{ store.currentRoleLabel }}</strong>
-              </el-dropdown-item>
-              <template v-if="store.canSwitchPreviewIdentity">
-                <el-dropdown-item divided disabled class="role-group-title">
-                  <strong>开发预览：切换身份</strong>
-                </el-dropdown-item>
-                <el-dropdown-item
-                  v-for="role in previewRoles"
-                  :key="role"
-                  :disabled="role === store.currentRole"
-                  @click="handlePreviewRoleChange(role)"
-                >
-                  {{ store.roleLabels[role] }}<span v-if="role === store.currentRole">（当前）</span>
-                </el-dropdown-item>
-              </template>
-              <el-dropdown-item divided @click="handleLogout">
-                <el-icon><SwitchButton /></el-icon>
-                退出登录
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-      </div>
+    <div class="nav-brand">
+      <button class="menu-toggle" type="button" aria-label="打开业务导航" @click="$emit('toggleMenu')">
+        <span aria-hidden="true">☰</span>
+      </button>
+      <img :src="emblemUrl" alt="党徽" class="brand-emblem" />
+      <strong class="brand-name">党建云平台</strong>
+      <span class="brand-subtitle">党员发展全过程管理系统</span>
     </div>
+    <el-dropdown trigger="click" placement="bottom-end">
+      <button class="user-trigger" type="button" aria-label="打开用户菜单">
+        <span class="user-avatar"
+          ><el-icon><UserFilled /></el-icon
+        ></span>
+        <span class="user-name">{{ store.userInfo.name }}</span>
+        <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
+      </button>
+      <template #dropdown>
+        <el-dropdown-menu>
+          <el-dropdown-item disabled>当前角色：{{ store.currentRoleLabel }}</el-dropdown-item>
+          <el-dropdown-item @click="router.push('/profile')">个人中心</el-dropdown-item>
+          <template v-if="store.canSwitchPreviewIdentity">
+            <el-dropdown-item divided disabled>开发预览：切换角色</el-dropdown-item>
+            <el-dropdown-item
+              v-for="role in previewRoles"
+              :key="role"
+              :disabled="role === store.currentRole"
+              @click="handlePreviewRoleChange(role)"
+            >
+              {{ store.roleLabels[role] }}
+            </el-dropdown-item>
+          </template>
+          <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
+        </el-dropdown-menu>
+      </template>
+    </el-dropdown>
   </header>
 </template>
 
 <style lang="scss" scoped>
 .top-nav {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  width: 100%;
-  height: 60px;
-  /* 红色背景 - 使用纯色，如需背景纹理图可替换为：
-     background-image: url('@/assets/images/backgrounds/red-bg-pure.jpg');
-     当前使用党建红纯色背景 */
-  background: linear-gradient(135deg, #c12c1f 0%, #d4332a 50%, #c12c1f 100%);
-  box-shadow: var(--shadow-nav);
-}
-
-.nav-inner {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 24px;
-  height: 100%;
+  height: 66px;
+  padding: 0 28px;
+  background: var(--workspace-red-deep);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 20px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 3px 16px rgba(69, 22, 20, 0.1);
 }
 
-/* 品牌标识 */
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
+  gap: 11px;
+  min-width: 0;
 }
-
 .brand-emblem {
-  width: 36px;
-  height: 36px;
+  width: 39px;
+  height: 39px;
   object-fit: contain;
 }
-
 .brand-name {
-  color: #fff;
   font-size: 20px;
-  font-weight: 700;
   letter-spacing: 2px;
   white-space: nowrap;
 }
-
-/* 导航菜单 */
-.nav-menu {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-
-.nav-item {
-  padding: 8px 18px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 15px;
-  font-weight: 500;
-  border-radius: 4px;
-  transition: all 0.25s ease;
+.brand-subtitle {
+  border-left: 1px solid rgba(255, 255, 255, 0.3);
+  padding-left: 19px;
+  margin-left: 8px;
+  color: #f5dfd8;
+  font-size: 12px;
+  letter-spacing: 2px;
   white-space: nowrap;
-  cursor: pointer;
-
-  &:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.15);
-  }
-
-  &.active {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.25);
-    font-weight: 700;
-  }
 }
-
-/* 用户区域 */
-.nav-user {
-  flex-shrink: 0;
+.user-trigger,
+.menu-toggle {
+  border: 0;
+  color: #fff;
+  background: transparent;
 }
-
 .user-trigger {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
+  gap: 10px;
+  padding: 5px 8px;
   border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.15);
-  }
+  white-space: nowrap;
 }
-
+.user-trigger:hover,
+.menu-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
 .user-avatar {
-  background: rgba(255, 255, 255, 0.3);
-  color: #fff;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
 }
-
-.user-name {
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-}
-
 .dropdown-icon {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 12px;
+  opacity: 0.7;
+}
+.menu-toggle {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 5px;
+  font-size: 20px;
 }
 
-.role-group-title {
-  pointer-events: none;
-  color: var(--text-secondary) !important;
-}
-
-/* 响应式：小屏幕隐藏部分导航文字 */
-@media (max-width: 1200px) {
-  .nav-item {
-    padding: 8px 12px;
-    font-size: 14px;
-  }
-}
-
-@media (max-width: 992px) {
-  .brand-name {
-    font-size: 16px;
-  }
-
-  .nav-item {
-    padding: 6px 10px;
-    font-size: 13px;
-  }
-
-  .user-name {
+@media (max-width: 900px) {
+  .brand-subtitle {
     display: none;
   }
 }
-
-@media (max-width: 768px) {
-  .nav-menu {
-    gap: 2px;
+@media (max-width: 680px) {
+  .top-nav {
+    padding: 0 16px;
   }
-
-  .nav-item {
-    padding: 6px 8px;
-    font-size: 12px;
+  .menu-toggle {
+    display: grid;
+    place-items: center;
+  }
+  .brand-emblem {
+    width: 31px;
+    height: 31px;
+  }
+  .brand-name {
+    font-size: 16px;
+    letter-spacing: 0;
+  }
+  .user-name {
+    display: none;
   }
 }
 </style>

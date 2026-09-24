@@ -15,7 +15,7 @@
  *   - super_admin / party_secretary：全部标签页 + 操作按钮
  *   - party_member / activist：仅"签到管理"标签页（只读）
  */
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, type Component } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -72,7 +72,6 @@ interface RegistrationRecord {
 const isSuperAdmin = computed(() => store.currentRole === "super_admin");
 const isSecretary = computed(() => store.currentRole === "party_secretary");
 const isAdmin = computed(() => isSuperAdmin.value || isSecretary.value);
-const isRegularMember = computed(() => store.currentRole === "party_member" || store.currentRole === "activist");
 
 // ============================================================
 // 活动 ID & 数据加载
@@ -211,7 +210,7 @@ function generateDefaultDetail(id: number): ActivityDetail {
 // Mock 签到记录
 // TODO: 替换为真实 API 调用
 // ============================================================
-function generateSignInRecords(act: ActivityDetail): SignInRecord[] {
+function generateSignInRecords(): SignInRecord[] {
   const allRecords: SignInRecord[] = [
     { id: 1, name: "张明", studentId: "20230101001", signInTime: "2026-08-15 13:35:22", status: "已签到" },
     { id: 2, name: "李娟", studentId: "20230101002", signInTime: "2026-08-15 13:38:15", status: "已签到" },
@@ -297,7 +296,7 @@ async function loadActivityDetail(): Promise<void> {
     activity.value = detail;
 
     // 加载关联数据
-    signInRecords.value = generateSignInRecords(detail);
+    signInRecords.value = generateSignInRecords();
     registrationRecords.value = generateRegistrationRecords();
 
     // 根据 URL 参数设置初始 tab
@@ -346,16 +345,6 @@ function handleTabChange(name: TabName): void {
 function formatDateTime(dateStr: string): string {
   if (!dateStr) return "-";
   return dateStr;
-}
-
-function formatDateOnly(dateStr: string): string {
-  if (!dateStr) return "-";
-  return dateStr.split(" ")[0];
-}
-
-function formatTimeOnly(dateStr: string): string {
-  if (!dateStr) return "-";
-  return dateStr.split(" ")[1] || dateStr;
 }
 
 // ============================================================
@@ -487,7 +476,7 @@ function handleExportSignIn(): void {
 interface HeaderAction {
   key: string;
   label: string;
-  icon?: any;
+  icon?: Component;
   type?: "primary" | "danger" | "warning" | "default";
   visible: boolean;
   handler: () => void;
