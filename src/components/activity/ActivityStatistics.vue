@@ -140,8 +140,8 @@ function buildChartOption(): echarts.EChartsOption {
       borderWidth: 1,
       padding: [12, 16],
       textStyle: { color: "#2C3E50", fontSize: 13 },
-      formatter: (params: any) => {
-        const p = Array.isArray(params) ? params[0] : params;
+      formatter: (params: unknown) => {
+        const p = (Array.isArray(params) ? params[0] : params) as { name: string; value: number };
         return `
           <div style="font-weight:600;margin-bottom:4px">${p.name} 时间段</div>
           <div>签到人数：<b style="color:#C12C1F;font-size:16px">${p.value}</b> 人</div>

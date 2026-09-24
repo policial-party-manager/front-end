@@ -5,6 +5,9 @@
  * ============================================ */
 /* CSS 变量定义 */
 :root {
+  --workspace-red-deep: #8e211d;
+  --workspace-line: #e8e8e2;
+  --workspace-sidebar-width: 242px;
   --party-red: #c12c1f;
   --party-red-dark: #a01e1a;
   --party-red-light: #e84646;
@@ -16,12 +19,12 @@
   --text-secondary: #909399;
   --text-placeholder: #c0c4cc;
 
-  --bg-page: #f5f6fa;
+  --bg-page: #f5f5f1;
   --bg-white: #ffffff;
   --border-color: #ebeef5;
   --border-light: #f2f6fc;
 
-  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 1px 4px rgba(30, 39, 42, 0.04);
   --shadow-hover: 0 4px 20px rgba(0, 0, 0, 0.12);
   --shadow-nav: 0 2px 8px rgba(0, 0, 0, 0.15);
 

@@ -2,7 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router"
 import { ElMessage } from "element-plus";
 import { useAppStore } from "@/stores/app";
 import { shouldRedirectToLogin } from "@/config/auth-mode";
-import { hasPermission, type Permission } from "@/config/permissions";
+import { hasPermission, type Permission, type Role } from "@/config/permissions";
 import { isDevSkipLoginEnabled } from "@/utils/authMode";
 
 /**
@@ -26,85 +26,120 @@ const routes: RouteRecordRaw[] = [
     path: "/members",
     name: "Members",
     component: () => import("@/views/members.vue"),
-    meta: { title: "成员管理 - 党建云平台", permission: "member:manage" },
+    meta: { title: "成员与支部 - 党建云平台", permission: "member:manage", roles: ["super_admin"] },
+  },
+  {
+    path: "/members/branch",
+    name: "BranchMembers",
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    meta: {
+      title: "成员与支部 - 党建云平台",
+      permission: "member:manage",
+      roles: ["party_secretary"],
+      placeholder: "branch",
+    },
   },
   {
     path: "/development",
     name: "Development",
-    component: () => import("@/views/development.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "党员发展 - 党建云平台", permission: "development:manage" },
   },
   {
     path: "/development/member/:id",
     name: "MemberDetail",
-    component: () => import("@/views/development/MemberDetail.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "成员培养详情 - 党建云平台", permission: "development:manage" },
   },
   {
     path: "/development/batch",
     name: "BatchAdjust",
-    component: () => import("@/views/development/BatchAdjust.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "批量调整身份 - 党建云平台", permission: "development:manage" },
+  },
+  {
+    path: "/my-development",
+    name: "MyDevelopment",
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    meta: { title: "我的培养 - 党建云平台", permission: "home:view", roles: ["party_member", "activist"] },
+  },
+  {
+    path: "/content",
+    name: "Content",
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    meta: { title: "资讯公告 - 党建云平台", permission: "content:view" },
   },
   {
     path: "/news",
     name: "NewsList",
-    component: () => import("@/views/news/NewsList.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "党建新闻 - 党建云平台", permission: "content:view" },
   },
   {
     path: "/news/:id",
     name: "NewsDetail",
-    component: () => import("@/views/ContentDetail.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "新闻详情 - 党建云平台", permission: "content:view" },
   },
   {
     path: "/notice",
     name: "NoticeList",
-    component: () => import("@/views/notice/NoticeList.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "通知公告 - 党建云平台", permission: "content:view" },
   },
   {
     path: "/notice/:id",
     name: "NoticeDetail",
-    component: () => import("@/views/ContentDetail.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "公告详情 - 党建云平台", permission: "content:view" },
   },
   {
     path: "/activity",
     name: "Activities",
-    component: () => import("@/views/activity/ActivityList.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "活动管理 - 党建云平台", permission: "activity:view" },
   },
   {
     path: "/activity/create",
     name: "ActivityCreate",
-    component: () => import("@/views/activity/ActivityForm.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "新建活动 - 党建云平台", permission: "activity:manage" },
   },
   {
     path: "/activity/edit/:id",
     name: "ActivityEdit",
-    component: () => import("@/views/activity/ActivityForm.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "编辑活动 - 党建云平台", permission: "activity:manage" },
   },
   {
     path: "/activity/:id",
     name: "ActivityDetail",
-    component: () => import("@/views/activity/ActivityDetail.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "活动详情 - 党建云平台", permission: "activity:view" },
   },
   {
     path: "/statistics",
     name: "Statistics",
-    component: () => import("@/views/statistics.vue"),
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
     meta: { title: "数据统计 - 党建云平台", permission: "statistics:view" },
   },
   {
     path: "/resources",
     name: "Resources",
-    component: () => import("@/views/resources/index.vue"),
-    meta: { title: "下载专区 - 党建云平台", permission: "resource:view" },
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    meta: { title: "资源中心 - 党建云平台", permission: "resource:view" },
+  },
+  {
+    path: "/system",
+    name: "System",
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    meta: { title: "系统管理 - 党建云平台", permission: "home:view", roles: ["super_admin"] },
+  },
+  {
+    path: "/profile",
+    name: "Profile",
+    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    meta: { title: "个人中心 - 党建云平台", permission: "home:view" },
   },
 ];
 
@@ -132,20 +167,31 @@ router.beforeEach((to, _from, next) => {
   }
 
   const permission = to.meta.permission as Permission | undefined;
-  if (!permission || !hasPermission(store.currentRole, permission)) {
+  const allowedRoles = to.meta.roles as Role[] | undefined;
+  if (
+    !permission ||
+    !hasPermission(store.currentRole, permission) ||
+    (allowedRoles && !allowedRoles.includes(store.currentRole))
+  ) {
     ElMessage.warning("当前身份无权访问该页面");
     next({ path: "/", replace: true });
     return;
   }
 
-  // 同步 TopNav 导航高亮：根据当前路径设置 activeNav
+  // 根据当前路径同步侧栏高亮
   const pathKeyMap: Record<string, string> = {
     "/": "home",
     "/members": "members",
+    "/my-development": "development",
     "/development": "development",
     "/activity": "activities",
+    "/content": "content",
+    "/news": "content",
+    "/notice": "content",
     "/statistics": "statistics",
-    "/resources": "downloads",
+    "/resources": "resources",
+    "/system": "system",
+    "/profile": "profile",
   };
   // 支持子路由匹配（如 /development/member/:id 也高亮 "党员发展"）
   const matchedKey = pathKeyMap[to.path] || pathKeyMap["/" + to.path.split("/")[1]] || "home";

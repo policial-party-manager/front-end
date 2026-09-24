@@ -46,8 +46,6 @@ const contentType = computed<"news" | "notice">(() => {
   return route.path.includes("/notice") ? "notice" : "news";
 });
 
-const typeLabel = computed(() => (contentType.value === "news" ? "党建新闻" : "通知公告"));
-
 // ============================================================
 // 状态
 // ============================================================
@@ -502,6 +500,7 @@ onMounted(() => {
           </div>
 
           <!-- 正文内容 -->
+          <!-- eslint-disable-next-line vue/no-v-html -- 正文目前只来自本组件内的静态 Mock；接入接口前须改为安全的富文本渲染。 -->
           <div class="article-body" v-html="detail.content"></div>
 
           <!-- 附件区域 -->

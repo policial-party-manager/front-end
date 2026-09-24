@@ -370,7 +370,7 @@ async function handleConfirm(): Promise<void> {
     ElMessage.success(`成功将 ${selectedIds.value.length} 位成员调整为【${targetIdentity.value}】`);
     // 跳转回党员发展列表页
     router.push("/development");
-  } catch (error) {
+  } catch {
     ElMessage.error("批量调整失败，请重试");
   } finally {
     submitting.value = false;

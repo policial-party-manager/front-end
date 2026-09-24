@@ -462,14 +462,17 @@ function initStageChart(): void {
       borderWidth: 1,
       padding: [12, 16],
       textStyle: { color: "#2C3E50", fontSize: 13 },
-      formatter: (params: any) => `
+      formatter: (params: unknown) => {
+        const item = params as { color: string; name: string; value: number; percent: number };
+        return `
         <div style="font-weight:600;margin-bottom:6px">
-          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${params.color};margin-right:6px"></span>
-          ${params.name}
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${item.color};margin-right:6px"></span>
+          ${item.name}
         </div>
-        <div>人数：<b style="font-size:16px">${params.value}</b> 人</div>
-        <div>占比：<b style="font-size:14px;color:#C12C1F">${params.percent}%</b></div>
-      `,
+        <div>人数：<b style="font-size:16px">${item.value}</b> 人</div>
+        <div>占比：<b style="font-size:14px;color:#C12C1F">${item.percent}%</b></div>
+      `;
+      },
     },
     legend: {
       orient: "vertical",
@@ -528,8 +531,8 @@ function initBranchChart(): void {
       borderWidth: 1,
       padding: [12, 16],
       textStyle: { color: "#2C3E50", fontSize: 13 },
-      formatter: (params: any) => {
-        const p = Array.isArray(params) ? params[0] : params;
+      formatter: (params: unknown) => {
+        const p = (Array.isArray(params) ? params[0] : params) as { name: string; value: number };
         return `<div style="font-weight:600;margin-bottom:4px">${p.name}</div><div>成员总数：<b style="color:#C12C1F;font-size:16px">${p.value}</b> 人</div>`;
       },
     },
@@ -585,7 +588,7 @@ function initTrendChart(): void {
     { name: "发展对象", key: "development" as keyof TrendItem, color: "#C9973B" },
     { name: "预备党员", key: "probationary" as keyof TrendItem, color: "#67C23A" },
     { name: "正式党员", key: "full" as keyof TrendItem, color: "#C12C1F" },
-  ];
+  ] as const;
 
   trendChartInstance.setOption({
     tooltip: {
@@ -621,7 +624,7 @@ function initTrendChart(): void {
     series: seriesConf.map((s) => ({
       name: s.name,
       type: "line",
-      data: trendData.value.map((d) => (d as any)[s.key] || 0),
+      data: trendData.value.map((d) => d[s.key] || 0),
       smooth: true,
       symbol: "circle",
       symbolSize: 6,

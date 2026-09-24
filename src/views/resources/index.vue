@@ -21,7 +21,7 @@
  *
  * TODO: 接入真实 API 后，替换所有 Mock 数据与上传逻辑
  */
-import { ref, computed, reactive, onMounted } from "vue";
+import { ref, computed, reactive, onMounted, type Component } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   Upload,
@@ -100,7 +100,7 @@ const CATEGORY_COLOR_MAP: Record<ResourceCategory, string> = {
 };
 
 /** 文件类型 → 图标/颜色映射 */
-const FILE_TYPE_CONFIG: Record<string, { icon: any; color: string; label: string }> = {
+const FILE_TYPE_CONFIG: Record<string, { icon: Component; color: string; label: string }> = {
   pdf: { icon: Document, color: "#E84646", label: "PDF" },
   doc: { icon: Document, color: "#409EFF", label: "Word" },
   docx: { icon: Document, color: "#409EFF", label: "Word" },
@@ -508,12 +508,13 @@ async function handleEditSubmit(): Promise<void> {
   if (!valid) return;
 
   if (!editingResource.value) return;
+  const editingId = editingResource.value.id;
 
   saving.value = true;
   // 模拟保存延迟
   await new Promise((resolve) => setTimeout(resolve, 600));
 
-  const target = resources.value.find((r) => r.id === editingResource.value!.id);
+  const target = resources.value.find((r) => r.id === editingId);
   if (target) {
     target.title = editFormData.title;
     target.category = editFormData.category as ResourceCategory;

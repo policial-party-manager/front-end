@@ -130,7 +130,7 @@ async function handleLogin(): Promise<void> {
           </div>
 
           <!-- 右侧表单面板 -->
-          <div class="login-form-panel">
+          <form class="login-form-panel" novalidate @submit.prevent="handleLogin">
             <!-- 头部：Logo + 欢迎语 -->
             <div class="form-header">
               <img :src="emblemUrl" alt="Logo" class="form-logo" />
@@ -186,8 +186,8 @@ async function handleLogin(): Promise<void> {
             </div>
 
             <!-- 登录按钮 -->
-            <button class="login-btn" type="button" @click="handleLogin">登 录</button>
-          </div>
+            <button class="login-btn" type="submit">登 录</button>
+          </form>
         </div>
       </section>
 
