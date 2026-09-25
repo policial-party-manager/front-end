@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { Plus } from "@element-plus/icons-vue";
+import { useAppStore } from "@/stores/app";
 import {
   createBranch,
   deleteBranch,
@@ -14,6 +15,8 @@ import {
   type BranchVo,
 } from "@/api/branches";
 
+const store = useAppStore();
+const isSuperAdmin = computed(() => store.currentRole === "super_admin");
 const rows = ref<BranchVo[]>([]);
 const loading = ref(false);
 const loadError = ref(false);
@@ -163,7 +166,7 @@ async function removeBranch(row: BranchVo) {
           <strong>支部列表</strong><span class="total-label">共 {{ total }} 条</span>
         </div>
         <div class="actions">
-          <el-button type="primary" :icon="Plus" @click="addBranch">新增支部</el-button>
+          <el-button v-if="isSuperAdmin" type="primary" :icon="Plus" @click="addBranch">新增支部</el-button>
         </div>
       </div>
       <div class="filters">
@@ -201,8 +204,9 @@ async function removeBranch(row: BranchVo) {
           ><template #default="{ row }"
             ><div class="row-actions">
               <el-button link type="primary" @click="viewBranch(row)">详情</el-button
-              ><el-button link type="primary" @click="editBranch(row)">编辑</el-button
+              ><el-button v-if="isSuperAdmin" link type="primary" @click="editBranch(row)">编辑</el-button
               ><el-button
+                v-if="isSuperAdmin"
                 link
                 type="danger"
                 :disabled="row.status === 2"
