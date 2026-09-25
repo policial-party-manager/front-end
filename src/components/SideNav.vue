@@ -18,6 +18,7 @@ const icons: Record<string, string> = {
   content: "Document",
   resources: "FolderOpened",
   statistics: "DataAnalysis",
+  branch: "OfficeBuilding",
   system: "Setting",
 };
 </script>
