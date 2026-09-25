@@ -72,31 +72,31 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/content",
     name: "Content",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    component: () => import("@/views/content/ContentHub.vue"),
     meta: { title: "资讯公告 - 党建云平台", permission: "content:view" },
   },
   {
     path: "/news",
     name: "NewsList",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    component: () => import("@/views/content/ContentList.vue"),
     meta: { title: "党建新闻 - 党建云平台", permission: "content:view" },
   },
   {
     path: "/news/:id",
     name: "NewsDetail",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    component: () => import("@/views/content/ContentArticle.vue"),
     meta: { title: "新闻详情 - 党建云平台", permission: "content:view" },
   },
   {
     path: "/notice",
     name: "NoticeList",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    component: () => import("@/views/content/ContentList.vue"),
     meta: { title: "通知公告 - 党建云平台", permission: "content:view" },
   },
   {
     path: "/notice/:id",
     name: "NoticeDetail",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    component: () => import("@/views/content/ContentArticle.vue"),
     meta: { title: "公告详情 - 党建云平台", permission: "content:view" },
   },
   {

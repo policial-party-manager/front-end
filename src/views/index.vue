@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useAppStore } from "@/stores/app";
+import { pageNews, pageNotices } from "@/api/content";
 
 const store = useAppStore();
 const newsTab = ref<"news" | "notice">("news");
@@ -53,7 +54,36 @@ const quickItems = computed(() => {
     : ["members", "development", "activities", "statistics"];
   return keys.map((key) => store.navItems.find((item) => item.key === key)).filter((item) => item !== undefined);
 });
-const articles = computed(() => (newsTab.value === "news" ? store.newsList.slice(0, 4) : store.noticeList.slice(0, 4)));
+const latestNews = ref<{ id: number; title: string; date: string }[]>([]);
+const latestNotices = ref<{ id: number; title: string; date: string }[]>([]);
+const contentErrors = ref({ news: false, notice: false });
+const articles = computed(() => (newsTab.value === "news" ? latestNews.value : latestNotices.value));
+async function loadLatestContent(): Promise<void> {
+  contentErrors.value = { news: false, notice: false };
+  const [newsResult, noticeResult] = await Promise.allSettled([
+    pageNews({ page: 1, size: 4 }),
+    pageNotices({ page: 1, size: 4 }),
+  ]);
+  if (newsResult.status === "fulfilled") {
+    latestNews.value = newsResult.value.records.map((item) => ({
+      id: item.id,
+      title: item.title,
+      date: item.createTime?.slice(0, 10) || "—",
+    }));
+  } else {
+    contentErrors.value.news = true;
+  }
+  if (noticeResult.status === "fulfilled") {
+    latestNotices.value = noticeResult.value.records.map((item) => ({
+      id: item.id,
+      title: item.title,
+      date: item.publishTime?.slice(0, 10) || "—",
+    }));
+  } else {
+    contentErrors.value.notice = true;
+  }
+}
+onMounted(() => void loadLatestContent());
 </script>
 
 <template>
@@ -133,6 +163,10 @@ const articles = computed(() => (newsTab.value === "news" ? store.newsList.slice
               <router-link :to="`/${newsTab}/${item.id}`">{{ item.title }}</router-link
               ><time>{{ item.date }}</time>
             </li>
+            <li v-if="contentErrors[newsTab]">
+              内容加载失败，<button type="button" class="content-retry" @click="loadLatestContent">重试</button>
+            </li>
+            <li v-else-if="articles.length === 0">暂无已发布内容</li>
           </ul>
         </section>
         <section class="workspace-panel quick-panel">
@@ -147,7 +181,7 @@ const articles = computed(() => (newsTab.value === "news" ? store.newsList.slice
           </div>
         </section>
       </div>
-      <p class="sample-note">首页数字、待办和资讯为现有 Mock 或布局示例，正式数据需由对应接口按角色范围提供。</p>
+      <p class="sample-note">首页数字与待办为现有 Mock 或布局示例，正式数据需由对应接口按角色范围提供。</p>
     </div>
   </div>
 </template>
@@ -354,6 +388,12 @@ const articles = computed(() => (newsTab.value === "news" ? store.newsList.slice
 }
 .news-list a:hover {
   color: var(--party-red);
+}
+.content-retry {
+  border: 0;
+  background: none;
+  color: var(--party-red);
+  cursor: pointer;
 }
 .news-list time {
   flex: none;
