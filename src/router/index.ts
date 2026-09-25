@@ -144,7 +144,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/profile",
     name: "Profile",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    component: () => import("@/views/profile/index.vue"),
     meta: { title: "个人中心 - 党建云平台", permission: "home:view" },
   },
 ];
