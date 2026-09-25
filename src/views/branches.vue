@@ -10,14 +10,14 @@ import {
   getBranch,
   pageBranches,
   updateBranch,
+  type Branch,
   type BranchFilters,
   type BranchSaveRequest,
-  type BranchVo,
 } from "@/api/branches";
 
 const store = useAppStore();
 const isSuperAdmin = computed(() => store.currentRole === "super_admin");
-const rows = ref<BranchVo[]>([]);
+const rows = ref<Branch[]>([]);
 const loading = ref(false);
 const loadError = ref(false);
 const total = ref(0);
@@ -25,13 +25,10 @@ const page = ref(1);
 const size = ref(10);
 const filters = reactive({
   keyword: "",
-  status: undefined as number | undefined,
 });
 const applied = ref<BranchFilters>({});
 const statusLabel = (status: number) => (status === 1 ? "启用" : "停用");
 const dateLabel = (date: string | null) => (date ? date.replace("T", " ").slice(0, 16) : "—");
-/** 数据源为 Mock，没有统一错误提示层，由页面兜底展示错误信息。 */
-const errorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
 
 let requestSequence = 0;
 async function loadBranches() {
@@ -54,13 +51,12 @@ async function loadBranches() {
   }
 }
 function search() {
-  applied.value = { keyword: filters.keyword.trim() || undefined, status: filters.status };
+  applied.value = { keyword: filters.keyword.trim() || undefined };
   page.value = 1;
   void loadBranches();
 }
 function reset() {
   filters.keyword = "";
-  filters.status = undefined;
   search();
 }
 function changePage(value: number) {
@@ -77,18 +73,19 @@ onMounted(() => {
 });
 
 const detailVisible = ref(false);
-const detail = ref<BranchVo | null>(null);
-async function viewBranch(row: BranchVo) {
+const detail = ref<Branch | null>(null);
+async function viewBranch(row: Branch) {
   try {
     detail.value = await getBranch(row.id);
     detailVisible.value = true;
-  } catch (error) {
-    ElMessage.error(errorMessage(error, "支部详情加载失败"));
+  } catch {
+    /* 请求层提示错误 */
   }
 }
 
+// secretaryId 暂无成员选择接口，编辑时原样带回、新增时留空，表单不做该项输入。
 function emptyForm(): BranchSaveRequest {
-  return { branchName: "", status: 1, remark: "" };
+  return { branchName: "", college: "", description: "", secretaryId: null, status: 1 };
 }
 const form = reactive<BranchSaveRequest>(emptyForm());
 const formRef = ref<FormInstance>();
@@ -103,18 +100,20 @@ function addBranch() {
   Object.assign(form, emptyForm());
   formVisible.value = true;
 }
-async function editBranch(row: BranchVo) {
+async function editBranch(row: Branch) {
   try {
     const value = await getBranch(row.id);
     editingId.value = row.id;
     Object.assign(form, {
       branchName: value.branchName,
+      college: value.college,
+      description: value.description,
+      secretaryId: value.secretaryId,
       status: value.status,
-      remark: value.remark,
     });
     formVisible.value = true;
-  } catch (error) {
-    ElMessage.error(errorMessage(error, "支部信息加载失败"));
+  } catch {
+    /* 请求层提示错误 */
   }
 }
 async function saveBranch() {
@@ -128,13 +127,13 @@ async function saveBranch() {
     ElMessage.success(isCreate ? "支部添加成功" : "支部信息已更新");
     formVisible.value = false;
     await loadBranches();
-  } catch (error) {
-    ElMessage.error(errorMessage(error, isCreate ? "支部添加失败" : "支部信息更新失败"));
+  } catch {
+    /* 请求层提示错误；保留表单内容，便于修改后重试 */
   } finally {
     saving.value = false;
   }
 }
-async function removeBranch(row: BranchVo) {
+async function removeBranch(row: Branch) {
   try {
     await ElMessageBox.confirm(`确定删除支部「${row.branchName}」吗？该操作会将支部置为停用状态。`, "删除确认", {
       type: "warning",
@@ -148,8 +147,8 @@ async function removeBranch(row: BranchVo) {
     await deleteBranch(row.id);
     ElMessage.success("已删除");
     await loadBranches();
-  } catch (error) {
-    ElMessage.error(errorMessage(error, "删除失败"));
+  } catch {
+    /* 请求层提示错误 */
   }
 }
 </script>
@@ -171,9 +170,6 @@ async function removeBranch(row: BranchVo) {
       </div>
       <div class="filters">
         <el-input v-model="filters.keyword" clearable placeholder="支部名称" @keyup.enter="search" />
-        <el-select v-model="filters.status" clearable placeholder="全部状态"
-          ><el-option label="启用" :value="1" /><el-option label="停用" :value="2"
-        /></el-select>
         <el-button type="primary" @click="search">搜索</el-button><el-button @click="reset">重置</el-button>
       </div>
       <el-alert v-if="loadError" title="支部数据加载失败" type="error" show-icon :closable="false" class="load-error"
@@ -187,19 +183,24 @@ async function removeBranch(row: BranchVo) {
         class="branches-table"
         empty-text="暂无支部数据"
       >
-        <el-table-column prop="branchName" label="支部名称" min-width="220" /><el-table-column label="状态" width="90"
+        <el-table-column prop="branchName" label="支部名称" min-width="200" /><el-table-column
+          prop="college"
+          label="所属学院"
+          min-width="160"
+          show-overflow-tooltip
+        /><el-table-column label="状态" width="90"
           ><template #default="{ row }"
             ><el-tag :type="row.status === 1 ? 'success' : 'info'">{{ statusLabel(row.status) }}</el-tag></template
           ></el-table-column
         >
-        <el-table-column prop="memberCount" label="成员数" width="100" /><el-table-column
+        <el-table-column
           label="创建时间"
           width="172"
           class-name="created-at-column"
           label-class-name="created-at-header"
           ><template #default="{ row }">{{ dateLabel(row.createTime) }}</template></el-table-column
         >
-        <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="description" label="简介" min-width="160" show-overflow-tooltip />
         <el-table-column label="操作" width="180" fixed="right"
           ><template #default="{ row }"
             ><div class="row-actions">
@@ -240,12 +241,13 @@ async function removeBranch(row: BranchVo) {
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" class="branch-form">
         <el-form-item label="支部名称" prop="branchName"><el-input v-model="form.branchName" /></el-form-item>
+        <el-form-item label="所属学院"><el-input v-model="form.college" /></el-form-item>
         <el-form-item label="状态"
           ><el-radio-group v-model="form.status"
             ><el-radio :value="1">启用</el-radio><el-radio :value="2">停用</el-radio></el-radio-group
           ></el-form-item
         >
-        <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" /></el-form-item>
+        <el-form-item label="简介"><el-input v-model="form.description" type="textarea" :rows="2" /></el-form-item>
       </el-form>
       <template #footer
         ><el-button @click="formVisible = false">取消</el-button
@@ -256,10 +258,13 @@ async function removeBranch(row: BranchVo) {
     <el-dialog v-model="detailVisible" title="支部详情" width="520px"
       ><el-descriptions v-if="detail" :column="2" border>
         <el-descriptions-item label="支部名称" :span="2">{{ detail.branchName }}</el-descriptions-item
-        ><el-descriptions-item label="状态">{{ statusLabel(detail.status) }}</el-descriptions-item
-        ><el-descriptions-item label="成员数">{{ detail.memberCount }}</el-descriptions-item>
-        <el-descriptions-item label="创建时间" :span="2">{{ dateLabel(detail.createTime) }}</el-descriptions-item
-        ><el-descriptions-item label="备注" :span="2">{{ detail.remark || "—" }}</el-descriptions-item>
+        ><el-descriptions-item label="所属学院">{{ detail.college || "—" }}</el-descriptions-item
+        ><el-descriptions-item label="状态">{{ statusLabel(detail.status) }}</el-descriptions-item>
+        <!-- TODO: 支部书记目前只能展示 ID，待成员选项接口可用于回显姓名 -->
+        <el-descriptions-item label="支部书记 ID">{{ detail.secretaryId ?? "—" }}</el-descriptions-item
+        ><el-descriptions-item label="创建时间">{{ dateLabel(detail.createTime) }}</el-descriptions-item>
+        <el-descriptions-item label="更新时间" :span="2">{{ dateLabel(detail.updateTime) }}</el-descriptions-item
+        ><el-descriptions-item label="简介" :span="2">{{ detail.description || "—" }}</el-descriptions-item>
       </el-descriptions></el-dialog
     >
   </div>
@@ -313,9 +318,6 @@ async function removeBranch(row: BranchVo) {
 .filters .el-input {
   width: 280px;
 }
-.filters .el-select {
-  width: 170px;
-}
 .load-error {
   margin-bottom: 16px;
 }
@@ -344,8 +346,7 @@ async function removeBranch(row: BranchVo) {
   .branches-page.page-container {
     width: 100%;
   }
-  .filters .el-input,
-  .filters .el-select {
+  .filters .el-input {
     width: 100%;
   }
 }
