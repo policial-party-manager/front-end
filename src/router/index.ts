@@ -40,6 +40,12 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: "/branches",
+    name: "Branches",
+    component: () => import("@/views/branches.vue"),
+    meta: { title: "支部管理 - 党建云平台", permission: "member:manage", roles: ["super_admin"] },
+  },
+  {
     path: "/development",
     name: "Development",
     component: () => import("@/views/WorkspacePlaceholder.vue"),
@@ -182,6 +188,7 @@ router.beforeEach((to, _from, next) => {
   const pathKeyMap: Record<string, string> = {
     "/": "home",
     "/members": "members",
+    "/branches": "branch",
     "/my-development": "development",
     "/development": "development",
     "/activity": "activities",

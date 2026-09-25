@@ -146,6 +146,7 @@ export const useAppStore = defineStore("app", () => {
       items.splice(1, 0, { key: "development", label: "我的培养", path: "/my-development", permission: "home:view" });
     }
     if (role === "super_admin") {
+      items.push({ key: "branch", label: "支部管理", path: "/branches", permission: "member:manage" });
       items.push({ key: "system", label: "系统管理", path: "/system", permission: "home:view" });
     }
     return items;
