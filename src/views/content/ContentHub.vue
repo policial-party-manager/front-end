@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useAppStore } from "@/stores/app";
+import { hasPermission } from "@/config/permissions";
 import { pageNews, pageNotices, type NewsArticle, type NoticeArticle } from "@/api/content";
 
+const store = useAppStore();
+const canManageContent = computed(() => hasPermission(store.currentRole, "content:manage"));
 const keyword = ref("");
 const appliedKeyword = ref("");
 const news = ref<NewsArticle[]>([]);
@@ -68,12 +72,17 @@ onMounted(() => void load());
       <span class="eyebrow">NEWS & NOTICES</span>
       <div class="title-search-row">
         <h1>资讯公告</h1>
-        <form class="search-panel" @submit.prevent="search">
-          <label class="sr-only" for="content-keyword">检索新闻与公告</label>
-          <el-input id="content-keyword" v-model="keyword" clearable placeholder="关键词" maxlength="80" />
-          <el-button type="primary" native-type="submit" :loading="loading">搜索</el-button>
-          <el-button :disabled="loading" @click="reset">重置</el-button>
-        </form>
+        <div class="heading-tools">
+          <router-link v-if="canManageContent" class="manage-content-link" to="/content/manage">
+            内容管理 <span aria-hidden="true">→</span>
+          </router-link>
+          <form class="search-panel" @submit.prevent="search">
+            <label class="sr-only" for="content-keyword">检索新闻与公告</label>
+            <el-input id="content-keyword" v-model="keyword" clearable placeholder="关键词" maxlength="80" />
+            <el-button type="primary" native-type="submit" :loading="loading">搜索</el-button>
+            <el-button :disabled="loading" @click="reset">重置</el-button>
+          </form>
+        </div>
       </div>
       <p>阅读新闻，查阅通知。两类内容各有清晰入口。</p>
     </header>
@@ -168,6 +177,21 @@ onMounted(() => void load());
   justify-content: space-between;
   gap: 12px;
 }
+.heading-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+}
+.manage-content-link {
+  color: var(--party-red);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.manage-content-link:hover {
+  text-decoration: underline;
+}
 .eyebrow {
   color: var(--party-red);
   font-size: 11px;
@@ -193,6 +217,7 @@ onMounted(() => void load());
   display: grid;
   place-items: center;
   overflow: hidden;
+  height: 275px;
   background:
     radial-gradient(
       circle at 50% 50%,
@@ -203,12 +228,12 @@ onMounted(() => void load());
       transparent 35.7%
     ),
     linear-gradient(125deg, #8e211d, #bb4b38);
-  min-height: 275px;
 }
 .headline-image img {
+  display: block;
   width: 100%;
   height: 100%;
-  min-height: 275px;
+  max-height: 275px;
   object-fit: cover;
 }
 .headline-image span {
@@ -348,7 +373,10 @@ onMounted(() => void load());
     grid-template-columns: 1fr;
   }
   .headline-image {
-    min-height: 200px;
+    height: 200px;
+  }
+  .headline-image img {
+    max-height: 200px;
   }
   .headline-copy {
     padding: 24px;
@@ -356,6 +384,13 @@ onMounted(() => void load());
 }
 @media (max-width: 560px) {
   .title-search-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .heading-tools {
+    width: 100%;
+    justify-content: space-between;
     gap: 8px;
   }
   .page-heading h1 {

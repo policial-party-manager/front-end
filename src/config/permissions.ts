@@ -5,6 +5,7 @@ export type Role = "super_admin" | "party_secretary" | "party_member" | "activis
 export type Permission =
   | "home:view"
   | "content:view"
+  | "content:manage"
   | "member:manage"
   | "development:manage"
   | "activity:view"
@@ -20,13 +21,14 @@ const managerPermissions = [
   "activity:manage",
   "statistics:view",
 ] as const;
+const superAdminPermissions = [...managerPermissions, "content:manage"] as const;
 
 /**
  * 前端页面权限矩阵。
  * 这里只负责隐藏入口和拦截路由，最终数据范围与操作权限仍由后端校验。
  */
 export const rolePermissions: Record<Role, readonly Permission[]> = {
-  super_admin: managerPermissions,
+  super_admin: superAdminPermissions,
   party_secretary: managerPermissions,
   party_member: commonPermissions,
   activist: commonPermissions,

@@ -76,6 +76,16 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "资讯公告 - 党建云平台", permission: "content:view" },
   },
   {
+    path: "/content/manage",
+    name: "ContentManage",
+    component: () => import("@/views/content/ContentManage.vue"),
+    meta: {
+      title: "新闻与公告管理 - 党建云平台",
+      permission: "content:manage",
+      roles: ["super_admin"],
+    },
+  },
+  {
     path: "/news",
     name: "NewsList",
     component: () => import("@/views/content/ContentList.vue"),

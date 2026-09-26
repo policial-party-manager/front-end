@@ -136,7 +136,7 @@ onMounted(() => void loadLatestContent());
         <section class="workspace-panel info-panel">
           <div class="panel-head">
             <h2 class="workspace-panel-title">资讯公告</h2>
-            <router-link :to="newsTab === 'news' ? '/news' : '/notice'">查看列表 →</router-link>
+            <router-link :to="newsTab === 'news' ? '/news' : '/notice'">查看全部 →</router-link>
           </div>
           <div class="news-tabs" role="tablist" aria-label="资讯类型">
             <button
