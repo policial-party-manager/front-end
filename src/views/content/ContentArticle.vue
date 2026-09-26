@@ -70,8 +70,7 @@ watch(
 <template>
   <div class="workspace-page article-page">
     <div class="workspace-breadcrumb">
-      <router-link to="/content">资讯公告</router-link> /
-      <router-link :to="kind === 'news' ? '/news' : '/notice'">{{ sectionName }}</router-link> / <span>正文</span>
+      <router-link to="/content">资讯公告</router-link> / {{ sectionName }} / <span>正文</span>
     </div>
     <section class="workspace-panel article-panel">
       <div v-if="loading" class="article-state" role="status">正在加载正文…</div>
@@ -93,7 +92,7 @@ watch(
           <a :href="attachmentUrl" target="_blank" rel="noopener noreferrer">打开公告文件 ↗</a>
         </p>
         <div class="article-foot">
-          <router-link :to="kind === 'news' ? '/news' : '/notice'">← 返回{{ sectionName }}列表</router-link>
+          <router-link to="/content">← 返回资讯公告</router-link>
         </div>
       </article>
     </section>
