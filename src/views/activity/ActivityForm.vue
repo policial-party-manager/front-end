@@ -23,6 +23,7 @@ const route = useRoute();
 const router = useRouter();
 const isEditMode = computed(() => route.name === "ActivityEdit");
 const editId = computed(() => Number(route.params.id));
+const isValidEditId = computed(() => Number.isSafeInteger(editId.value) && editId.value > 0);
 const formRef = ref<FormInstance>();
 const loading = ref(false);
 const saving = ref(false);
@@ -97,7 +98,13 @@ async function loadOptions(): Promise<void> {
 }
 
 async function loadEditData(): Promise<void> {
-  if (!isEditMode.value || !Number.isFinite(editId.value) || editId.value <= 0) return;
+  if (!isEditMode.value) return;
+  if (!isValidEditId.value) {
+    errorMessage.value = "活动编号无效。";
+    editLoadFailed.value = true;
+    return;
+  }
+
   loading.value = true;
   errorMessage.value = "";
   editLoadFailed.value = false;
@@ -219,7 +226,7 @@ onMounted(async () => {
         :closable="false"
       />
       <el-alert v-if="errorMessage" class="form-alert" :title="errorMessage" type="error" show-icon :closable="false">
-        <template v-if="editLoadFailed" #default>
+        <template v-if="editLoadFailed && isValidEditId" #default>
           <el-button text type="primary" @click="loadEditData">重新加载活动数据</el-button>
         </template>
       </el-alert>
