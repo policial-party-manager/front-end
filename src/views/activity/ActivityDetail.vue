@@ -1,1177 +1,761 @@
 <script setup lang="ts">
-/**
- * ActivityDetail.vue - 活动详情页
- *
- * 路由：/activity/:id
- *
- * 功能：
- *   - 活动基本信息展示
- *   - 三标签页：签到管理 / 报名列表 / 活动统计
- *   - 二维码签到（60 秒自动刷新）
- *   - 签到记录表格（筛选 + 分页）
- *   - ECharts 签到时间分布图
- *
- * 权限说明：
- *   - super_admin / party_secretary：全部标签页 + 操作按钮
- *   - party_member / activist：仅"签到管理"标签页（只读）
- */
-import { ref, computed, watch, onMounted, onUnmounted, type Component } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useAppStore } from "@/stores/app";
 import { ElMessage, ElMessageBox } from "element-plus";
-import QRCode from "qrcode";
-import ActivityStatistics from "@/components/activity/ActivityStatistics.vue";
-import { ArrowLeft, Edit, Delete, RefreshRight, Download, PictureFilled, CircleClose } from "@element-plus/icons-vue";
+import { ArrowDown, ArrowLeft, Delete, Edit } from "@element-plus/icons-vue";
+import {
+  deleteAdminActivity,
+  getAdminActivity,
+  getPublishedActivity,
+  updateAdminActivityStatus,
+  type ActivityStatus,
+  type ActivityVo,
+} from "@/api/activities";
+import { getApiErrorMessage as getErrorMessage } from "@/utils/apiError";
+import { useAppStore } from "@/stores/app";
+import {
+  activityStatusClass as statusClass,
+  activityStatusLabel as statusLabel,
+  activityStatusOptions as statusOptions,
+} from "./activityStatus";
 
 const route = useRoute();
 const router = useRouter();
 const store = useAppStore();
-
-// ============================================================
-// 类型定义
-// ============================================================
-type ActivityType = "组织生活" | "主题党日" | "党课学习" | "二课活动" | "志愿服务" | "其他";
-type ActivityStatus = "未开始" | "报名中" | "进行中" | "已结束" | "已归档";
-
-interface ActivityDetail {
-  id: number;
-  name: string;
-  type: ActivityType;
-  branch: string;
-  location: string;
-  description: string;
-  coverUrl: string;
-  activityStartTime: string;
-  activityEndTime: string;
-  signInStartTime: string;
-  signInEndTime: string;
-  status: ActivityStatus;
-  participantScope: "all" | "specified";
-  specifiedIdentities: string[];
-}
-
-interface SignInRecord {
-  id: number;
-  name: string;
-  studentId: string;
-  signInTime: string;
-  status: "已签到" | "未签到";
-}
-
-interface RegistrationRecord {
-  id: number;
-  name: string;
-  studentId: string;
-  identity: string;
-  registrationTime: string;
-}
-
-// ============================================================
-// 角色权限
-// ============================================================
 const isSuperAdmin = computed(() => store.currentRole === "super_admin");
-const isSecretary = computed(() => store.currentRole === "party_secretary");
-const isAdmin = computed(() => isSuperAdmin.value || isSecretary.value);
-
-// ============================================================
-// 活动 ID & 数据加载
-// ============================================================
 const activityId = computed(() => Number(route.params.id));
+const activity = ref<ActivityVo | null>(null);
 const loading = ref(false);
-const activity = ref<ActivityDetail | null>(null);
-
-// ============================================================
-// 颜色映射（与列表页保持一致）
-// ============================================================
-const activityTypeColorMap: Record<string, string> = {
-  组织生活: "#C12C1F",
-  主题党日: "#E6A23C",
-  党课学习: "#409EFF",
-  二课活动: "#67C23A",
-  志愿服务: "#E84646",
-  其他: "#909399",
-};
-
-const activityStatusColorMap: Record<string, string> = {
-  未开始: "#909399",
-  报名中: "#409EFF",
-  进行中: "#67C23A",
-  已结束: "#E6A23C",
-  已归档: "#909399",
-};
-
-const signInStatusColorMap: Record<string, string> = {
-  已签到: "#67C23A",
-  未签到: "#E6A23C",
-};
-
-const identityColorMap: Record<string, string> = {
-  入党申请人: "#909399",
-  积极分子: "#E6A23C",
-  发展对象: "#409EFF",
-  预备党员: "#67C23A",
-  正式党员: "#C12C1F",
-};
-
-// ============================================================
-// Mock 活动详情数据
-// TODO: 替换为真实 API 调用（GET /api/activity/:id）
-// ============================================================
-const mockDetailMap: Record<number, ActivityDetail> = {
-  1: {
-    id: 1,
-    name: "学习贯彻党的二十届三中全会精神主题党日",
-    type: "主题党日",
-    branch: "计算机学院学生第一党支部",
-    location: "学院楼A座301会议室",
-    description:
-      "深入学习贯彻党的二十届三中全会精神，结合学院党建工作实际，开展专题学习研讨。重点学习全会关于全面深化改革的重要论述，研讨如何将全会精神落实到学院党建和育人工作中。",
-    coverUrl: "",
-    activityStartTime: "2026-08-15 14:00:00",
-    activityEndTime: "2026-08-15 16:30:00",
-    signInStartTime: "2026-08-15 13:30:00",
-    signInEndTime: "2026-08-15 17:00:00",
-    status: "已结束",
-    participantScope: "all",
-    specifiedIdentities: [],
-  },
-  2: {
-    id: 2,
-    name: "习近平新时代中国特色社会主义思想专题党课",
-    type: "党课学习",
-    branch: "计算机学院学生第一党支部",
-    location: "学院楼C座阶梯教室101",
-    description:
-      '深入学习习近平新时代中国特色社会主义思想的核心要义和精神实质，增强"四个意识"、坚定"四个自信"、做到"两个维护"。',
-    coverUrl: "",
-    activityStartTime: "2026-08-20 09:00:00",
-    activityEndTime: "2026-08-20 11:00:00",
-    signInStartTime: "2026-08-20 08:30:00",
-    signInEndTime: "2026-08-20 11:30:00",
-    status: "报名中",
-    participantScope: "all",
-    specifiedIdentities: [],
-  },
-  4: {
-    id: 4,
-    name: "社区志愿服务活动——关爱空巢老人",
-    type: "志愿服务",
-    branch: "软件学院学生党支部",
-    location: "阳光社区服务中心",
-    description: "组织党员和积极分子走进社区，为空巢老人提供生活照料、心理慰藉等志愿服务，弘扬尊老敬老传统美德。",
-    coverUrl: "",
-    activityStartTime: "2026-08-10 08:00:00",
-    activityEndTime: "2026-08-10 12:00:00",
-    signInStartTime: "2026-08-10 07:30:00",
-    signInEndTime: "2026-08-10 12:30:00",
-    status: "进行中",
-    participantScope: "specified",
-    specifiedIdentities: ["积极分子", "发展对象", "预备党员", "正式党员"],
-  },
-  11: {
-    id: 11,
-    name: "学习党章党规组织生活会",
-    type: "组织生活",
-    branch: "计算机学院学生第一党支部",
-    location: "学院楼B座201党员活动室",
-    description: "围绕党章党规开展组织生活会，交流学习心得，查摆问题不足，开展批评与自我批评。",
-    coverUrl: "",
-    activityStartTime: "2026-08-12 15:00:00",
-    activityEndTime: "2026-08-12 17:00:00",
-    signInStartTime: "2026-08-12 14:30:00",
-    signInEndTime: "2026-08-12 17:30:00",
-    status: "进行中",
-    participantScope: "specified",
-    specifiedIdentities: ["预备党员", "正式党员"],
-  },
-};
-
-/** 生成默认 Mock 详情（ID 未命中时使用） */
-function generateDefaultDetail(id: number): ActivityDetail {
-  return {
-    id,
-    name: `活动详情 #${id}`,
-    type: "主题党日",
-    branch: "计算机学院学生第一党支部",
-    location: "学院楼会议室",
-    description: "这是一条通过 Mock 生成的默认活动数据。实际项目中此处由后端接口返回。",
-    coverUrl: "",
-    activityStartTime: "2026-09-20 14:00:00",
-    activityEndTime: "2026-09-20 16:00:00",
-    signInStartTime: "2026-09-20 13:30:00",
-    signInEndTime: "2026-09-20 16:30:00",
-    status: "未开始",
-    participantScope: "all",
-    specifiedIdentities: [],
-  };
-}
-
-// ============================================================
-// Mock 签到记录
-// TODO: 替换为真实 API 调用
-// ============================================================
-function generateSignInRecords(): SignInRecord[] {
-  const allRecords: SignInRecord[] = [
-    { id: 1, name: "张明", studentId: "20230101001", signInTime: "2026-08-15 13:35:22", status: "已签到" },
-    { id: 2, name: "李娟", studentId: "20230101002", signInTime: "2026-08-15 13:38:15", status: "已签到" },
-    { id: 3, name: "王磊", studentId: "20230101003", signInTime: "2026-08-15 13:42:08", status: "已签到" },
-    { id: 4, name: "赵婷", studentId: "20230101004", signInTime: "2026-08-15 13:45:33", status: "已签到" },
-    { id: 5, name: "孙浩", studentId: "20230101005", signInTime: "2026-08-15 13:50:01", status: "已签到" },
-    { id: 6, name: "周颖", studentId: "20220201006", signInTime: "2026-08-15 13:52:44", status: "已签到" },
-    { id: 7, name: "吴强", studentId: "20220201001", signInTime: "2026-08-15 13:55:19", status: "已签到" },
-    { id: 8, name: "郑雪", studentId: "20220201002", signInTime: "2026-08-15 13:58:30", status: "已签到" },
-    { id: 9, name: "陈伟", studentId: "20220201003", signInTime: "2026-08-15 14:02:11", status: "已签到" },
-    { id: 10, name: "刘洋", studentId: "20220201004", signInTime: "2026-08-15 14:05:47", status: "已签到" },
-    { id: 11, name: "黄丽", studentId: "20220201005", signInTime: "2026-08-15 14:08:23", status: "已签到" },
-    { id: 12, name: "杨帆", studentId: "20210101001", signInTime: "2026-08-15 14:12:05", status: "已签到" },
-    { id: 13, name: "朱峰", studentId: "20210101002", signInTime: "2026-08-15 14:15:38", status: "已签到" },
-    { id: 14, name: "马丽", studentId: "20210101003", signInTime: "2026-08-15 14:18:52", status: "已签到" },
-    { id: 15, name: "胡涛", studentId: "20210101004", signInTime: "2026-08-15 14:22:10", status: "已签到" },
-    { id: 16, name: "林芳", studentId: "20210101005", signInTime: "", status: "未签到" },
-    { id: 17, name: "何军", studentId: "20200101001", signInTime: "", status: "未签到" },
-    { id: 18, name: "罗兰", studentId: "20200101002", signInTime: "", status: "未签到" },
-    { id: 19, name: "梁超", studentId: "20200101003", signInTime: "", status: "未签到" },
-    { id: 20, name: "宋雨", studentId: "20200101004", signInTime: "", status: "未签到" },
-  ];
-  return allRecords;
-}
-
-// ============================================================
-// Mock 报名列表
-// TODO: 替换为真实 API 调用
-// ============================================================
-function generateRegistrationRecords(): RegistrationRecord[] {
-  return [
-    { id: 1, name: "张明", studentId: "20230101001", identity: "发展对象", registrationTime: "2026-08-10 09:15:00" },
-    { id: 2, name: "李娟", studentId: "20230101002", identity: "积极分子", registrationTime: "2026-08-10 09:22:00" },
-    { id: 3, name: "王磊", studentId: "20230101003", identity: "预备党员", registrationTime: "2026-08-10 10:05:00" },
-    { id: 4, name: "赵婷", studentId: "20230101004", identity: "入党申请人", registrationTime: "2026-08-10 10:18:00" },
-    { id: 5, name: "孙浩", studentId: "20230101005", identity: "积极分子", registrationTime: "2026-08-10 11:30:00" },
-    { id: 6, name: "周颖", studentId: "20220201006", identity: "正式党员", registrationTime: "2026-08-10 14:00:00" },
-    { id: 7, name: "吴强", studentId: "20220201001", identity: "发展对象", registrationTime: "2026-08-10 14:45:00" },
-    { id: 8, name: "郑雪", studentId: "20220201002", identity: "积极分子", registrationTime: "2026-08-11 08:30:00" },
-    { id: 9, name: "陈伟", studentId: "20220201003", identity: "入党申请人", registrationTime: "2026-08-11 09:00:00" },
-    { id: 10, name: "刘洋", studentId: "20220201004", identity: "正式党员", registrationTime: "2026-08-11 09:45:00" },
-    { id: 11, name: "黄丽", studentId: "20220201005", identity: "积极分子", registrationTime: "2026-08-11 10:20:00" },
-    { id: 12, name: "杨帆", studentId: "20210101001", identity: "发展对象", registrationTime: "2026-08-11 11:00:00" },
-    { id: 13, name: "朱峰", studentId: "20210101002", identity: "预备党员", registrationTime: "2026-08-11 14:30:00" },
-    { id: 14, name: "马丽", studentId: "20210101003", identity: "入党申请人", registrationTime: "2026-08-11 15:15:00" },
-    { id: 15, name: "胡涛", studentId: "20210101004", identity: "预备党员", registrationTime: "2026-08-12 08:00:00" },
-    { id: 16, name: "林芳", studentId: "20210101005", identity: "正式党员", registrationTime: "2026-08-12 08:45:00" },
-    { id: 17, name: "何军", studentId: "20200101001", identity: "积极分子", registrationTime: "2026-08-12 09:30:00" },
-    { id: 18, name: "罗兰", studentId: "20200101002", identity: "发展对象", registrationTime: "2026-08-12 10:15:00" },
-    { id: 19, name: "梁超", studentId: "20200101003", identity: "入党申请人", registrationTime: "2026-08-12 11:00:00" },
-    { id: 20, name: "宋雨", studentId: "20200101004", identity: "正式党员", registrationTime: "2026-08-12 14:00:00" },
-    { id: 21, name: "唐明", studentId: "20230101006", identity: "积极分子", registrationTime: "2026-08-12 14:45:00" },
-    { id: 22, name: "许婷", studentId: "20230101007", identity: "积极分子", registrationTime: "2026-08-12 15:30:00" },
-    { id: 23, name: "秦汉", studentId: "20220201007", identity: "正式党员", registrationTime: "2026-08-12 16:15:00" },
-    { id: 24, name: "韩冰", studentId: "20210101006", identity: "入党申请人", registrationTime: "2026-08-13 08:00:00" },
-    { id: 25, name: "丁一", studentId: "20200101005", identity: "预备党员", registrationTime: "2026-08-13 09:00:00" },
-  ];
-}
-
-// ============================================================
-// 参与范围文本
-// ============================================================
-const participantScopeText = computed(() => {
-  if (!activity.value) return "";
-  if (activity.value.participantScope === "all") return "全部成员";
-  return activity.value.specifiedIdentities.join("、");
+const errorMessage = ref("");
+const coverLoadFailed = ref(false);
+const requestSequence = ref(0);
+const coverUrl = computed(() => {
+  const value = activity.value?.cover?.trim();
+  return value && (/^https?:\/\//i.test(value) || value.startsWith("/")) ? value : "";
 });
 
-// ============================================================
-// 加载活动详情
-// ============================================================
-const signInRecords = ref<SignInRecord[]>([]);
-const registrationRecords = ref<RegistrationRecord[]>([]);
+function formatDateTime(value: string | null | undefined): string {
+  return value ? value.replace("T", " ").slice(0, 16) : "未设置";
+}
 
-async function loadActivityDetail(): Promise<void> {
+function statusActions(): { value: ActivityStatus; label: string }[] {
+  return statusOptions.filter((option) => option.value !== activity.value?.status);
+}
+
+async function loadActivity(): Promise<void> {
+  if (!Number.isFinite(activityId.value) || activityId.value <= 0) {
+    errorMessage.value = "活动编号无效。";
+    activity.value = null;
+    return;
+  }
+
+  const sequence = ++requestSequence.value;
   loading.value = true;
+  errorMessage.value = "";
+  coverLoadFailed.value = false;
   try {
-    // TODO: 替换为真实 API 调用
-    // const res = await api.getActivityDetail(activityId.value)
-    await new Promise((resolve) => setTimeout(resolve, 350));
-
-    const detail = mockDetailMap[activityId.value] || generateDefaultDetail(activityId.value);
-    activity.value = detail;
-
-    // 加载关联数据
-    signInRecords.value = generateSignInRecords();
-    registrationRecords.value = generateRegistrationRecords();
-
-    // 根据 URL 参数设置初始 tab
-    const tabParam = route.query.tab as string;
-    if (["sign", "registration", "statistics"].includes(tabParam)) {
-      activeTab.value = tabParam as "sign" | "registration" | "statistics";
+    const result = isSuperAdmin.value
+      ? await getAdminActivity(activityId.value)
+      : await getPublishedActivity(activityId.value);
+    if (sequence === requestSequence.value) activity.value = result;
+  } catch (error) {
+    if (sequence === requestSequence.value) {
+      activity.value = null;
+      errorMessage.value = getErrorMessage(error);
     }
-  } catch {
-    ElMessage.error("加载活动详情失败");
-    router.push("/activity");
   } finally {
-    loading.value = false;
+    if (sequence === requestSequence.value) loading.value = false;
   }
 }
 
-onMounted(() => {
-  loadActivityDetail();
-});
-
-// ============================================================
-// 标签页管理（URL 参数同步）
-// ============================================================
-type TabName = "sign" | "registration" | "statistics";
-
-const activeTab = ref<TabName>("sign");
-
-/** 管理员可看的标签页 */
-const adminTabs = [
-  { name: "sign" as TabName, label: "签到管理" },
-  { name: "registration" as TabName, label: "报名列表" },
-  { name: "statistics" as TabName, label: "活动统计" },
-];
-
-/** 普通成员可看的标签页（仅签到管理，只读） */
-const memberTabs = [{ name: "sign" as TabName, label: "签到管理" }];
-
-const visibleTabs = computed(() => (isAdmin.value ? adminTabs : memberTabs));
-
-function handleTabChange(name: TabName): void {
-  router.replace({ query: { ...route.query, tab: name } });
-}
-
-// ============================================================
-// 日期格式化
-// ============================================================
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return "-";
-  return dateStr;
-}
-
-// ============================================================
-// 二维码签到
-// ============================================================
-const qrDataUrl = ref("");
-const qrCountdown = ref(60);
-const qrLoading = ref(false);
-let qrTimer: ReturnType<typeof setInterval> | null = null;
-
-async function generateQRCode(): Promise<void> {
+async function handleStatusCommand(command: string | number): Promise<void> {
   if (!activity.value) return;
-
-  qrLoading.value = true;
+  const nextStatus = Number(command) as ActivityStatus;
+  const nextLabel = statusLabel(nextStatus);
   try {
-    const payload = JSON.stringify({
-      activityId: activity.value.id,
-      timestamp: Date.now(),
-    });
-    qrDataUrl.value = await QRCode.toDataURL(payload, {
-      width: 220,
-      margin: 2,
-      color: { dark: "#C12C1F", light: "#FFFFFF" },
-    });
-    qrCountdown.value = 60;
-  } catch {
-    ElMessage.error("二维码生成失败");
-  } finally {
-    qrLoading.value = false;
-  }
-}
-
-function startQRTimer(): void {
-  stopQRTimer();
-  qrTimer = setInterval(() => {
-    qrCountdown.value--;
-    if (qrCountdown.value <= 0) {
-      generateQRCode();
-    }
-  }, 1000);
-}
-
-function stopQRTimer(): void {
-  if (qrTimer) {
-    clearInterval(qrTimer);
-    qrTimer = null;
-  }
-}
-
-function handleRefreshQR(): void {
-  generateQRCode();
-}
-
-function handleCloseQR(): void {
-  stopQRTimer();
-  qrDataUrl.value = "";
-  qrCountdown.value = 60;
-}
-
-// 离开签到标签页时停止二维码倒计时
-watch(activeTab, (tab) => {
-  if (tab !== "sign") {
-    stopQRTimer();
-  }
-});
-
-// ============================================================
-// 签到记录筛选 & 分页
-// ============================================================
-const signFilterStatus = ref("");
-const signCurrentPage = ref(1);
-const signPageSize = ref(10);
-
-const signStatusOptions = [
-  { value: "", label: "全部" },
-  { value: "已签到", label: "已签到" },
-  { value: "未签到", label: "未签到" },
-];
-
-const filteredSignInRecords = computed(() => {
-  let list = signInRecords.value;
-  if (signFilterStatus.value) {
-    list = list.filter((r) => r.status === signFilterStatus.value);
-  }
-  return list;
-});
-
-const signTotalFiltered = computed(() => filteredSignInRecords.value.length);
-
-const pagedSignInRecords = computed(() => {
-  const start = (signCurrentPage.value - 1) * signPageSize.value;
-  return filteredSignInRecords.value.slice(start, start + signPageSize.value);
-});
-
-watch(signFilterStatus, () => {
-  signCurrentPage.value = 1;
-});
-
-function handleSignPageChange(page: number): void {
-  signCurrentPage.value = page;
-}
-
-function handleSignSizeChange(size: number): void {
-  signPageSize.value = size;
-  signCurrentPage.value = 1;
-}
-
-// ============================================================
-// 签到统计
-// ============================================================
-const signInStats = computed(() => {
-  const total = signInRecords.value.length;
-  const signedIn = signInRecords.value.filter((r) => r.status === "已签到").length;
-  const notSignedIn = total - signedIn;
-  const rate = total > 0 ? Math.round((signedIn / total) * 100) : 0;
-  return { total, signedIn, notSignedIn, rate };
-});
-
-/** 导出签到数据 */
-function handleExportSignIn(): void {
-  // TODO: 替换为真实导出逻辑（调用后端接口下载 Excel/CSV）
-  ElMessage.success("签到数据导出成功（Mock）");
-  console.log("[Mock] 导出签到数据：", signInRecords.value);
-}
-
-// ============================================================
-// 操作按钮（页面头部）
-// ============================================================
-interface HeaderAction {
-  key: string;
-  label: string;
-  icon?: Component;
-  type?: "primary" | "danger" | "warning" | "default";
-  visible: boolean;
-  handler: () => void;
-}
-
-const headerActions = computed<HeaderAction[]>(() => {
-  if (!activity.value) return [];
-  const { status } = activity.value;
-
-  return [
-    {
-      key: "edit",
-      label: "编辑",
-      icon: Edit,
-      type: "default",
-      visible: isAdmin.value && status === "未开始",
-      handler: handleEdit,
-    },
-    {
-      key: "delete",
-      label: "删除",
-      icon: Delete,
-      type: "danger",
-      visible: isSuperAdmin.value && status === "未开始",
-      handler: handleDelete,
-    },
-    {
-      key: "qrcode",
-      label: "生成二维码",
-      icon: PictureFilled,
-      type: "primary",
-      visible: isAdmin.value && (status === "报名中" || status === "进行中"),
-      handler: () => {
-        switchToTab("sign");
-        generateQRCode();
-        startQRTimer();
-      },
-    },
-    {
-      key: "archive",
-      label: "归档",
-      type: "warning",
-      visible: isAdmin.value && status === "已结束",
-      handler: handleArchive,
-    },
-  ];
-});
-
-function switchToTab(tab: TabName): void {
-  activeTab.value = tab;
-  router.replace({ query: { ...route.query, tab } });
-}
-
-function handleEdit(): void {
-  if (!activity.value) return;
-  router.push(`/activity/edit/${activity.value.id}`);
-}
-
-async function handleDelete(): Promise<void> {
-  if (!activity.value) return;
-  try {
-    await ElMessageBox.confirm(`确定要删除活动"${activity.value.name}"吗？删除后不可恢复。`, "删除确认", {
-      confirmButtonText: "确定删除",
+    await ElMessageBox.confirm("确认将《" + activity.value.title + "》调整为“" + nextLabel + "”吗？", "调整活动状态", {
+      confirmButtonText: "确认调整",
       cancelButtonText: "取消",
       type: "warning",
     });
-    // TODO: 替换为真实 API 调用
+    await updateAdminActivityStatus(activity.value.id, nextStatus);
+    ElMessage.success("活动状态已更新");
+    await loadActivity();
+  } catch (error) {
+    if (error !== "cancel" && error !== "close") errorMessage.value = getErrorMessage(error);
+  }
+}
+
+async function removeActivity(): Promise<void> {
+  if (!activity.value) return;
+  try {
+    await ElMessageBox.confirm("删除后无法恢复，确认删除《" + activity.value.title + "》吗？", "删除活动", {
+      confirmButtonText: "确认删除",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+    await deleteAdminActivity(activity.value.id);
     ElMessage.success("活动已删除");
-    router.push("/activity");
-  } catch {
-    // 用户取消
+    await router.push("/activity");
+  } catch (error) {
+    if (error !== "cancel" && error !== "close") errorMessage.value = getErrorMessage(error);
   }
 }
 
-async function handleArchive(): Promise<void> {
-  if (!activity.value) return;
-  try {
-    await ElMessageBox.confirm(`确定要归档活动"${activity.value.name}"吗？`, "归档确认", {
-      confirmButtonText: "确定归档",
-      cancelButtonText: "取消",
-      type: "info",
-    });
-    // TODO: 替换为真实 API 调用
-    activity.value.status = "已归档";
-    ElMessage.success("活动已归档");
-  } catch {
-    // 用户取消
-  }
-}
-
-// ============================================================
-// 返回列表
-// ============================================================
 function goBack(): void {
-  router.push("/activity");
+  void router.push("/activity");
 }
 
-// ============================================================
-// 生命周期清理
-// ============================================================
-onUnmounted(() => {
-  stopQRTimer();
-});
+function goToEdit(): void {
+  if (activity.value) void router.push("/activity/edit/" + activity.value.id);
+}
+
+onMounted(() => void loadActivity());
+watch([activityId, isSuperAdmin], () => void loadActivity());
 </script>
 
 <template>
-  <div v-loading="loading" class="activity-detail-page" element-loading-text="正在加载活动详情...">
-    <div class="page-container">
-      <!-- ==================== 页面头部 ==================== -->
-      <div v-if="activity" class="detail-header">
-        <div class="header-top">
-          <el-button text class="back-btn" @click="goBack">
-            <el-icon><ArrowLeft /></el-icon>
-            返回列表
-          </el-button>
-        </div>
+  <main class="activity-detail-page">
+    <div class="detail-container">
+      <button class="back-link" type="button" @click="goBack">
+        <el-icon><ArrowLeft /></el-icon>
+        返回活动列表
+      </button>
 
-        <div class="header-main">
-          <div class="header-info">
-            <h2 class="activity-title">{{ activity.name }}</h2>
-            <div class="header-meta">
-              <el-tag :color="activityStatusColorMap[activity.status]" effect="light" size="large">
-                {{ activity.status }}
-              </el-tag>
-              <span class="meta-branch">{{ activity.branch }}</span>
+      <el-alert
+        v-if="errorMessage"
+        class="detail-error"
+        :title="errorMessage"
+        description="请检查登录状态与访问权限，或确认活动仍然存在。"
+        type="error"
+        show-icon
+        :closable="false"
+      >
+        <template #default>
+          <el-button text type="primary" @click="loadActivity">重新加载</el-button>
+        </template>
+      </el-alert>
+
+      <section v-loading="loading" class="detail-card" element-loading-text="正在读取活动详情…">
+        <template v-if="activity">
+          <header class="detail-hero">
+            <div class="hero-topline">
+              <div class="hero-kicker"><span></span> 活动记录 / {{ String(activity.id).padStart(4, "0") }}</div>
+              <span v-if="isSuperAdmin" class="status-pill" :class="statusClass(activity.status)">
+                <i></i>{{ statusLabel(activity.status) }}
+              </span>
             </div>
-          </div>
+            <div class="hero-content">
+              <div class="hero-copy">
+                <div class="type-overline">{{ activity.typeName || "党建活动" }}</div>
+                <h1>{{ activity.title }}</h1>
+                <p>{{ activity.branchName || "校级活动" }} <span>·</span> {{ formatDateTime(activity.startTime) }}</p>
+              </div>
+              <div v-if="activity.cover" class="hero-cover">
+                <img
+                  v-if="coverUrl && !coverLoadFailed"
+                  class="activity-cover-hero"
+                  :src="coverUrl"
+                  :alt="activity.title + '封面'"
+                  @error="coverLoadFailed = true"
+                />
+                <div v-else class="cover-unavailable-hero" role="img" aria-label="活动封面无法显示">
+                  <strong>封面暂无法显示</strong>
+                  <small>请检查封面地址是否可公开访问</small>
+                </div>
+                <span class="hero-cover-caption">活动封面</span>
+              </div>
+              <div v-else class="hero-seal" aria-hidden="true">党</div>
+            </div>
+          </header>
 
-          <div v-if="headerActions.length > 0" class="header-actions">
-            <el-button
-              v-for="action in headerActions"
-              :key="action.key"
-              :type="action.type || 'default'"
-              @click="action.handler"
-            >
-              <el-icon v-if="action.icon"><component :is="action.icon" /></el-icon>
-              {{ action.label }}
-            </el-button>
-          </div>
-        </div>
-      </div>
+          <el-alert
+            v-if="isSuperAdmin"
+            class="status-assumption"
+            title="状态约定：已发布对应后端状态 1；未发布（0）与已下线（2）的名称按原型约定呈现。"
+            type="info"
+            :closable="false"
+            show-icon
+          />
 
-      <!-- ==================== 基本信息卡片 ==================== -->
-      <div v-if="activity" class="content-card info-card">
-        <h3 class="section-subtitle">基本信息</h3>
-        <el-descriptions :column="2" border size="large">
-          <el-descriptions-item label="活动类型" :span="1">
-            <el-tag :color="activityTypeColorMap[activity.type]" effect="light" size="small">
-              {{ activity.type }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="举办支部" :span="1">
-            {{ activity.branch }}
-          </el-descriptions-item>
-          <el-descriptions-item label="活动地点" :span="1">
-            {{ activity.location }}
-          </el-descriptions-item>
-          <el-descriptions-item label="参与范围" :span="1">
-            {{ participantScopeText }}
-          </el-descriptions-item>
-          <el-descriptions-item label="活动时间" :span="1">
-            <span class="time-highlight">
-              {{ formatDateTime(activity.activityStartTime) }}
-            </span>
-            <span class="time-separator"> ~ </span>
-            <span class="time-highlight">
-              {{ formatDateTime(activity.activityEndTime) }}
-            </span>
-          </el-descriptions-item>
-          <el-descriptions-item label="签到时间" :span="1">
-            {{ formatDateTime(activity.signInStartTime) }}
-            <span class="time-separator"> ~ </span>
-            {{ formatDateTime(activity.signInEndTime) }}
-          </el-descriptions-item>
-          <el-descriptions-item v-if="activity.description" label="活动简介" :span="2">
-            <span class="description-text">{{ activity.description }}</span>
-          </el-descriptions-item>
-        </el-descriptions>
-      </div>
+          <div class="detail-body">
+            <section class="description-section">
+              <div class="section-label"><span>01</span> 活动简介</div>
+              <p class="description-copy">{{ activity.description || "暂无活动简介。" }}</p>
+            </section>
 
-      <!-- ==================== 标签页 ==================== -->
-      <div v-if="activity" class="content-card tabs-card">
-        <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-          <el-tab-pane v-for="tab in visibleTabs" :key="tab.name" :label="tab.label" :name="tab.name">
-            <!-- ========== 标签页 1：签到管理 ========== -->
-            <template v-if="tab.name === 'sign'">
-              <div class="signin-layout">
-                <!-- 左侧：二维码区 -->
-                <div class="signin-qrcode">
-                  <div v-loading="qrLoading" class="qr-card">
-                    <img v-if="qrDataUrl" :src="qrDataUrl" alt="签到二维码" class="qr-image" />
-                    <div v-else class="qr-placeholder">
-                      <el-icon :size="48" class="qr-placeholder-icon"><PictureFilled /></el-icon>
-                      <p class="qr-placeholder-text">点击下方按钮生成签到二维码</p>
-                    </div>
-                    <p v-if="qrDataUrl" class="qr-tip">请使用微信小程序扫码签到</p>
-                  </div>
+            <section class="facts-grid" aria-label="活动信息">
+              <article class="fact-card fact-highlight">
+                <span class="fact-label">活动时间</span>
+                <strong>{{ formatDateTime(activity.startTime) }}</strong>
+                <small>至 {{ formatDateTime(activity.endTime) }}</small>
+              </article>
+              <article class="fact-card">
+                <span class="fact-label">地点说明</span>
+                <strong>{{
+                  activity.locationDescription || (activity.location ? "已配置地理范围" : "线上活动")
+                }}</strong>
+                <small>{{ activity.location ? "已保存地理范围" : "未配置线下地理范围" }}</small>
+              </article>
+              <article class="fact-card">
+                <span class="fact-label">人数上限</span>
+                <strong>{{ activity.maxParticipants ?? "不限" }}</strong>
+                <small>人</small>
+              </article>
+              <article class="fact-card">
+                <span class="fact-label">活动类型</span>
+                <strong>{{ activity.typeName || "未分类" }}</strong>
+                <small>{{ activity.branchName || "校级活动" }}</small>
+              </article>
+            </section>
 
-                  <div class="qr-stats">
-                    <div class="qr-stat-item">
-                      <span class="qr-stat-num signed">{{ signInStats.signedIn }}</span>
-                      <span class="qr-stat-label">已签到</span>
-                    </div>
-                    <div class="qr-stat-divider">/</div>
-                    <div class="qr-stat-item">
-                      <span class="qr-stat-num total">{{ signInStats.total }}</span>
-                      <span class="qr-stat-label">总人数</span>
-                    </div>
-                  </div>
+            <section class="schedule-section">
+              <div class="section-label"><span>02</span> 时间安排</div>
+              <div class="schedule-row">
+                <span>活动开始</span><strong>{{ formatDateTime(activity.startTime) }}</strong>
+              </div>
+              <div class="schedule-row">
+                <span>活动结束</span><strong>{{ formatDateTime(activity.endTime) }}</strong>
+              </div>
+              <div class="schedule-row">
+                <span>签到时间配置</span>
+                <strong>{{ formatDateTime(activity.signStart) }} — {{ formatDateTime(activity.signEnd) }}</strong>
+              </div>
+              <p class="schedule-note">页面仅展示服务端保存的签到时间配置，不提供报名、签到、二维码或签到记录操作。</p>
+            </section>
 
-                  <!-- 未生成二维码：显示生成按钮 -->
-                  <el-button
-                    v-if="!qrDataUrl"
-                    type="primary"
-                    :loading="qrLoading"
-                    class="qr-refresh-btn"
-                    @click="handleRefreshQR"
-                  >
-                    <el-icon><PictureFilled /></el-icon>
-                    生成二维码
+            <section v-if="isSuperAdmin" class="detail-actions-panel" aria-label="活动管理操作">
+              <div class="actions-copy">
+                <strong>活动管理</strong>
+                <span>编辑活动内容或调整发布状态</span>
+              </div>
+              <div class="detail-action-buttons">
+                <el-button :icon="Edit" @click="goToEdit">编辑活动</el-button>
+                <el-dropdown @command="handleStatusCommand">
+                  <el-button type="primary">
+                    调整状态<el-icon class="dropdown-icon"><ArrowDown /></el-icon>
                   </el-button>
-
-                  <!-- 已生成二维码：显示倒计时 + 刷新按钮 -->
-                  <template v-if="qrDataUrl">
-                    <div class="qr-timer" :class="{ warning: qrCountdown <= 10 }">
-                      <span class="timer-label">二维码有效期剩余</span>
-                      <span class="timer-value">{{ qrCountdown }}s</span>
-                    </div>
-
-                    <div class="qr-actions">
-                      <el-button class="qr-action-btn" plain :loading="qrLoading" @click="handleRefreshQR">
-                        <el-icon><RefreshRight /></el-icon>
-                        刷新二维码
-                      </el-button>
-
-                      <el-button class="qr-action-btn" type="danger" plain @click="handleCloseQR">
-                        <el-icon><CircleClose /></el-icon>
-                        关闭二维码
-                      </el-button>
-                    </div>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item v-for="option in statusActions()" :key="option.value" :command="option.value">
+                        {{ option.label }}
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
                   </template>
-                </div>
-
-                <!-- 右侧：签到记录表格 -->
-                <div class="signin-records">
-                  <div class="records-header">
-                    <h4 class="records-title">签到记录</h4>
-                    <div class="records-toolbar">
-                      <el-select
-                        v-model="signFilterStatus"
-                        placeholder="签到状态"
-                        clearable
-                        size="small"
-                        style="width: 120px"
-                      >
-                        <el-option
-                          v-for="opt in signStatusOptions"
-                          :key="opt.value"
-                          :label="opt.label"
-                          :value="opt.value"
-                        />
-                      </el-select>
-                      <el-button size="small" @click="handleExportSignIn">
-                        <el-icon><Download /></el-icon>
-                        导出数据
-                      </el-button>
-                    </div>
-                  </div>
-
-                  <el-table :data="pagedSignInRecords" stripe size="small" style="width: 100%">
-                    <el-table-column prop="name" label="姓名" width="80" />
-                    <el-table-column prop="studentId" label="学号" width="130" />
-                    <el-table-column label="签到时间" min-width="160">
-                      <template #default="{ row }">
-                        <span v-if="row.signInTime" class="time-cell">
-                          {{ formatDateTime(row.signInTime) }}
-                        </span>
-                        <span v-else class="time-cell time-empty">-</span>
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="状态" width="90" align="center">
-                      <template #default="{ row }">
-                        <el-tag :color="signInStatusColorMap[row.status]" effect="light" size="small">
-                          {{ row.status }}
-                        </el-tag>
-                      </template>
-                    </el-table-column>
-                  </el-table>
-
-                  <div v-if="signTotalFiltered > 0" class="records-footer">
-                    <span class="total-info">共 {{ signTotalFiltered }} 条</span>
-                    <el-pagination
-                      v-model:current-page="signCurrentPage"
-                      v-model:page-size="signPageSize"
-                      :page-sizes="[10, 20, 50]"
-                      :total="signTotalFiltered"
-                      layout="sizes, prev, pager, next"
-                      background
-                      small
-                      @current-change="handleSignPageChange"
-                      @size-change="handleSignSizeChange"
-                    />
-                  </div>
-                </div>
+                </el-dropdown>
+                <el-button type="danger" plain :icon="Delete" @click="removeActivity">删除活动</el-button>
               </div>
-            </template>
+            </section>
 
-            <!-- ========== 标签页 2：报名列表 ========== -->
-            <template v-if="tab.name === 'registration'">
-              <div class="registration-section">
-                <div class="section-toolbar">
-                  <h4 class="records-title">
-                    报名成员列表
-                    <span class="count-badge">{{ registrationRecords.length }} 人</span>
-                  </h4>
-                  <!-- 二期功能占位 -->
-                  <!-- <el-button size="small" type="primary">添加报名</el-button> -->
-                </div>
+            <footer class="detail-footer">
+              <span>创建于 {{ formatDateTime(activity.createTime) }}</span>
+              <span v-if="activity.updateTime">最近更新 {{ formatDateTime(activity.updateTime) }}</span>
+            </footer>
+          </div>
+        </template>
 
-                <el-table :data="registrationRecords" stripe style="width: 100%">
-                  <el-table-column prop="name" label="姓名" width="80" />
-                  <el-table-column prop="studentId" label="学号" width="130" />
-                  <el-table-column label="身份" width="110" align="center">
-                    <template #default="{ row }">
-                      <el-tag :color="identityColorMap[row.identity] || '#909399'" effect="light" size="small">
-                        {{ row.identity }}
-                      </el-tag>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="报名时间" min-width="170">
-                    <template #default="{ row }">
-                      <span class="time-cell">{{ formatDateTime(row.registrationTime) }}</span>
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </div>
-            </template>
-
-            <!-- ========== 标签页 3：活动统计 ========== -->
-            <template v-if="tab.name === 'statistics'">
-              <ActivityStatistics :activity-id="activityId" />
-            </template>
-          </el-tab-pane>
-        </el-tabs>
-      </div>
+        <div v-else-if="!loading && !errorMessage" class="detail-empty">
+          <div class="empty-mark">活</div>
+          <h2>活动记录不存在</h2>
+          <p>该活动可能已被删除，或当前身份无法查看。</p>
+          <el-button type="primary" plain @click="goBack">返回活动列表</el-button>
+        </div>
+      </section>
     </div>
-  </div>
+  </main>
 </template>
 
 <style lang="scss" scoped>
-/* ============================================================
- * ActivityDetail.vue 样式
- * ============================================================ */
-
 .activity-detail-page {
-  padding: 24px 0 40px;
+  min-height: 100%;
+  padding: 30px 0 56px;
+  color: #292c2d;
+  background: radial-gradient(circle at 91% 1%, rgba(181, 139, 77, 0.075), transparent 22rem), #f4f2ec;
 }
 
-/* ---- 页面头部 ---- */
-.detail-header {
-  margin-bottom: 24px;
+.detail-container {
+  width: min(1080px, calc(100% - 56px));
+  margin: 0 auto;
 }
 
-.header-top {
-  margin-bottom: 8px;
-}
-
-.back-btn {
-  padding-left: 0;
-  color: var(--text-secondary, #909399);
-  font-size: 14px;
-
-  &:hover {
-    color: var(--party-red, #c12c1f);
-  }
-}
-
-.header-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.header-info {
-  flex: 1;
-}
-
-.activity-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-primary, #2c3e50);
-  line-height: 1.4;
-  margin-bottom: 8px;
-}
-
-.header-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.meta-branch {
-  font-size: 14px;
-  color: var(--text-secondary, #909399);
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-/* ---- 基本信息卡片 ---- */
-.info-card {
-  margin-bottom: 24px;
-}
-
-.section-subtitle {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary, #2c3e50);
-  margin-bottom: 16px;
-
-  &::before {
-    content: "";
-    display: inline-block;
-    width: 4px;
-    height: 18px;
-    background: var(--party-red, #c12c1f);
-    border-radius: 2px;
-    margin-right: 10px;
-    vertical-align: middle;
-    position: relative;
-    top: -1px;
-  }
-}
-
-.time-highlight {
-  font-weight: 600;
-  color: var(--text-primary, #2c3e50);
-}
-
-.time-separator {
-  color: var(--text-placeholder, #c0c4cc);
-  margin: 0 4px;
-}
-
-.description-text {
-  color: var(--text-regular, #606266);
-  line-height: 1.8;
-}
-
-/* ---- 标签页卡片 ---- */
-.tabs-card {
-  :deep(.el-tabs__header) {
-    margin-bottom: 20px;
-  }
-}
-
-/* ============================================================
- * 标签页 1：签到管理
- * ============================================================ */
-.signin-layout {
-  display: flex;
-  gap: 32px;
-  align-items: flex-start;
-
-  @media (max-width: 992px) {
-    flex-direction: column;
-  }
-}
-
-/* 左侧：二维码 */
-.signin-qrcode {
-  flex-shrink: 0;
-  width: 280px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.qr-card {
-  width: 240px;
-  height: 240px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--border-color, #ebeef5);
-  border-radius: var(--radius-lg, 12px);
-  padding: 8px;
-  background: #fff;
-}
-
-.qr-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.qr-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.qr-placeholder-icon {
-  color: var(--text-placeholder, #c0c4cc);
-}
-
-.qr-placeholder-text {
-  font-size: 13px;
-  color: var(--text-secondary, #909399);
-  text-align: center;
-  line-height: 1.5;
-}
-
-.qr-tip {
-  margin-top: 12px;
-  font-size: 13px;
-  color: var(--text-secondary, #909399);
-  text-align: center;
-}
-
-.qr-stats {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.qr-stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.qr-stat-num {
-  font-size: 24px;
-  font-weight: 700;
-
-  &.signed {
-    color: #67c23a;
-  }
-  &.total {
-    color: var(--text-primary, #2c3e50);
-  }
-}
-
-.qr-stat-label {
-  font-size: 12px;
-  color: var(--text-secondary, #909399);
-}
-
-.qr-stat-divider {
-  font-size: 20px;
-  color: var(--text-placeholder, #c0c4cc);
-  margin-top: -8px;
-}
-
-.qr-timer {
-  margin-top: 12px;
-  display: flex;
+.back-link {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  margin-bottom: 18px;
+  padding: 0;
+  border: 0;
+  color: #827e74;
+  background: transparent;
   font-size: 13px;
-  color: var(--text-secondary, #909399);
-
-  &.warning {
-    color: $party-red;
-  }
+  cursor: pointer;
 }
 
-.timer-label {
-  color: inherit;
+.back-link:hover {
+  color: var(--party-red);
 }
 
-.timer-value {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  min-width: 32px;
+.detail-error,
+.status-assumption {
+  margin-bottom: 14px;
+  border-radius: 8px;
 }
 
-.qr-actions {
+.detail-card {
+  min-height: 500px;
+  overflow: hidden;
+  border: 1px solid var(--workspace-line);
+  border-radius: 12px;
+  background: #fffefa;
+  box-shadow: 0 10px 30px rgba(46, 37, 27, 0.05);
+}
+
+.detail-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 19px 34px 18px;
+  color: #fff8ef;
+  background:
+    radial-gradient(circle at 85% 8%, rgba(226, 181, 119, 0.17), transparent 16rem),
+    linear-gradient(117deg, var(--workspace-red-deep), var(--party-red) 67%, var(--party-red-dark));
+}
+
+.hero-topline,
+.hero-content {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.hero-kicker {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  margin-top: 16px;
-  width: 100%;
+  color: rgba(255, 244, 227, 0.73);
+  font-size: 10px;
+  letter-spacing: 0.11em;
 }
 
-.qr-action-btn {
-  width: 100% !important;
-  margin-left: 0 !important;
-  justify-content: center;
+.hero-kicker span {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: #d2ad72;
+  transform: rotate(45deg);
 }
 
-.qr-refresh-btn {
-  margin-top: 16px;
-  width: 100% !important;
-  justify-content: center;
+.hero-content {
+  align-items: center;
+  margin-top: 15px;
 }
 
-/* 右侧：签到记录 */
-.signin-records {
+.hero-copy {
   flex: 1;
   min-width: 0;
 }
 
-.records-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.records-toolbar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.records-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary, #2c3e50);
-}
-
-.count-badge {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 0 10px;
+.type-overline {
+  margin-bottom: 8px;
+  color: #e4c994;
   font-size: 12px;
-  font-weight: 500;
-  color: var(--party-red, #c12c1f);
-  background: var(--party-red-bg, rgba(193, 44, 31, 0.08));
-  border-radius: 10px;
-  line-height: 22px;
+  letter-spacing: 0.08em;
 }
 
-.records-footer {
+.hero-content h1 {
+  max-width: 720px;
+  color: #fffaf1;
+  font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
+  font-size: clamp(24px, 3.4vw, 34px);
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  line-height: 1.45;
+}
+
+.hero-content p {
+  margin-top: 11px;
+  color: rgba(255, 244, 227, 0.73);
+  font-size: 13px;
+}
+
+.hero-content p span {
+  margin: 0 6px;
+  color: #d0ae79;
+}
+
+.hero-seal {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  place-items: center;
+  border: 1px solid rgba(244, 218, 177, 0.35);
+  border-radius: 50%;
+  color: rgba(244, 218, 177, 0.76);
+  box-shadow: inset 0 0 0 4px rgba(244, 218, 177, 0.08);
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 27px;
+}
+
+.hero-cover {
+  display: flex;
+  width: 260px;
+  max-width: 32%;
+  flex: 0 0 260px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.activity-cover-hero {
+  display: block;
+  width: 100%;
+  height: 126px;
+  border: 1px solid rgba(255, 246, 230, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  object-fit: contain;
+}
+
+.hero-cover-caption {
+  color: rgba(255, 244, 227, 0.68);
+  font-size: 12px;
+  text-align: right;
+}
+
+.cover-unavailable-hero {
+  display: flex;
+  height: 126px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 246, 230, 0.28);
+  border-radius: 8px;
+  color: #fff8ef;
+  background: rgba(255, 255, 255, 0.08);
+  text-align: center;
+}
+
+.cover-unavailable-hero strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.cover-unavailable-hero small {
+  color: rgba(255, 244, 227, 0.68);
+  font-size: 12px;
+}
+
+.dropdown-icon {
+  margin-left: 4px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.status-pill i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.is-published {
+  color: #e4f1e3;
+  background: rgba(68, 118, 79, 0.35);
+}
+
+.is-draft {
+  color: #fae7bd;
+  background: rgba(163, 124, 57, 0.33);
+}
+
+.is-offline {
+  color: #eee9df;
+  background: rgba(97, 93, 84, 0.42);
+}
+
+.detail-body {
+  padding: 27px 34px 19px;
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #424642;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.section-label span {
+  color: #b18b53;
+  font-family: var(--font-family);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.description-copy {
+  max-width: 850px;
+  margin: 13px 0 0 27px;
+  color: #696d69;
+  font-size: 16px;
+  line-height: 1.85;
+  white-space: pre-wrap;
+}
+
+.facts-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 25px;
+  border: 1px solid var(--workspace-line);
+  border-radius: 9px;
+  background: #fbfaf6;
+}
+
+.fact-card {
+  display: flex;
+  min-height: 112px;
+  flex-direction: column;
+  justify-content: center;
+  padding: 17px 18px;
+  border-right: 1px solid var(--workspace-line);
+}
+
+.fact-card:last-child {
+  border-right: 0;
+}
+
+.fact-label {
+  color: #99968e;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+}
+
+.fact-card strong {
+  margin-top: 7px;
+  overflow-wrap: anywhere;
+  color: #414541;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.fact-card small {
+  margin-top: 3px;
+  color: #999990;
+  font-size: 13px;
+}
+
+.fact-highlight strong {
+  color: var(--party-red);
+}
+
+.schedule-section {
+  margin-top: 28px;
+  padding-bottom: 7px;
+}
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.5fr) 1.5fr;
+  gap: 15px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0ede6;
+  font-size: 14px;
+}
+
+.schedule-row:first-of-type {
+  margin-top: 9px;
+}
+
+.schedule-row span {
+  color: #99968e;
+}
+
+.schedule-row strong {
+  color: #565b57;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-note {
+  margin-top: 9px;
+  color: #9a8b74;
+  font-size: 13px;
+}
+
+.detail-actions-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 22px;
+  padding: 17px 18px;
+  border: 1px solid #e9e2d7;
+  border-radius: 9px;
+  background: #faf8f2;
+}
+
+.actions-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.actions-copy strong {
+  color: #4b4d49;
+  font-size: 16px;
+}
+
+.actions-copy span {
+  color: #898981;
+  font-size: 14px;
+}
+
+.detail-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.detail-action-buttons :deep(.el-button) {
+  min-height: 36px;
+  margin-left: 0;
+  border-radius: 6px;
+}
+
+.detail-action-buttons :deep(.el-button--primary) {
+  border-color: var(--party-red);
+  background: var(--party-red);
+}
+
+.detail-footer {
   display: flex;
   justify-content: space-between;
+  gap: 14px;
+  margin-top: 21px;
+  padding-top: 12px;
+  border-top: 1px solid #efede7;
+  color: #a09f98;
+  font-size: 11px;
+}
+
+.detail-empty {
+  display: flex;
+  min-height: 480px;
+  flex-direction: column;
   align-items: center;
-  margin-top: 12px;
-  flex-wrap: wrap;
-  gap: 8px;
+  justify-content: center;
+  text-align: center;
 }
 
-.total-info {
-  font-size: 13px;
-  color: var(--text-secondary, #909399);
+.empty-mark {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid #e9dfd1;
+  border-radius: 50%;
+  color: #a9834e;
+  background: #faf6ee;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 19px;
 }
 
-.time-cell {
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-regular, #606266);
+.detail-empty h2 {
+  margin-top: 13px;
+  color: #454946;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 18px;
 }
 
-.time-empty {
-  color: var(--text-placeholder, #c0c4cc);
+.detail-empty p {
+  margin: 5px 0 15px;
+  color: #93948e;
+  font-size: 12px;
 }
 
-/* ============================================================
- * 标签页 2：报名列表
- * ============================================================ */
-.registration-section {
-  .section-toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
+@media (max-width: 760px) {
+  .detail-container {
+    width: min(100% - 28px, 620px);
+  }
+
+  .detail-hero {
+    padding: 17px 21px;
+  }
+
+  .detail-body {
+    padding: 23px 21px 17px;
+  }
+
+  .facts-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fact-card:nth-child(2) {
+    border-right: 0;
+  }
+
+  .fact-card:nth-child(n + 3) {
+    border-top: 1px solid var(--workspace-line);
+  }
+
+  .hero-seal {
+    width: 49px;
+    height: 49px;
+    flex-basis: 49px;
+    font-size: 21px;
+  }
+
+  .hero-content {
+    align-items: stretch;
+    flex-direction: column;
+    margin-top: 13px;
+  }
+
+  .hero-cover {
+    width: min(100%, 420px);
+    max-width: 100%;
+    flex-basis: auto;
   }
 }
 
-/* ---- 响应式 ---- */
-@media (max-width: 768px) {
-  .header-main {
+@media (max-width: 520px) {
+  .hero-content h1 {
+    font-size: 23px;
+  }
+
+  .hero-seal {
+    display: none;
+  }
+
+  .detail-actions-panel {
+    align-items: flex-start;
     flex-direction: column;
   }
 
-  .header-actions {
+  .detail-action-buttons {
     width: 100%;
-    flex-wrap: wrap;
   }
 
-  .activity-title {
-    font-size: 18px;
+  .schedule-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .detail-footer {
+    flex-direction: column;
   }
 }
 </style>

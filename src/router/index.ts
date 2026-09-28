@@ -112,25 +112,25 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/activity",
     name: "Activities",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    component: () => import("@/views/activity/ActivityList.vue"),
     meta: { title: "活动管理 - 党建云平台", permission: "activity:view" },
   },
   {
     path: "/activity/create",
     name: "ActivityCreate",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
-    meta: { title: "新建活动 - 党建云平台", permission: "activity:manage" },
+    component: () => import("@/views/activity/ActivityForm.vue"),
+    meta: { title: "发布活动 - 党建云平台", permission: "activity:manage", roles: ["super_admin"] },
   },
   {
     path: "/activity/edit/:id",
     name: "ActivityEdit",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
-    meta: { title: "编辑活动 - 党建云平台", permission: "activity:manage" },
+    component: () => import("@/views/activity/ActivityForm.vue"),
+    meta: { title: "编辑活动 - 党建云平台", permission: "activity:manage", roles: ["super_admin"] },
   },
   {
     path: "/activity/:id",
     name: "ActivityDetail",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    component: () => import("@/views/activity/ActivityDetail.vue"),
     meta: { title: "活动详情 - 党建云平台", permission: "activity:view" },
   },
   {
