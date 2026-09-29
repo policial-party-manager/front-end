@@ -148,8 +148,16 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/system",
     name: "System",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
-    meta: { title: "系统管理 - 党建云平台", permission: "home:view", roles: ["super_admin"] },
+    redirect: "/system/roles",
+    meta: { title: "系统管理 - 党建云平台", permission: "system:manage", roles: ["super_admin"] },
+    children: [
+      {
+        path: "roles",
+        name: "SystemRoles",
+        component: () => import("@/views/system/roles.vue"),
+        meta: { title: "角色管理 - 党建云平台" },
+      },
+    ],
   },
   {
     path: "/profile",
