@@ -157,6 +157,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import("@/views/system/roles.vue"),
         meta: { title: "角色管理 - 党建云平台" },
       },
+      {
+        path: "logs",
+        name: "SystemLogs",
+        component: () => import("@/views/system/logs.vue"),
+        meta: { title: "操作日志 - 党建云平台" },
+      },
     ],
   },
   {
