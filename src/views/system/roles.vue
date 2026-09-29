@@ -182,8 +182,11 @@ async function removeRole(row: RoleVo) {
 <template>
   <div class="roles-page page-container">
     <div class="page-header">
-      <h2 class="section-title">角色管理</h2>
-      <p>维护系统角色及其权限点映射。</p>
+      <div>
+        <h2 class="section-title">角色管理</h2>
+        <p>维护系统角色及其权限点映射。</p>
+      </div>
+      <router-link class="logs-link" to="/system/logs">操作日志 →</router-link>
     </div>
     <el-alert v-if="!sessionHasAccessToken" title="角色管理需要登录" type="warning" show-icon :closable="false">
       <template #default>
@@ -307,11 +310,21 @@ async function removeRole(row: RoleVo) {
   padding-inline: 16px;
 }
 .page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 24px;
   p {
     color: var(--text-secondary);
     margin-top: 4px;
   }
+}
+.logs-link {
+  flex: none;
+  color: var(--party-red);
+  font-size: 13px;
+  white-space: nowrap;
 }
 .card-header {
   display: flex;
@@ -389,6 +402,9 @@ async function removeRole(row: RoleVo) {
 @media (max-width: 768px) {
   .roles-page.page-container {
     width: 100%;
+  }
+  .page-header {
+    flex-direction: column;
   }
   .filters .el-input {
     width: 100%;
