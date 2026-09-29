@@ -11,7 +11,8 @@ export type Permission =
   | "activity:view"
   | "activity:manage"
   | "statistics:view"
-  | "resource:view";
+  | "resource:view"
+  | "system:manage";
 
 const commonPermissions = ["home:view", "content:view", "activity:view", "resource:view"] as const;
 const managerPermissions = [
@@ -21,7 +22,7 @@ const managerPermissions = [
   "activity:manage",
   "statistics:view",
 ] as const;
-const superAdminPermissions = [...managerPermissions, "content:manage"] as const;
+const superAdminPermissions = [...managerPermissions, "content:manage", "system:manage"] as const;
 
 /**
  * 前端页面权限矩阵。

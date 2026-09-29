@@ -35,6 +35,11 @@ for (const role of ["party_secretary", ...memberRoles]) {
   assert.equal(hasPermission(role, "content:manage"), false, `${role} 不应具备资讯公告管理权限`);
 }
 
+assert.equal(hasPermission("super_admin", "system:manage"), true, "超级管理员应具备系统管理权限");
+for (const role of ["party_secretary", ...memberRoles]) {
+  assert.equal(hasPermission(role, "system:manage"), false, `${role} 不应具备系统管理权限`);
+}
+
 assert.equal(isRole("unknown"), false, "未知角色不应通过校验");
 assert.equal(roleFromBackend("super_admin"), "super_admin");
 assert.equal(roleFromBackend("branch_admin"), "party_secretary");
