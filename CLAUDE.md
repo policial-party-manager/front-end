@@ -1,77 +1,9 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本仓库的共用工程指引以 [AGENTS.md](AGENTS.md) 为准。开始任务前阅读该文件，并遵守其中的架构、权限和验证约定。
 
-## Project Overview
+- 盘点功能或接入接口时，阅读 [前后端接入现状](docs/前后端接入现状.md)，再核对当前路由与后端实现。
+- 读写 GitHub 任务前，阅读 [任务跟踪约定](docs/agents/issue-tracker.md)；分类前阅读 [triage 标签约定](docs/agents/triage-labels.md)。
+- 探索领域前按 [领域文档约定](docs/agents/domain.md) 读取词汇和相关 ADR。
 
-党建云平台（"党员发展全过程管理系统"）— a university party-building SPA for managing party-member development lifecycle: member development stages, activities, news/notices, statistics, and downloadable resources. Built with Vue 3 + TypeScript + Element Plus + Vite. All UI text and code comments are in Chinese — keep that style when adding code.
-
-## Commands
-
-npm is the package manager (CI uses `npm ci`). Scripts from `package.json`:
-
-| Command | What it does |
-|---|---|
-| `npm run dev` | Start Vite dev server (default http://localhost:5173) |
-| `npm run build` | Production build to `dist/` |
-| `npm run preview` | Preview the production build |
-| `npm run typecheck` | `vue-tsc --noEmit` TypeScript check |
-| `npm run lint` | `eslint src --ext .vue,.ts,.js --fix` (auto-fixes; `no-console` is an error in production) |
-| `npm run format` / `format:check` | Prettier write / check (`printWidth: 120`, double quotes, semicolons) |
-
-No test framework is configured. CI (`.github/workflows/ci.yml`) runs `format:check` → eslint → `typecheck` → `build` on push/PR to `main`.
-
-## Architecture
-
-### Global layout
-`App.vue` renders a fixed shell around every page: sticky `TopNav` + `<router-view>` + `FooterBar` + floating `SmartAssistant`. A new page is just a new view component plus a route entry — the shell is already in place.
-
-### Navigation (requires touching 2 files)
-Nav items live in the Pinia store (`navItems` in `src/stores/app.ts`); the highlight state `activeNav` is synced in `router.beforeEach` (`src/router/index.ts`) via a `pathKeyMap`. To add a top-level nav entry you must update **both** the store's `navItems` and the guard's `pathKeyMap`.
-
-### State & mock data
-`src/stores/app.ts` is the only Pinia store. It holds the current role, nav items, and the shared mock data (news, notices, banners, quick entries, user info). Role switching (TopNav dropdown) drives data scoping — e.g. `statData` is a computed that returns different numbers per role.
-
-**All data is mock**, either inline in a component or in the store. Every API integration point is marked with a `TODO: 替换为真实 API 调用` comment — replacing these with real calls is the main backend-integration path.
-
-### Role permissions
-Four roles: `super_admin`, `party_secretary`, `party_member`, `activist` (type `Role` in the store). Views check permissions with computed values derived from `store.currentRole` (see `src/views/resources/index.vue` for the full pattern: `canManage`, `isSuperAdmin`, and branch-scoped uploader checks).
-
-### Component registration
-Element Plus and **all its icons are registered globally** in `src/main.ts`, so `<el-*>` components and icon components (e.g. `<Search />`, `<ArrowDown />`) work in templates with no import. Exceptions: `ElMessage` / `ElMessageBox` are still imported explicitly from `element-plus` when used in script. Vue itself is never auto-imported — import from `vue` normally.
-
-### Styling
-- SCSS. Theme color is 党建红 `#C12C1F`.
-- CSS custom properties (e.g. `--party-red`, `--shadow-card`, `--radius-base`) are defined once in `src/styles/global.scss` — prefer `var(--…)` over hardcoded values.
-- `vite.config.ts` injects SCSS variables `$party-red`, `$party-red-dark`, `$party-red-light` into **every** SFC via `css.preprocessorOptions.scss.additionalData` — usable directly in `<style lang="scss">`.
-- Reusable layout classes: `.page-container` (max-width 1400px), `.section-title`, `.content-card`, `.more-link`.
-- Responsive breakpoints: 1200px / 992px / 768px / 576px.
-
-### Assets & paths
-- Path alias `@` → `src` (configured in both `vite.config.ts` and `tsconfig.json`).
-- Images are referenced via `new URL("@/assets/…", import.meta.url).href`, never string paths.
-
-### Shared components worth knowing
-- `src/views/ContentDetail.vue` intentionally serves **both** `/news/:id` and `/notice/:id` detail pages (type inferred from `route.path`); keep it shared unless the two genuinely diverge — see the design rationale comment at the top of the file.
-- `src/views/activity/ActivityForm.vue` is shared by create (`/activity/create`) and edit (`/activity/edit/:id`) routes.
-- `src/views/development/MemberDetail.vue` is the largest feature view (tabbed: 培养记录 / 思想汇报 / 活动参与 / 身份历史).
-
-## Notes
-
-- `README.md` is stale — it still lists several pages as placeholders that are actually implemented (statistics, downloads/resources, news/notice, activity). Prefer reading the code and `src/router/index.ts` over the README for the current page inventory.
-- `unplugin-auto-import` / `unplugin-vue-components` are present in `devDependencies` but **not** wired into `vite.config.ts` — do not rely on them.
-- ESLint ignores `*.d.ts`, `vite.config.*`, and `src/assets/**`; `vue/multi-word-component-names` is off (single-word names like `index.vue` / `TopNav` are fine).
-
-## Agent skills
-
-### Issue tracker
-
-使用 GitHub Issues 跟踪任务；读写任务前先阅读 `docs/agents/issue-tracker.md`。
-
-### Triage labels
-
-使用五个默认 triage 标签；分类前先阅读 `docs/agents/triage-labels.md`。
-
-### Domain docs
-
-采用 single-context（单上下文）布局；探索代码前按 `docs/agents/domain.md` 读取领域词汇和相关 ADR。
+共用规则只在 AGENTS.md 维护，避免两份指引出现“全部 Mock”与真实 API 接入状态相矛盾的描述。

@@ -1,263 +1,107 @@
-# 党建云平台——党员发展全过程管理系统
+# 党建云平台前端
 
-面向高校基层党组织的党员发展全过程管理前端。项目覆盖成员管理、党员培养、党建活动、新闻公告、数据统计和资料下载等场景，采用 Vue 3、TypeScript、Element Plus 与 Vite 构建。
+党员发展全过程管理系统的 Vue 3 + TypeScript + Element Plus + Vite 单页应用。
 
-> 当前项目处于前后端联调阶段：认证、成员与支部管理、活动管理和超级管理员资讯管理等已接入服务端接口；首页、新闻/公告浏览、党员发展、数据统计和下载专区等仍有 Mock。活动报名、签到和归档统计等能力尚无完整服务端契约，页面暂不开放模拟操作。
+目前处于前后端联调阶段。认证、超级管理员成员与支部维护、资讯公告读写、活动基础管理、角色管理、日志查询及本人资料查询已接入接口；党员发展、我的培养、支部成员工作台、统计和资源中心的当前路由仍为占位页。后端已有更多业务接口，尚未等同于前端功能可用。
 
-## 功能概览
+详细模块状态、后端新增契约、Issue 缺口与联调限制见[前后端接入现状](docs/前后端接入现状.md)。该文档按代码核对，不代表部署或生产验收。
 
-- 登录认证：邮箱验证码登录、账号密码登录、JWT 持久化、Token 自动刷新和退出登录。
-- 首页看板：角色相关统计卡片、党建轮播图、新闻公告和快捷入口。
-- 成员管理：服务端筛选、分页、新增、编辑、状态调整、Excel 模板下载与批量导入；CSV 导出由前端生成。
-- 党员发展：培养成员筛选、成员培养详情、培养记录、思想汇报、活动参与、身份历史、单人及批量身份调整。
-- 新闻公告：新闻/公告列表、关键词与日期筛选、共享详情页、富文本正文和附件列表。
-- 活动管理：服务端活动筛选与分页、详情、活动类型选择；超级管理员可新建、编辑、发布、调整状态和删除活动。
-- 数据统计：周期切换、培养阶段分布、支部人数对比、关键指标、发展趋势和多维明细表。
-- 下载专区：分类检索、资源卡片、详情预览，以及按角色控制的上传、编辑和删除入口。
-- 全局外壳：固定顶部导航、页脚和智能助手悬浮入口；登录页使用独立全屏布局。
+## 开发与检查
 
-## 技术栈
-
-| 类别      | 技术                                                 |
-| --------- | ---------------------------------------------------- |
-| 前端框架  | Vue 3.5、Composition API、`<script setup lang="ts">` |
-| 开发语言  | TypeScript 6                                         |
-| 构建工具  | Vite 8                                               |
-| UI 与图标 | Element Plus、`@element-plus/icons-vue`              |
-| 状态管理  | Pinia 3                                              |
-| 路由      | Vue Router 4                                         |
-| HTTP      | Axios                                                |
-| 图表      | ECharts 6                                            |
-| 二维码    | qrcode                                               |
-| 样式      | SCSS、CSS 自定义属性                                 |
-| 代码质量  | ESLint 10、Prettier 3、vue-tsc                       |
-
-实际安装版本以 `package-lock.json` 为准。
-
-## 环境要求
-
-- Node.js 20（与 GitHub Actions CI 保持一致）
-- npm（项目提交了 `package-lock.json`）
-- 可访问的后端认证服务；未登录访问业务路由会被重定向到 `/login`
-
-## 快速开始
+使用 npm 和提交的 `package-lock.json`。CI 使用 Node.js 20；本地还应满足锁定 Vite 版本的 Node.js 引擎要求。
 
 ```bash
 npm ci
 npm run dev
 ```
 
-默认访问地址：`http://localhost:5173`。
+开发地址默认是 `http://localhost:5173`。API 前缀由 `VITE_API_BASE_URL` 配置，请求模块中的路径不重复包含 `/api`。开发代理见 `vite.config.ts` 的 `server.proxy`；按实际联调环境配置目标地址，勿将凭据提交到仓库。
 
-开发和生产环境的 API 前缀均由环境变量设置：
+| 命令                                | 用途                       |
+| ----------------------------------- | -------------------------- |
+| `npm run dev`                       | 启动开发服务器             |
+| `npm run build`                     | 生产构建至 `dist/`         |
+| `npm run preview`                   | 预览生产构建               |
+| `npm run typecheck`                 | Vue 与 TypeScript 类型检查 |
+| `npm run check:permissions`         | 权限矩阵及开发预览策略检查 |
+| `npx eslint src --ext .vue,.ts,.js` | 只读 ESLint 检查           |
+| `npm run lint`                      | ESLint 检查并自动修复      |
+| `npm run format:check`              | 检查 `src` 格式            |
+| `npm run format`                    | 格式化 `src`               |
 
-```env
-VITE_API_BASE_URL=/api
-```
+项目没有配置通用单元测试或端到端测试框架；`check:permissions` 是独立的断言脚本，不能替代业务联调。
 
-开发服务器会将 `/api` 代理到 `vite.config.ts` 中配置的后端地址。首次运行前请将其中的 `server.proxy["/api"].target` 修改为实际后端地址。
+## 当前路由
 
-## 常用命令
+正常模式下，除 `/login` 外均需登录。以下表示当前路由实际挂载的页面，不能用仓库中保留的旧原型推断功能已开放。
 
-| 命令                   | 说明                                     |
-| ---------------------- | ---------------------------------------- |
-| `npm run dev`          | 启动 Vite 开发服务器                     |
-| `npm run build`        | 构建生产版本到 `dist/`                   |
-| `npm run preview`      | 本地预览生产构建                         |
-| `npm run typecheck`    | 执行 `vue-tsc --noEmit`                  |
-| `npm run lint`         | 检查并自动修复 `src` 下的 Vue/TS/JS 文件 |
-| `npm run format`       | 使用 Prettier 格式化 `src`               |
-| `npm run format:check` | 检查 `src` 的格式，不写入文件            |
+| 路径                                                            | 当前页面与边界                                                        |
+| --------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `/login`                                                        | 邮箱验证码、账号密码登录；扫码为占位 UI                               |
+| `/`                                                             | 首页；资讯预览读取接口，数字与待办仍为示例                            |
+| `/members`                                                      | 超管成员列表、详情、新增、编辑、启停、Excel 模板与导入、导入错误报告  |
+| `/branches`                                                     | 超管支部查询、详情、新增、编辑、软删除；未接模板与导入                |
+| `/members/branch`                                               | 支委成员工作台占位页                                                  |
+| `/development`、`/development/member/:id`、`/development/batch` | 管理侧党员发展占位页                                                  |
+| `/my-development`                                               | 普通成员的培养占位页                                                  |
+| `/content`、`/news`、`/notice`                                  | 真实资讯聚合、关键词搜索及分页列表                                    |
+| `/news/:id`、`/notice/:id`                                      | 共享 `content/ContentArticle.vue`，正文转纯文本展示；公告支持文件链接 |
+| `/content/manage`                                               | 超管新闻公告新增、编辑、发布状态管理和删除                            |
+| `/activity`、`/activity/:id`                                    | 活动查询与详情；普通查询只读已发布活动                                |
+| `/activity/create`、`/activity/edit/:id`                        | 超管活动表单；报名、签到与二维码尚未接入                              |
+| `/statistics`、`/resources`                                     | 统计、资源中心占位页                                                  |
+| `/system`                                                       | 重定向到 `/system/roles`                                              |
+| `/system/roles`                                                 | 超管角色 CRUD、权限字典与权限分配                                     |
+| `/system/logs`                                                  | 超管日志分页、筛选与详情；无日志统计或清理入口                        |
+| `/profile`                                                      | 本人基础资料只读查询；个人业务记录尚未接入                            |
 
-项目当前没有配置单元测试或端到端测试框架。
+## 角色、会话与权限
 
-## 项目结构
+角色定义和页面权限矩阵位于 `src/config/permissions.ts`，路由守卫位于 `src/router/index.ts`。服务端仍负责最终鉴权及数据范围。
 
-```text
-.
-├── .github/workflows/ci.yml       # GitHub Actions：CI 检查与 PR 自动合并
-├── docs/
-│   └── 前端开发计划与策略.md      # 前端功能规划、角色权限与协作策略
-├── public/                        # 公共 SVG 资源
-├── src/
-│   ├── api/                       # 认证、成员、支部、资讯公告和活动等 API 模块
-│   │   ├── activities.ts          # 活动与活动类型查询、超级管理员管理接口
-│   │   └── request.ts             # Axios 实例、统一响应与 401 刷新重试
-│   ├── assets/images/             # 登录背景、轮播图、党徽素材
-│   ├── components/
-│   │   ├── activity/              # 活动统计图表
-│   │   ├── development/           # 身份历史时间线
-│   │   ├── AdjustIdentityDialog.vue
-│   │   ├── CarouselBanner.vue
-│   │   ├── FooterBar.vue
-│   │   ├── NewsSection.vue
-│   │   ├── QuickEntries.vue
-│   │   ├── SmartAssistant.vue
-│   │   ├── StatCards.vue
-│   │   └── TopNav.vue
-│   ├── router/index.ts            # 路由表、登录守卫、页面标题与导航高亮
-│   ├── stores/app.ts              # 唯一 Pinia Store：会话、角色和首页数据
-│   ├── styles/global.scss         # 全局变量、重置样式和复用布局类
-│   ├── utils/
-│   │   ├── apiError.ts            # API 错误消息提取
-│   │   └── token.ts               # access/refresh token 本地存储
-│   ├── views/
-│   │   ├── activity/              # 活动列表、表单、详情与状态展示规则
-│   │   ├── development/           # 成员培养详情、批量身份调整
-│   │   ├── news/                  # 新闻列表
-│   │   ├── notice/                # 公告列表
-│   │   ├── resources/             # 下载专区
-│   │   ├── ContentDetail.vue      # 新闻/公告共享详情页
-│   │   ├── Login.vue
-│   │   ├── development.vue        # 党员发展列表
-│   │   ├── index.vue              # 首页
-│   │   ├── members.vue            # 成员管理
-│   │   └── statistics.vue         # 数据统计
-│   ├── App.vue                    # 全局页面外壳
-│   └── main.ts                    # 应用入口和全局组件注册
-├── .env.development
-├── .env.production
-├── eslint.config.ts
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
-```
+| 后端登录角色   | 前端角色          | 含义                                             |
+| -------------- | ----------------- | ------------------------------------------------ |
+| `super_admin`  | `super_admin`     | 超级管理员                                       |
+| `branch_admin` | `party_secretary` | 支部管理员；界面目前标为“党支部书记”             |
+| `student`      | `party_member`    | 普通成员；界面目前标为“普通党员”，不代表政治身份 |
+| 未知编码       | `party_member`    | 回退为最低权限角色                               |
 
-`src/views/activities.vue` 和 `src/views/downloads.vue` 是早期遗留的占位页，当前路由分别使用 `activity/ActivityList.vue` 和 `resources/index.vue`。
+`activist` 仅保留用于开发预览和旧 Mock 兼容。政治身份与系统角色分别建模，不能从前端角色名称推断成员的真实发展阶段。
 
-## 路由表
+只有开发环境启用 `VITE_SKIP_LOGIN=true` 且当前无 access token 时，才允许免登录预览和角色切换。预览不会获得服务端授权，真实请求仍可能返回 401；生产环境不启用该开关。
 
-除 `/login` 外，所有路由都需要本地存在 access token。
+## 请求与数据
 
-| 路径                      | 页面          | 主要能力                                         |
-| ------------------------- | ------------- | ------------------------------------------------ |
-| `/login`                  | 登录          | 邮箱验证码、账号密码、扫码 UI                    |
-| `/`                       | 首页          | 统计、轮播、新闻公告、快捷入口                   |
-| `/members`                | 成员管理      | 筛选、分页、增删改、CSV 导出                     |
-| `/development`            | 党员发展      | 培养成员列表、角色数据范围、批量调整入口         |
-| `/development/member/:id` | 成员培养详情  | 培养记录、思想汇报、活动参与、身份历史           |
-| `/development/batch`      | 批量身份调整  | 成员筛选、目标身份、原因和二次确认               |
-| `/news`                   | 党建新闻      | 列表、关键词/日期筛选、分页                      |
-| `/news/:id`               | 新闻详情      | 富文本正文、封面、附件                           |
-| `/notice`                 | 通知公告      | 列表、关键词/日期筛选、分页                      |
-| `/notice/:id`             | 公告详情      | 富文本正文、附件                                 |
-| `/activity`               | 活动查询/管理 | 服务端筛选、分页；超级管理员可管理活动           |
-| `/activity/create`        | 发布活动      | 超级管理员创建草稿或发布活动                     |
-| `/activity/edit/:id`      | 编辑活动      | 与发布页共用表单，保存后重新读取服务端数据       |
-| `/activity/:id`           | 活动详情      | 活动信息和封面；超级管理员可调整状态、删除或编辑 |
-| `/statistics`             | 数据统计      | ECharts 图表、指标卡、多维表格                   |
-| `/resources`              | 下载专区      | 分类检索、预览、下载和管理操作                   |
+`src/api/request.ts` 使用 Axios，普通 JSON 业务响应按 `{ code, message, data }` 解包；文件下载使用 Blob。自动携带 Bearer token，普通业务请求遇到 401 时尝试刷新并重放一次，失败则清理会话并跳转登录页。
 
-## 登录与接口约定
+- `auth.ts`：账号密码、邮箱验证码、刷新与退出；手机号虽有封装，页面没有入口，后端短信真实发送仍缺。后端 CAS 端点已有，前端尚未接入。
+- `members.ts`、`branches.ts`：当前仅接超管接口；成员导入错误可下载 CSV，尚无成员数据导出入口。
+- `content.ts`、`admin-content.ts`：已发布资讯查询与超管内容管理。正文通过纯文本插值展示，未直接渲染接口 HTML。
+- `activities.ts`：已发布活动查询、活动类型及超管 CRUD/状态管理。
+- `roles.ts`、`logs.ts`：角色维护与日志分页查询；任意新建后端角色不会自动变成前端业务菜单。
+- `profile.ts`：当前用户本人资料查询。
 
-认证接口位于 `src/api/auth.ts`，请求层位于 `src/api/request.ts`：
+首页资讯使用真实接口，Store 中仍保留旧新闻、通知等 Mock。统计、轮播、快捷入口和旧原型数据不能作为真实业务结果。
 
-- `POST /v1/auth/login/userpass`：用户名密码登录
-- `POST /v1/auth/login/email`：邮箱验证码登录
-- `POST /v1/auth/login/phone`：手机号验证码登录（已封装，登录页暂未提供入口）
-- `POST /v1/auth/verifyCode`：发送验证码
-- `POST /v1/auth/refresh`：刷新 access token
-- `POST /v1/auth/logout`：退出登录
+## 架构与文件入口
 
-请求层约定后端返回：
+- `src/App.vue`：顶部用户栏、左侧 `SideNav`、业务页面、页脚和悬浮助手；登录页独立布局。移动端侧栏在 680px 断点切换为抽屉。
+- `src/stores/app.ts`：导航、当前角色、布局状态和部分 Mock；会话状态由 `src/utils/session.ts` 管理。
+- `src/router/index.ts`：页面清单、登录与角色门禁、导航高亮。新增导航时同步 Store 的菜单和守卫的 `pathKeyMap`。
+- `src/views/content/`：当前资讯阅读及管理页面；旧新闻、公告列表和 `ContentDetail.vue` 已不由当前资讯路由使用。
+- `src/views/WorkspacePlaceholder.vue`：未接入模块的实际入口；保留的党员发展、资源和统计原型不是当前业务入口。
+- `src/main.ts`：全局注册 Element Plus 及图标。Vue API 仍需显式导入，`ElMessage`、`ElMessageBox` 等命令式 API 也需显式导入。
+- `src/styles/global.scss`：主题与公共布局；优先使用 CSS 变量。Vite 注入 SCSS 主题变量，`@` 映射到 `src`。
 
-```ts
-interface ApiResponse<T> {
-  code: number; // 200 表示成功
-  message: string;
-  data: T;
-}
-```
+## CI 与交付
 
-成功响应会直接解包为 `data`。请求自动携带 `Authorization: Bearer <accessToken>`；普通业务请求收到 401 后会尝试刷新 Token 并重放一次，刷新失败则清理会话并跳转登录页。
+`.github/workflows/ci.yml` 对 `main`、`feature/**`、`fix/**` 的 push，以及面向 `main` 的 PR 执行格式、ESLint、类型检查和构建。`check:permissions` 当前未列入该工作流，涉及权限时需本地另跑。
 
-后端角色会映射为前端角色：
+工作流对同仓库非草稿 PR 配置了检查通过后请求 Auto-merge；实际合并还受仓库设置和分支保护约束。创建 PR 前需留意这一自动行为。`main` push 构建上传 Pages 产物，工作流本身没有部署步骤。
 
-| 后端角色       | 前端角色                        |
-| -------------- | ------------------------------- |
-| `super_admin`  | `super_admin`（超级管理员）     |
-| `branch_admin` | `party_secretary`（党支部书记） |
-| `student`      | `party_member`（普通党员）      |
-| 其他值         | 回退为 `party_member`           |
+## 文档索引
 
-前端另保留 `activist`（积极分子）角色，用于演示受限视图。
-
-活动页面按服务端已提供的权限边界工作：超级管理员使用 `/api/v4/admin/activities/**` 管理活动；其他角色只能使用 `/api/v2/content/activities/**` 查询已发布活动。支部管理员的管理操作保持不可用，直到后端提供对应角色和数据范围接口。
-
-## 角色与权限
-
-当前权限主要在页面组件中通过 `store.currentRole` 进行前端演示控制，不能替代后端鉴权。
-
-| 角色       | 当前前端行为                                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------------------------------- |
-| 超级管理员 | 可使用已接入的成员、支部和资讯管理接口；活动可新建、编辑、删除并调整状态；其他未接入模块仍使用 Mock           |
-| 党支部书记 | 活动仅查询服务端已发布活动；活动管理入口不可用，等待后端提供角色与数据范围接口；其他未接入模块仍可能使用 Mock |
-| 普通党员   | 活动仅查询服务端已发布活动；无活动管理、成员编辑和身份调整权限                                                |
-| 积极分子   | 活动仅查询服务端已发布活动；其他视图与普通党员类似                                                            |
-
-顶部用户菜单提供角色切换，便于在 Mock 阶段检查不同视图。统计页的支部级数据过滤目前仅保留了实现说明，尚未启用。
-
-## 数据与功能完成度
-
-| 模块     | 当前数据来源                                                                 | 尚未接入或仅模拟的部分                                                                        |
-| -------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| 认证     | 真实后端 API                                                                 | 扫码登录仅生成占位二维码；手机号登录未出现在页面                                              |
-| 首页     | Pinia Mock                                                                   | 快捷入口和智能助手暂无实际业务跳转/对话能力                                                   |
-| 成员管理 | 服务端 API（`/api/v4/admin/users/**`）                                       | CSV 导出由前端生成；其他字段和流程以当前成员接口契约为准                                      |
-| 支部管理 | 服务端 API（`/api/v4/admin/branches/**`）                                    | 支部模板下载与 Excel 导入尚未接入                                                             |
-| 党员发展 | 组件内 Mock                                                                  | 材料上传、身份调整和批量调整未调用后端                                                        |
-| 新闻公告 | 公开列表/详情仍为 Mock；超级管理员管理接口已接入                             | 公开内容查询与附件下载尚未接入                                                                |
-| 活动管理 | 服务端 API（`/api/v2/content/activities/**`、`/api/v4/admin/activities/**`） | 报名与参与范围管理、签到二维码和名单、签到统计与导出、归档/复制、同步个人培养档案等待后端契约 |
-| 数据统计 | 可复现随机 Mock                                                              | Excel 导出与角色数据隔离未接入                                                                |
-| 下载专区 | 组件内 Mock                                                                  | 上传、编辑、删除、下载和图片预览均为演示逻辑                                                  |
-
-活动状态值 1 明确表示“已发布”；状态 0“未发布”和状态 2“已下线”沿用原型约定。报名、签到、实时名单和签到导出没有完整服务端契约，不能以 Mock 交互冒充真实能力。其他业务接口接入点仍以 `TODO: 替换为真实 API 调用` 或同类注释标记。
-
-## 关键架构约定
-
-### 全局布局
-
-`App.vue` 在业务页外统一渲染 `TopNav`、`router-view`、`FooterBar` 和 `SmartAssistant`。`/login` 使用独立布局，不显示全局外壳。
-
-### 导航同步
-
-新增顶级导航时需要同时修改：
-
-1. `src/stores/app.ts` 中的 `navItems`。
-2. `src/router/index.ts` 导航守卫中的 `pathKeyMap`。
-
-### 组件注册
-
-Element Plus 及其全部图标在 `src/main.ts` 全局注册。`ElMessage`、`ElMessageBox` 等命令式 API 仍需在使用文件中显式导入。Vue API 不支持自动导入。
-
-### 样式与资源
-
-- 主题色为党建红 `#C12C1F`。
-- 全局 CSS 变量和复用类定义在 `src/styles/global.scss`。
-- Vite 为每个 SCSS SFC 注入 `$party-red`、`$party-red-dark`、`$party-red-light`。
-- 通用布局类包括 `.page-container`、`.section-title`、`.content-card` 和 `.more-link`。
-- `@` 指向 `src`；脚本中的图片通常通过 `new URL("@/assets/...", import.meta.url).href` 引用。
-- 主要响应式断点为 1200px、992px、768px 和 576px。
-
-## 持续集成与自动合并
-
-GitHub Actions 在推送到 `main`、`feature/**`、`fix/**`，以及面向 `main` 的 Pull Request 时运行 CI：
-
-1. `npm ci`
-2. `npm run format:check`
-3. `npx eslint src --ext .vue,.ts,.js`
-4. `npm run typecheck`
-5. `npm run build`
-
-面向 `main` 的非草稿 PR 在上述检查全部通过后，会自动开启 GitHub Auto-merge，并使用 squash 合并；合并后删除 PR 分支。自动化只处理本仓库内的分支 PR，来自 fork 的 PR 仍需手动处理。Auto-merge 会继续遵守 `main` 的分支保护规则，例如必需检查和审查要求。
-
-启用此流程前，请在 GitHub 仓库设置中完成以下配置：
-
-- 在 **Settings → General → Pull Requests** 中开启 **Allow auto-merge** 和 **Allow squash merging**。
-- 为 `main` 创建分支保护规则，要求 PR 通过以下状态检查：
-  - `代码检查（Lint）`
-  - `TypeScript 类型检查`
-  - `生产构建`
-- 可按团队协作要求设置 PR 审批人数，并决定是否要求分支先更新到最新的 `main`。
-
-`main` 分支推送构建成功后会上传 `dist/` 为 Pages 构建产物；工作流当前未包含实际部署步骤。
+- [前后端接入现状](docs/前后端接入现状.md)：当前事实、接口入口、未完成项与联调注意事项。
+- [前端开发计划与策略](docs/前端开发计划与策略.md)：目标能力和阶段安排；未完成项不能视为当前功能。
+- [前端板块与角色权限规划](docs/前端板块与角色权限规划.md)：目标信息架构与当前导航、权限边界。
+- [Agent 任务跟踪约定](docs/agents/issue-tracker.md)：Issue 和发布操作约定。
