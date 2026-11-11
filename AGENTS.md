@@ -16,6 +16,7 @@ npm is the package manager (CI uses `npm ci`). Scripts from `package.json`:
 | `npm run build`                   | Production build to `dist/`                                                                |
 | `npm run preview`                 | Preview the production build                                                               |
 | `npm run typecheck`               | `vue-tsc --noEmit` TypeScript check                                                        |
+| `npm run check:permissions`       | Check page permissions, session fences and development preview policy                      |
 | `npm run lint`                    | `eslint src --ext .vue,.ts,.js --fix` (auto-fixes; `no-console` is an error in production) |
 | `npm run format` / `format:check` | Prettier write / check (`printWidth: 120`, double quotes, semicolons)                      |
 
@@ -25,7 +26,7 @@ No test framework is configured. CI (`.github/workflows/ci.yml`) runs `format:ch
 
 ### Global layout
 
-`App.vue` renders a fixed shell around every page: sticky `TopNav` + `<router-view>` + `FooterBar` + floating `SmartAssistant`. A new page is just a new view component plus a route entry — the shell is already in place.
+`App.vue` renders the business shell: `TopNav` + left `SideNav` + `<router-view>` + `FooterBar` + floating `SmartAssistant`. `/login` uses an independent full-screen layout. Mobile sidebar behavior switches at 680px.
 
 ### Navigation (requires touching 2 files)
 
@@ -33,13 +34,15 @@ Nav items live in the Pinia store (`navItems` in `src/stores/app.ts`); the highl
 
 ### State & mock data
 
-`src/stores/app.ts` is the only Pinia store. It holds the current role, nav items, and the shared mock data (news, notices, banners, quick entries, user info). Role switching (TopNav dropdown) drives data scoping — e.g. `statData` is a computed that returns different numbers per role.
+`src/stores/app.ts` is the only Pinia store; session state lives in `src/utils/session.ts`. The store exposes role/nav/layout state and retains Mock data. Homepage news/notices now come from `src/api/content.ts`; statistics and to-dos remain examples.
 
-共享状态中的新闻、通知、轮播图、快捷入口和用户信息等数据仍为 Mock。活动模块已通过 `src/api/activities.ts` 接入服务端活动与类型接口；其他尚未接入的模块仍可能使用 Mock，并以 `TODO: 替换为真实 API 调用` 标记待接入位置。
+接口接入和模块盘点前阅读 `docs/前后端接入现状.md`。以 `src/router/index.ts` 判断实际页面：党员发展、我的培养、支委成员、统计和资源中心仍为占位路由；仓库中保留的旧 Mock 原型不代表已开放。后端已有报名、二维码签到、培养和统计接口，不能继续笼统写成“后端尚无接口”。
 
 ### Role permissions
 
-Four roles: `super_admin`, `party_secretary`, `party_member`, `activist` (type `Role` in the store). Views check permissions with computed values derived from `store.currentRole` (see `src/views/resources/index.vue` for the full pattern: `canManage`, `isSuperAdmin`, and branch-scoped uploader checks).
+角色和页面权限定义于 `src/config/permissions.ts`，守卫在 `src/router/index.ts`。正式登录角色映射为 `super_admin`、`party_secretary`、`party_member`；`activist` 仅兼容旧 Mock 与开发预览。政治身份独立于角色，`party_member` 不证明当前用户是党员。
+
+只有开发环境 `VITE_SKIP_LOGIN=true` 且无 access token 时允许免登录预览及切换角色。真实登录后沿用服务端角色。权限变更运行 `npm run check:permissions`；服务端负责最终鉴权及范围校验，不能仅靠前端菜单隐藏。
 
 ### Component registration
 
@@ -60,12 +63,18 @@ Element Plus and **all its icons are registered globally** in `src/main.ts`, so 
 
 ### Shared components worth knowing
 
-- `src/views/ContentDetail.vue` intentionally serves **both** `/news/:id` and `/notice/:id` detail pages (type inferred from `route.path`); keep it shared unless the two genuinely diverge — see the design rationale comment at the top of the file.
+- `src/views/content/ContentArticle.vue` serves both `/news/:id` and `/notice/:id`; `ContentList.vue` shares their list implementation. Old `ContentDetail.vue` is not mounted by current routes. Preserve safe plain-text rendering of server content.
 - `src/views/activity/ActivityForm.vue` is shared by create (`/activity/create`) and edit (`/activity/edit/:id`) routes.
-- `src/views/development/MemberDetail.vue` is the largest feature view (tabbed: 培养记录 / 思想汇报 / 活动参与 / 身份历史).
+- `src/views/development/MemberDetail.vue` is a retained Mock prototype; current development routes mount `WorkspacePlaceholder.vue`.
 
 ## Notes
 
-- `README.md` is stale — it still lists several pages as placeholders that are actually implemented (statistics, downloads/resources, news/notice, activity). Prefer reading the code and `src/router/index.ts` over the README for the current page inventory.
+- `README.md` summarizes mounted pages; `docs/前后端接入现状.md` separates frontend integration from backend capability. Verify owning code when behavior changes, and update these docs together.
 - `unplugin-auto-import` / `unplugin-vue-components` are present in `devDependencies` but **not** wired into `vite.config.ts` — do not rely on them.
 - ESLint ignores `*.d.ts`, `vite.config.*`, and `src/assets/**`; `vue/multi-word-component-names` is off (single-word names like `index.vue` / `TopNav` are fine).
+
+## Agent skills
+
+- 读写 GitHub 任务前阅读 `docs/agents/issue-tracker.md`，使用 gh 并遵守发布与关闭授权边界。
+- 任务分类前阅读 `docs/agents/triage-labels.md`。
+- 探索领域前按 `docs/agents/domain.md` 读取词汇表和相关 ADR。
