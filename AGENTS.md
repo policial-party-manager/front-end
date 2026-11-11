@@ -2,6 +2,12 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+## 仓库修改边界
+
+- 本规则适用于本前端仓库的所有任务：仅修改本仓库内与任务相关的前端代码、测试、配置及文档。
+- 后端仓库仅用于只读核对接口契约与实现；不得修改后端代码、SQL、配置或数据库，也不得以完成前端任务为由扩大修改范围。
+- 如果任务依赖后端变更，先说明所需变更、原因及受影响的前端工作；继续推进不依赖该变更的部分。只有用户另行明确授权后，才能开展后端修改。
+
 ## Project Overview
 
 党建云平台（"党员发展全过程管理系统"）— a university party-building SPA for managing party-member development lifecycle: member development stages, activities, news/notices, statistics, and downloadable resources. Built with Vue 3 + TypeScript + Element Plus + Vite. All UI text and code comments are in Chinese — keep that style when adding code.
