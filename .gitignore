@@ -12,6 +12,18 @@ dist
 dist-ssr
 *.local
 
+# 本地环境覆盖配置（保留共享的 .env.development / .env.production）
+.env.local
+.env.*.local
+
+# 构建缓存与测试产物
+*.tsbuildinfo
+/.cache/
+/.vite/
+/coverage/
+/playwright-report/
+/test-results/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -26,3 +38,13 @@ dist-ssr
 # Claude Code / tooling
 CLAUDE.md
 .playwright-mcp
+/.claude/
+
+# 本地设计预览、截图、演示与导入样例
+/outputs/
+
+# 本地文档备份
+*.local-backup.md
+
+# 本地前后端接口对接清单
+/docs/前后端待接入接口清单.md
