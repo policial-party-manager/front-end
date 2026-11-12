@@ -454,6 +454,17 @@ function isTimeoutError(error: unknown): boolean {
   const message = "message" in error ? String(error.message ?? "") : "";
   return code === "ECONNABORTED" || code === "ETIMEDOUT" || /timeout|超时/i.test(message);
 }
+/** 读取服务端返回的业务原因，用于区分「确定性拒绝」与「结果未知」。 */
+function readServerRejection(error: unknown): { status: number; message: string } | null {
+  if (typeof error !== "object" || error === null) return null;
+  const response = (error as { response?: { status?: unknown; data?: { message?: unknown } } }).response;
+  const status = typeof response?.status === "number" ? response.status : 0;
+  // 4xx 表示服务端已明确拒绝本次请求，没有进入逐行写入；
+  // 5xx、断网与超时都可能发生在写入过程中，结果未知。
+  if (status < 400 || status >= 500) return null;
+  const message = typeof response?.data?.message === "string" ? response.data.message.trim() : "";
+  return { status, message };
+}
 async function submitImport() {
   // 同步置位，避免校验与异步阶段中双击产生第二次导入请求。
   if (importing.value) return;
@@ -503,6 +514,16 @@ async function submitImport() {
     }
   } catch (error) {
     if (!isImportActive(epoch) || !isSessionIdentityCurrent(snapshot)) return;
+    // 服务端已明确拒绝（如「Excel 中没有可导入的数据行」「表头与模板不一致」）：
+    // 此时既没有逐行写入，也不能归为「网络失败」或「结果未确认」，需原样转达服务端原因。
+    const rejection = readServerRejection(error);
+    if (rejection) {
+      importFailure.value = rejection.message
+        ? `导入未执行：${rejection.message}`
+        : `导入未执行：服务端拒绝了本次请求（HTTP ${rejection.status}），未写入任何成员。`;
+      scrollImportResultIntoView();
+      return;
+    }
     if (isTimeoutError(error)) {
       importFailure.value =
         "导入请求超时，尚未确认处理结果。请先核对成员列表确认是否已写入，再决定是否重新导入；请勿重复提交。";

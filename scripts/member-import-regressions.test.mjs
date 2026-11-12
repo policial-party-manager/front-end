@@ -120,6 +120,7 @@ async function fixture(t, options = {}) {
     importStarted: false,
     importAborts: 0,
     importStatus: 0,
+    importMessage: "导入处理失败",
     importResult: { total: 2, successCount: 2, failCount: 0, errors: [] },
     refreshes: 0,
     listMembers: Array.from({ length: 3 }, (_, index) => member(101 + index, `成员${index + 1}`)),
@@ -181,6 +182,12 @@ async function fixture(t, options = {}) {
       }
       if (state.importStatus === 403) {
         return route.fulfill({ status: 403, json: { code: 403, message: "没有导入权限" } });
+      }
+      if (state.importStatus === 400) {
+        return route.fulfill({ status: 400, json: { code: 400, message: state.importMessage } });
+      }
+      if (state.importStatus === 500) {
+        return route.fulfill({ status: 500, json: { code: 500, message: "服务器内部错误" } });
       }
       return ok(route, state.importResult);
     }
@@ -380,16 +387,47 @@ test("提交失败不伪造计数、保留文件且不自动重试", async (t) =
   assert.equal(state.imports.length, 1, "失败后不得自动重传");
 });
 
-test("403 拒绝时按请求失败处理且不显示成功", async (t) => {
+test("服务端 4xx 明确拒绝时转达原因，不声称结果未知", async (t) => {
+  const { page, state } = await fixture(t);
+  // 真实后端对「只有表头」「表头与模板不一致」统一返回 HTTP 400 + 业务原因。
+  state.importStatus = 400;
+  state.importMessage = "Excel 中没有可导入的数据行（数据从第 2 行开始）";
+  const dialog = await openImport(page);
+  await selectFile(dialog, "只有表头.xlsx");
+  await dialog.getByRole("button", { name: "开始导入", exact: true }).click();
+  await eventually(async () => (await dialog.innerText()).includes("导入未执行"), "确定性拒绝应说明未执行");
+  const text = await dialog.innerText();
+  assert.ok(text.includes("Excel 中没有可导入的数据行"), "应原样转达服务端业务原因");
+  assert.ok(!text.includes("尚未确认处理结果"), "确定性拒绝不得说成结果未知");
+  assert.ok(!text.includes("已保留所选文件"), "确定性拒绝不需要按网络失败引导重试");
+  assert.equal(await dialog.locator('[data-testid="import-result-summary"]').count(), 0, "不得伪造计数");
+  assert.equal(await messageCount(page, "success"), 0);
+  assert.equal(state.imports.length, 1);
+});
+
+test("403 拒绝时按未执行处理且不显示成功", async (t) => {
   const { page, state } = await fixture(t);
   state.importStatus = 403;
   const dialog = await openImport(page);
   await selectFile(dialog, "成员导入.xlsx");
   await dialog.getByRole("button", { name: "开始导入", exact: true }).click();
-  await eventually(async () => (await dialog.innerText()).includes("导入请求失败"), "403 应说明未获得导入结果");
+  await eventually(async () => (await dialog.innerText()).includes("导入未执行"), "403 应说明未执行");
   assert.equal(await messageCount(page, "success"), 0);
   assert.equal(await dialog.locator('[data-testid="import-result-summary"]').count(), 0);
   assert.equal(state.imports.length, 1);
+});
+
+test("5xx 服务端故障按结果未知处理，不声称未写入", async (t) => {
+  const { page, state } = await fixture(t);
+  state.importStatus = 500;
+  const dialog = await openImport(page);
+  await selectFile(dialog, "成员导入.xlsx");
+  await dialog.getByRole("button", { name: "开始导入", exact: true }).click();
+  await eventually(async () => (await dialog.innerText()).includes("导入请求失败"), "5xx 应按请求失败处理");
+  const text = await dialog.innerText();
+  assert.ok(!text.includes("导入未执行"), "5xx 不得断言服务端没有写入");
+  assert.ok(text.includes("已保留所选文件"));
+  assert.equal(await dialog.locator('[data-testid="import-result-summary"]').count(), 0);
 });
 
 test("双击开始导入只发送一次逻辑请求", async (t) => {
