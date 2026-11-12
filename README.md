@@ -31,6 +31,15 @@ npm run dev
 
 项目没有配置通用单元测试或端到端测试框架；`check:permissions` 是独立的断言脚本，不能替代业务联调。
 
+支部表单有独立的浏览器回归脚本，使用 Node.js 测试运行器和仅开发依赖 `playwright-core`。首次运行先安装浏览器：
+
+```bash
+npx playwright-core install chromium
+npm run test:branches
+```
+
+也可通过 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指定已有 Chromium 的绝对路径。脚本自行启动本地 Vite，拦截测试上下文中的业务接口，验证正常 401 刷新、搜索清空竞态、详情切换和退出/换号隔离，不连接真实后端。CI 会安装 Chromium 并运行该脚本。
+
 ## 当前路由
 
 正常模式下，除 `/login` 外均需登录。以下表示当前路由实际挂载的页面，不能用仓库中保留的旧原型推断功能已开放。
@@ -73,6 +82,8 @@ npm run dev
 ## 请求与数据
 
 `src/api/request.ts` 使用 Axios，普通 JSON 业务响应按 `{ code, message, data }` 解包；文件下载使用 Blob。自动携带 Bearer token，普通业务请求遇到 401 时尝试刷新并重放一次，失败则清理会话并跳转登录页。
+
+支部页面另用会话身份标记隔离退出或换号前的旧响应；该标记在正常令牌刷新时保持不变，避免丢失未保存表单。请求层的 Token 快照与刷新校验仍独立保留。
 
 - `auth.ts`：账号密码、邮箱验证码、刷新与退出；手机号虽有封装，页面没有入口，后端短信真实发送仍缺。后端 CAS 端点已有，前端尚未接入。
 - `members.ts`、`branches.ts`：当前仅接超管接口；支部表单按角色字典定位 `branch_admin` 并分页查询书记候选，提交真实用户 ID，创建强制 `status=1`、编辑不改状态；成员导入错误可下载 CSV，尚无成员数据导出或支部 Excel 导入入口。
