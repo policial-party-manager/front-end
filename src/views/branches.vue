@@ -4,8 +4,13 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { Plus } from "@element-plus/icons-vue";
 import { useAppStore } from "@/stores/app";
-import { captureSession, isSessionCurrent, sessionHasAccessToken, sessionUser } from "@/utils/session";
-import type { SessionSnapshot } from "@/config/session-fence";
+import {
+  captureSessionIdentity,
+  isSessionIdentityCurrent,
+  sessionHasAccessToken,
+  sessionIdentity,
+} from "@/utils/session";
+import type { SessionIdentitySnapshot } from "@/utils/session";
 import { listRoles, type RoleVo } from "@/api/roles";
 import { getMember, pageMembers, type UserVo } from "@/api/members";
 import {
@@ -44,7 +49,7 @@ const dateLabel = (date: string | null) => (date ? date.replace("T", " ").slice(
 let requestSequence = 0;
 async function loadBranches(): Promise<boolean> {
   const sequence = ++requestSequence;
-  const snapshot = captureSession();
+  const snapshot = captureSessionIdentity();
   if (!canManage.value) {
     rows.value = [];
     total.value = 0;
@@ -54,12 +59,12 @@ async function loadBranches(): Promise<boolean> {
   loadError.value = false;
   try {
     const result = await pageBranches({ page: page.value, size: size.value, ...applied.value });
-    if (sequence !== requestSequence || !isSessionCurrent(snapshot) || !canManage.value) return true;
+    if (sequence !== requestSequence || !isSessionIdentityCurrent(snapshot) || !canManage.value) return true;
     rows.value = result.records;
     total.value = result.total;
     return true;
   } catch {
-    if (sequence === requestSequence && isSessionCurrent(snapshot)) {
+    if (sequence === requestSequence && isSessionIdentityCurrent(snapshot)) {
       rows.value = [];
       total.value = 0;
       loadError.value = true;
@@ -67,7 +72,7 @@ async function loadBranches(): Promise<boolean> {
     }
     return true;
   } finally {
-    if (sequence === requestSequence && isSessionCurrent(snapshot)) loading.value = false;
+    if (sequence === requestSequence && isSessionIdentityCurrent(snapshot)) loading.value = false;
   }
 }
 function search() {
@@ -93,29 +98,34 @@ const detailVisible = ref(false);
 const detail = ref<Branch | null>(null);
 const detailSecretary = ref<UserVo | null>(null);
 const detailSecretaryError = ref(false);
-async function readDetailSecretary(snapshot: SessionSnapshot, secretaryId: number) {
+let detailSequence = 0;
+function isDetailCurrent(snapshot: SessionIdentitySnapshot, sequence: number): boolean {
+  return sequence === detailSequence && detailVisible.value && isSessionIdentityCurrent(snapshot) && canManage.value;
+}
+async function readDetailSecretary(snapshot: SessionIdentitySnapshot, secretaryId: number, sequence: number) {
   try {
     const user = await getMember(secretaryId);
-    if (isSessionCurrent(snapshot) && canManage.value) detailSecretary.value = user;
+    if (isDetailCurrent(snapshot, sequence)) detailSecretary.value = user;
   } catch {
-    if (isSessionCurrent(snapshot) && canManage.value) detailSecretaryError.value = true;
+    if (isDetailCurrent(snapshot, sequence)) detailSecretaryError.value = true;
   }
 }
-function openDetail(value: Branch, snapshot: SessionSnapshot): void {
-  if (!isSessionCurrent(snapshot) || !canManage.value) return;
+function openDetail(value: Branch, snapshot: SessionIdentitySnapshot, sequence: number): void {
+  if (sequence !== detailSequence || !isSessionIdentityCurrent(snapshot) || !canManage.value) return;
   detail.value = value;
   detailSecretary.value = null;
   detailSecretaryError.value = false;
   detailVisible.value = true;
   if (typeof value.secretaryId === "number" && value.secretaryId > 0) {
-    void readDetailSecretary(snapshot, value.secretaryId);
+    void readDetailSecretary(snapshot, value.secretaryId, sequence);
   }
 }
 async function viewBranch(row: Branch) {
-  const snapshot = captureSession();
+  const sequence = ++detailSequence;
+  const snapshot = captureSessionIdentity();
   try {
     const value = await getBranch(row.id);
-    openDetail(value, snapshot);
+    openDetail(value, snapshot, sequence);
   } catch {
     /* 请求层提示错误 */
   }
@@ -192,10 +202,14 @@ function pinSecretary(user: UserVo | null) {
 // formEpoch 标识一次表单实例；关闭、切换编辑对象、会话变化都会让它失效。
 let formEpoch = 0;
 let candidateSequence = 0;
-let formSession: SessionSnapshot | null = null;
+let formSession: SessionIdentitySnapshot | null = null;
 function isFormActive(epoch: number): boolean {
   return (
-    formVisible.value && epoch === formEpoch && formSession !== null && isSessionCurrent(formSession) && canManage.value
+    formVisible.value &&
+    epoch === formEpoch &&
+    formSession !== null &&
+    isSessionIdentityCurrent(formSession) &&
+    canManage.value
   );
 }
 function invalidateFormRequests() {
@@ -220,7 +234,7 @@ function onFormClosed() {
 }
 function beginForm() {
   invalidateFormRequests();
-  formSession = captureSession();
+  formSession = captureSessionIdentity();
   formVisible.value = true;
   roleState.value = "loading";
   candidateState.value = "loading";
@@ -255,6 +269,8 @@ async function fetchCandidates(epoch: number, targetPage: number, keyword: strin
   const roleId = branchAdminRoleId.value;
   if (roleId === null) return;
   const sequence = ++candidateSequence;
+  // 记录最新查询意图，而非等成功后才记录，确保在途搜索被清空时也能使旧请求失效。
+  candidateKeyword.value = keyword;
   candidateState.value = "loading";
   candidates.value = [];
   try {
@@ -269,7 +285,6 @@ async function fetchCandidates(epoch: number, targetPage: number, keyword: strin
     candidates.value = result.records;
     candidateTotal.value = result.total;
     candidatePage.value = targetPage;
-    candidateKeyword.value = keyword;
     candidateState.value = result.records.length ? "ready" : "empty";
   } catch {
     if (isFormActive(epoch) && sequence === candidateSequence) {
@@ -333,14 +348,14 @@ function addBranch() {
 }
 async function editBranch(row: Branch) {
   if (!canManage.value) return;
-  const snapshot = captureSession();
+  const snapshot = captureSessionIdentity();
   let value: Branch;
   try {
     value = await getBranch(row.id);
   } catch {
     return;
   }
-  if (!isSessionCurrent(snapshot) || !canManage.value) return;
+  if (!isSessionIdentityCurrent(snapshot) || !canManage.value) return;
   editingId.value = row.id;
   Object.assign(form, {
     branchName: value.branchName,
@@ -382,26 +397,27 @@ function isTimeoutError(error: unknown): boolean {
   return code === "ECONNABORTED" || code === "ETIMEDOUT" || /timeout|超时/i.test(message);
 }
 async function refreshAfterSave(editedId: number | null, branchName: string, showDetail: boolean) {
-  const snapshot = captureSession();
+  const snapshot = captureSessionIdentity();
+  const sequence = showDetail ? ++detailSequence : detailSequence;
   let detailFailed = false;
   if (showDetail) {
     try {
       let id = editedId;
       if (id === null) {
         const found = await pageBranches({ page: 1, size: 10, keyword: branchName });
-        if (!isSessionCurrent(snapshot) || !canManage.value) return;
+        if (!isSessionIdentityCurrent(snapshot) || !canManage.value) return;
         id = found.records.find((item) => item.branchName === branchName)?.id ?? null;
       }
       if (id !== null) {
         const fresh = await getBranch(id);
-        openDetail(fresh, snapshot);
+        openDetail(fresh, snapshot, sequence);
       }
     } catch {
-      detailFailed = isSessionCurrent(snapshot) && canManage.value;
+      detailFailed = isSessionIdentityCurrent(snapshot) && canManage.value;
     }
   }
   const listOk = await loadBranches();
-  if (!isSessionCurrent(snapshot) || !canManage.value) return;
+  if (!isSessionIdentityCurrent(snapshot) || !canManage.value) return;
   if (detailFailed) ElMessage.warning("保存成功，但详情回读失败，请稍后通过列表「详情」重试");
   if (!listOk) ElMessage.warning("保存成功，但列表刷新失败，请点击列表上方的「重试」");
 }
@@ -430,7 +446,7 @@ async function saveBranch() {
       }
       return;
     }
-    if (snapshot === null || !isSessionCurrent(snapshot) || !canManage.value) return;
+    if (snapshot === null || !isSessionIdentityCurrent(snapshot) || !canManage.value) return;
     const sameForm = epoch === formEpoch;
     if (sameForm) {
       ElMessage.success(isCreate ? "支部添加成功" : "支部信息已更新");
@@ -448,6 +464,8 @@ async function confirmAfterTimeout() {
   else ElMessage.warning("列表刷新失败，请点击列表上方的「重试」");
 }
 async function removeBranch(row: Branch) {
+  if (!canManage.value) return;
+  const snapshot = captureSessionIdentity();
   try {
     await ElMessageBox.confirm(
       `确定删除支部「${row.branchName}」吗？该操作为软删除，支部状态将置为 0（已删除），不会物理删除数据。`,
@@ -457,8 +475,11 @@ async function removeBranch(row: Branch) {
   } catch {
     return;
   }
+  // 确认框可能跨越退出或换号，不能用新账号执行旧会话发起的删除。
+  if (!isSessionIdentityCurrent(snapshot) || !canManage.value) return;
   try {
     await deleteBranch(row.id);
+    if (!isSessionIdentityCurrent(snapshot) || !canManage.value) return;
     ElMessage.success("已删除");
     await loadBranches();
   } catch {
@@ -469,7 +490,7 @@ async function removeBranch(row: Branch) {
 onMounted(() => {
   if (canManage.value) void loadBranches();
 });
-watch([canManage, sessionUser], () => {
+watch([canManage, sessionIdentity], () => {
   // 退出、重新登录或角色变化后，旧请求不得回写新会话页面。
   invalidateFormRequests();
   formVisible.value = false;
@@ -478,15 +499,28 @@ watch([canManage, sessionUser], () => {
   total.value = 0;
   loading.value = false;
   loadError.value = false;
-  if (!canManage.value) {
-    detailVisible.value = false;
-    detail.value = null;
-    detailSecretary.value = null;
-  } else {
-    void loadBranches();
-  }
+  detailSequence += 1;
+  detailVisible.value = false;
+  detail.value = null;
+  detailSecretary.value = null;
+  detailSecretaryError.value = false;
+  if (canManage.value) void loadBranches();
 });
-onBeforeUnmount(invalidateFormRequests);
+watch(
+  detailVisible,
+  (visible) => {
+    if (!visible) {
+      detailSequence += 1;
+      detailSecretary.value = null;
+      detailSecretaryError.value = false;
+    }
+  },
+  { flush: "sync" },
+);
+onBeforeUnmount(() => {
+  detailSequence += 1;
+  invalidateFormRequests();
+});
 </script>
 
 <template>
