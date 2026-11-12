@@ -1,10 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { Download, Plus, Upload } from "@element-plus/icons-vue";
+import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
-import { sessionHasAccessToken } from "@/utils/session";
+import {
+  captureSessionIdentity,
+  isSessionIdentityCurrent,
+  sessionHasAccessToken,
+  sessionIdentity,
+  type SessionIdentitySnapshot,
+} from "@/utils/session";
 import {
   createMember,
   downloadMemberTemplate,
@@ -22,6 +29,7 @@ import {
 } from "@/api/members";
 
 const store = useAppStore();
+const router = useRouter();
 const canManage = computed(() => store.currentRole === "super_admin" && sessionHasAccessToken.value);
 const rows = ref<UserVo[]>([]);
 const branches = ref<{ id: number; branchName: string }[]>([]);
@@ -44,21 +52,22 @@ const dateLabel = (date: string | null) => (date ? date.replace("T", " ").slice(
 let requestSequence = 0;
 async function loadMembers() {
   const sequence = ++requestSequence;
+  const snapshot = captureSessionIdentity();
   loading.value = true;
   loadError.value = false;
   try {
     const result = await pageMembers({ page: page.value, size: size.value, ...applied.value });
-    if (sequence !== requestSequence) return;
+    if (sequence !== requestSequence || !isSessionIdentityCurrent(snapshot)) return;
     rows.value = result.records;
     total.value = result.total;
   } catch {
-    if (sequence === requestSequence) {
+    if (sequence === requestSequence && isSessionIdentityCurrent(snapshot)) {
       rows.value = [];
       total.value = 0;
       loadError.value = true;
     }
   } finally {
-    if (sequence === requestSequence) loading.value = false;
+    if (sequence === requestSequence && isSessionIdentityCurrent(snapshot)) loading.value = false;
   }
 }
 function search() {
@@ -66,7 +75,8 @@ function search() {
   page.value = 1;
   void loadMembers();
 }
-function reset() {
+/** 仅清空筛选条件并重新查询，不删除成员、不撤销导入。 */
+function resetFilters() {
   filters.keyword = "";
   filters.branchId = undefined;
   filters.status = undefined;
@@ -82,9 +92,11 @@ function changeSize(value: number) {
   void loadMembers();
 }
 async function loadOptions() {
-  try {
-    [branches.value, roles.value] = await Promise.all([listBranches(), listRoles()]);
-  } catch {
+  // 支部与角色字典相互独立：任一失败不影响另一份结果，避免列表筛选和导入核对一起丢失。
+  const [branchResult, roleResult] = await Promise.allSettled([listBranches(), listRoles()]);
+  if (branchResult.status === "fulfilled") branches.value = Array.isArray(branchResult.value) ? branchResult.value : [];
+  if (roleResult.status === "fulfilled") roles.value = Array.isArray(roleResult.value) ? roleResult.value : [];
+  if (branchResult.status === "rejected" || roleResult.status === "rejected") {
     ElMessage.warning("支部或角色选项加载失败，请刷新页面重试");
   }
 }
@@ -94,13 +106,22 @@ onMounted(() => {
     void loadOptions();
   }
 });
-watch(canManage, (enabled) => {
+watch([canManage, sessionIdentity], () => {
+  // 退出、换号或权限变化：清除上一个会话的列表、导入文件与报告，并使在途回调失效。
+  invalidateImport();
+  importVisible.value = false;
   rows.value = [];
   total.value = 0;
-  if (enabled) {
+  loading.value = false;
+  loadError.value = false;
+  if (canManage.value) {
     void loadMembers();
     void loadOptions();
   }
+});
+onBeforeUnmount(() => {
+  invalidateImport();
+  importVisible.value = false;
 });
 
 const detailVisible = ref(false);
@@ -229,16 +250,213 @@ async function downloadTemplate() {
     /* 请求层提示错误 */
   }
 }
+
+// ---------------- 成员 Excel 导入 ----------------
+// 支部核对使用独立状态，即使角色字典失败也不影响导入前的支部查询结果。
+type OptionState = "idle" | "loading" | "ready" | "error" | "empty";
+const MAX_IMPORT_SIZE = 10 * 1024 * 1024;
+
 const importVisible = ref(false);
+const importDialogBody = ref<HTMLElement>();
+const importResultAnchor = ref<HTMLElement>();
 const importFile = ref<File | null>(null);
+const importFileInput = ref<HTMLInputElement>();
 const importing = ref(false);
 const importProgress = ref(0);
 const importResult = ref<ImportResult | null>(null);
-function chooseFile(event: Event) {
-  importFile.value = (event.target as HTMLInputElement).files?.[0] || null;
+const importFailure = ref("");
+const importBranchState = ref<OptionState>("idle");
+const importBranches = ref<{ id: number; branchName: string }[]>([]);
+const importBranchKeyword = ref("");
+const importBranchOptions = computed(() => {
+  const keyword = importBranchKeyword.value.trim();
+  if (!keyword) return importBranches.value;
+  return importBranches.value.filter((branch) => branch.branchName.includes(keyword));
+});
+const importBranchStateText = computed(() => {
+  switch (importBranchState.value) {
+    case "loading":
+      return "正在加载支部选项…";
+    case "ready":
+      return `共 ${importBranches.value.length} 个正常支部`;
+    case "empty":
+      return "暂无可匹配的正常支部";
+    case "error":
+      return "加载失败，暂时无法核对";
+    default:
+      return "尚未加载";
+  }
+});
+
+// importEpoch 标识一次导入会话；关闭弹窗、退出或换号都会让它失效，
+// 旧会话的回调（进度、结果、列表回读）因此不会污染新会话。
+let importEpoch = 0;
+let importBranchSequence = 0;
+let importSession: SessionIdentitySnapshot | null = null;
+function isImportActive(epoch: number): boolean {
+  return (
+    importVisible.value &&
+    epoch === importEpoch &&
+    importSession !== null &&
+    isSessionIdentityCurrent(importSession) &&
+    canManage.value
+  );
+}
+function resetImportFileInput() {
+  if (importFileInput.value) importFileInput.value.value = "";
+}
+function clearImportReport() {
   importResult.value = null;
+  importFailure.value = "";
+  importProgress.value = 0;
+}
+function invalidateImport() {
+  importEpoch += 1;
+  importBranchSequence += 1;
+  importSession = null;
+  importing.value = false;
+  clearImportReport();
+  importFile.value = null;
+  importBranches.value = [];
+  importBranchKeyword.value = "";
+  importBranchState.value = "idle";
+  resetImportFileInput();
+}
+function openImport() {
+  if (!canManage.value) return;
+  invalidateImport();
+  importSession = captureSessionIdentity();
+  importVisible.value = true;
+  void loadImportBranches();
+}
+/** 内容区可滚动，打开时回到顶部，避免直接停在填写规则中段。 */
+function scrollImportTop() {
+  void nextTick(() => {
+    if (importDialogBody.value) importDialogBody.value.scrollTop = 0;
+  });
+}
+/** 结果出现后滚到结果区，避免窄屏下需要手动滚动才能看到反馈。 */
+function scrollImportResultIntoView() {
+  void nextTick(() => {
+    importResultAnchor.value?.scrollIntoView({ block: "nearest" });
+  });
+}
+function onImportClosed() {
+  // 关闭动画结束前若已重新打开，不清理新会话的数据。
+  if (!importVisible.value) invalidateImport();
+}
+function goToBranches() {
+  if (importing.value) return;
+  void router.push("/branches");
+}
+async function loadImportBranches() {
+  const epoch = importEpoch;
+  const sequence = ++importBranchSequence;
+  importBranchState.value = "loading";
+  try {
+    const list = await listBranches();
+    if (!isImportActive(epoch) || sequence !== importBranchSequence) return;
+    importBranches.value = Array.isArray(list) ? list : [];
+    importBranchState.value = importBranches.value.length ? "ready" : "empty";
+  } catch {
+    if (isImportActive(epoch) && sequence === importBranchSequence) {
+      // 失败不等于没有支部：只提示暂时无法核对，不给出空列表结论。
+      importBranches.value = [];
+      importBranchState.value = "error";
+    }
+  }
+}
+function chooseFile(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] ?? null;
+  // 换文件必须先清除上一份文件的报告与进度，避免旧结果被当成新文件的结果。
+  clearImportReport();
+  importFile.value = file;
+  if (!file) return;
+  if (!/\.xlsx$/i.test(file.name)) {
+    importFile.value = null;
+    resetImportFileInput();
+    ElMessage.warning("请上传 .xlsx 格式文件");
+    return;
+  }
+  if (file.size === 0) {
+    importFile.value = null;
+    resetImportFileInput();
+    ElMessage.warning("文件内容为空，请选择包含数据的 .xlsx 文件");
+    return;
+  }
+  if (file.size > MAX_IMPORT_SIZE) {
+    importFile.value = null;
+    resetImportFileInput();
+    ElMessage.warning("文件不能超过 10 MB");
+    return;
+  }
+}
+const toCount = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
+/** 只接受结构完整的 ImportResult；结构不符时不得编造计数。 */
+function parseImportResult(raw: unknown): ImportResult | null {
+  if (!raw || typeof raw !== "object") return null;
+  const source = raw as Partial<ImportResult>;
+  const total = toCount(source.total);
+  const successCount = toCount(source.successCount);
+  const failCount = toCount(source.failCount);
+  if (total === null || successCount === null || failCount === null) return null;
+  const errors: { row: number; reason: string }[] = [];
+  if (Array.isArray(source.errors)) {
+    for (const item of source.errors) {
+      if (!item || typeof item !== "object") continue;
+      const row = toCount((item as { row?: unknown }).row);
+      const reason = (item as { reason?: unknown }).reason;
+      // row 是 Excel 行号，只能原样展示与导出，不能按数组下标重排。
+      if (row === null || typeof reason !== "string") continue;
+      errors.push({ row, reason });
+    }
+  }
+  return { total, successCount, failCount, errors };
+}
+function notifyImportResult(result: ImportResult) {
+  if (result.total === 0) {
+    ElMessage.info("文件中没有可导入的数据行");
+    return;
+  }
+  if (result.failCount === 0 && result.successCount > 0) {
+    ElMessage.success(`导入完成：共 ${result.total} 行，全部成功`);
+    return;
+  }
+  if (result.successCount > 0) {
+    ElMessage.warning(`导入部分成功：成功 ${result.successCount} 行，失败 ${result.failCount} 行，请下载错误报告核对`);
+    return;
+  }
+  if (result.failCount > 0) {
+    ElMessage.error(`导入失败：共 ${result.total} 行，全部失败，请下载错误报告核对`);
+    return;
+  }
+  ElMessage.warning("导入结果未包含成功或失败行，请核对成员列表确认实际写入情况");
+}
+const importOutcome = computed<{ type: "success" | "warning" | "error" | "info"; title: string } | null>(() => {
+  const result = importResult.value;
+  if (!result) return null;
+  if (result.total === 0) return { type: "info", title: "文件中没有可导入的数据行" };
+  if (result.failCount === 0 && result.successCount > 0) return { type: "success", title: "全部导入成功" };
+  if (result.successCount > 0) return { type: "warning", title: "部分导入成功" };
+  if (result.failCount > 0) return { type: "error", title: "全部导入失败" };
+  return { type: "info", title: "导入结果未包含成功或失败计数" };
+});
+const importSummary = computed(() => {
+  const result = importResult.value;
+  if (!result) return "";
+  return `共 ${result.total} 行，成功 ${result.successCount} 行，失败 ${result.failCount} 行`;
+});
+function isTimeoutError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code = "code" in error ? String(error.code ?? "") : "";
+  const message = "message" in error ? String(error.message ?? "") : "";
+  return code === "ECONNABORTED" || code === "ETIMEDOUT" || /timeout|超时/i.test(message);
 }
 async function submitImport() {
+  // 同步置位，避免校验与异步阶段中双击产生第二次导入请求。
+  if (importing.value) return;
   const file = importFile.value;
   if (!file) {
     ElMessage.warning("请选择 Excel 文件");
@@ -248,30 +466,61 @@ async function submitImport() {
     ElMessage.warning("请上传 .xlsx 格式文件");
     return;
   }
-  if (file.size > 10 * 1024 * 1024) {
+  if (file.size === 0) {
+    ElMessage.warning("文件内容为空，请选择包含数据的 .xlsx 文件");
+    return;
+  }
+  if (file.size > MAX_IMPORT_SIZE) {
     ElMessage.warning("文件不能超过 10 MB");
     return;
   }
+  const epoch = importEpoch;
+  const snapshot = captureSessionIdentity();
+  importSession = snapshot;
   importing.value = true;
-  importProgress.value = 0;
+  clearImportReport();
   try {
-    importResult.value = await importMembers(file, (percent) => {
-      importProgress.value = percent;
+    const response = await importMembers(file, (percent) => {
+      if (!isImportActive(epoch) || !isSessionIdentityCurrent(snapshot)) return;
+      const next = Number.isFinite(percent) ? Math.min(100, Math.max(0, Math.round(percent))) : 0;
+      if (next > importProgress.value) importProgress.value = next;
     });
-    ElMessage.success(`导入完成：成功 ${importResult.value.successCount} 条，失败 ${importResult.value.failCount} 条`);
-    page.value = 1;
-    await loadMembers();
-  } catch {
-    /* 文件保留供重试 */
+    if (!isImportActive(epoch) || !isSessionIdentityCurrent(snapshot)) return;
+    const result = parseImportResult(response);
+    if (!result) {
+      importFailure.value =
+        "服务端返回的导入结果不完整，无法确认成功与失败行数。请先核对成员列表，再决定是否重新导入。";
+      return;
+    }
+    importResult.value = result;
+    importProgress.value = 100;
+    notifyImportResult(result);
+    scrollImportResultIntoView();
+    if (result.successCount > 0) {
+      // 只回读服务端列表；回读失败不得篡改已获得的导入报告。
+      page.value = 1;
+      await loadMembers();
+    }
+  } catch (error) {
+    if (!isImportActive(epoch) || !isSessionIdentityCurrent(snapshot)) return;
+    if (isTimeoutError(error)) {
+      importFailure.value =
+        "导入请求超时，尚未确认处理结果。请先核对成员列表确认是否已写入，再决定是否重新导入；请勿重复提交。";
+    } else {
+      importFailure.value = "导入请求失败，未获得导入结果。已保留所选文件，请核对网络或权限后重试。";
+    }
+    scrollImportResultIntoView();
   } finally {
-    importing.value = false;
+    // 关闭重开或换号会推进 importEpoch，因此旧操作不得清除新操作的导入状态。
+    if (epoch === importEpoch) importing.value = false;
   }
 }
 function downloadErrors() {
   if (!importResult.value) return;
+  const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
   const lines = [
     "行号,失败原因",
-    ...importResult.value.errors.map(({ row, reason }) => `${row},"${reason.replace(/"/g, '""')}"`),
+    ...importResult.value.errors.map(({ row, reason }) => `${row},${quote(reason.replace(/\r?\n/g, " "))}`),
   ];
   saveFile(new Blob(["\uFEFF", lines.join("\r\n")], { type: "text/csv;charset=utf-8" }), "成员导入错误报告.csv");
 }
@@ -303,7 +552,7 @@ function downloadErrors() {
         </div>
         <div class="actions">
           <el-button :icon="Download" @click="downloadTemplate">下载导入模板</el-button
-          ><el-button :icon="Upload" @click="importVisible = true">Excel 导入</el-button
+          ><el-button :icon="Upload" @click="openImport">Excel 导入</el-button
           ><el-button type="primary" :icon="Plus" @click="addMember">新增成员</el-button>
         </div>
       </div>
@@ -320,7 +569,7 @@ function downloadErrors() {
         <el-select v-model="filters.status" clearable placeholder="全部状态"
           ><el-option label="启用" :value="1" /><el-option label="停用" :value="2"
         /></el-select>
-        <el-button type="primary" @click="search">搜索</el-button><el-button @click="reset">重置</el-button>
+        <el-button type="primary" @click="search">搜索</el-button><el-button @click="resetFilters">重置筛选</el-button>
       </div>
       <el-alert v-if="loadError" title="成员数据加载失败" type="error" show-icon :closable="false" class="load-error"
         ><template #default><el-button link type="primary" @click="loadMembers">重试</el-button></template></el-alert
@@ -462,32 +711,150 @@ function downloadErrors() {
     <el-dialog
       v-model="importVisible"
       title="Excel 导入成员"
-      width="620px"
+      width="min(680px, calc(100vw - 32px))"
+      class="import-dialog-shell"
       :close-on-click-modal="!importing"
+      :close-on-press-escape="!importing"
       :show-close="!importing"
+      @opened="scrollImportTop"
+      @closed="onImportClosed"
     >
-      <p class="import-hint">请先下载系统模板，填写后上传 .xlsx 文件。导入会逐行处理，失败行可下载错误报告。</p>
-      <el-button :icon="Download" @click="downloadTemplate">下载导入模板</el-button>
-      <input class="file-input" type="file" accept=".xlsx" :disabled="importing" @change="chooseFile" />
-      <el-progress v-if="importing" :percentage="importProgress" class="progress" />
-      <div v-if="importResult" class="import-result">
-        <el-alert
-          :title="`共 ${importResult.total} 行，成功 ${importResult.successCount} 行，失败 ${importResult.failCount} 行`"
-          :type="importResult.failCount ? 'warning' : 'success'"
-          show-icon
-          :closable="false"
-        />
-        <template v-if="importResult.errors?.length"
-          ><el-table :data="importResult.errors" max-height="240" stripe
-            ><el-table-column prop="row" label="Excel 行号" width="110" /><el-table-column
-              prop="reason"
-              label="失败原因" /></el-table
-          ><el-button :icon="Download" @click="downloadErrors">下载错误报告</el-button></template
-        >
+      <div ref="importDialogBody" class="import-dialog" data-testid="import-dialog-body">
+        <el-alert title="填写规则" type="info" show-icon :closable="false" class="import-rule">
+          <template #default>
+            <ul class="rule-list">
+              <li>填写所属支部前，请先在<a class="rule-link" @click="goToBranches">支部管理</a>中维护对应支部。</li>
+              <li>填写时须匹配系统中正常支部的名称；首尾空格由服务端处理，名称不一致的行会逐行失败。</li>
+              <li>所属支部可以留空，留空表示未分配支部。</li>
+              <li>重复的账号/学号、手机号或邮箱会按行失败，不会覆盖已有成员。</li>
+              <li>部分成功后重新上传整个文件时，已成功的行可能因重复再次失败。</li>
+            </ul>
+          </template>
+        </el-alert>
+
+        <section class="import-branches">
+          <div class="import-branches-header">
+            <strong>可匹配的正常支部</strong>
+            <span class="import-branches-state">{{ importBranchStateText }}</span>
+            <el-button
+              link
+              type="primary"
+              :disabled="importing"
+              :loading="importBranchState === 'loading'"
+              @click="loadImportBranches"
+            >
+              刷新
+            </el-button>
+          </div>
+          <el-input
+            v-model="importBranchKeyword"
+            clearable
+            placeholder="按名称筛选支部（仅本地筛选，不代表文件已匹配）"
+            :disabled="importing || importBranchState !== 'ready'"
+            class="import-branch-filter"
+          />
+          <el-alert
+            v-if="importBranchState === 'error'"
+            title="暂时无法核对支部名称"
+            type="error"
+            show-icon
+            :closable="false"
+            class="import-branch-alert"
+          >
+            <template #default>
+              <p>
+                支部选项加载失败，无法确认系统内的正常支部。请点击「刷新」重试；这不影响提交，所属支部是否有效仍由服务端判定。
+              </p>
+              <el-button link type="primary" :disabled="importing" @click="loadImportBranches">重试</el-button>
+            </template>
+          </el-alert>
+          <el-alert
+            v-else-if="importBranchState === 'empty'"
+            title="系统中暂无正常状态的支部"
+            type="warning"
+            show-icon
+            :closable="false"
+            class="import-branch-alert"
+          >
+            <template #default>
+              <p>
+                填写了支部名称的行会因无法匹配而失败。可先到支部管理维护支部，也可以把所属支部留空后导入（成员将未分配支部）。
+              </p>
+            </template>
+          </el-alert>
+          <el-skeleton v-if="importBranchState === 'loading'" :rows="2" animated class="import-branch-alert" />
+          <p v-else-if="importBranchState === 'ready' && !importBranchOptions.length" class="import-branch-empty">
+            没有符合当前筛选条件的支部名称。
+          </p>
+          <ul v-else-if="importBranchState === 'ready'" class="import-branch-list" data-testid="import-branch-list">
+            <li v-for="branch in importBranchOptions" :key="branch.id">{{ branch.branchName }}</li>
+          </ul>
+        </section>
+
+        <section class="import-submit">
+          <el-button :icon="Download" :disabled="importing" @click="downloadTemplate">下载导入模板</el-button>
+          <input
+            ref="importFileInput"
+            class="file-input"
+            data-testid="import-file-input"
+            type="file"
+            accept=".xlsx"
+            :disabled="importing"
+            @change="chooseFile"
+          />
+          <p v-if="importFile" class="import-file-name">已选择：{{ importFile.name }}</p>
+          <p v-else class="import-file-name">请选择 .xlsx 文件，大小不超过 10 MB。</p>
+        </section>
+
+        <el-progress v-if="importing" :percentage="importProgress" class="progress" />
+        <p v-if="importing" class="import-waiting" data-testid="import-waiting">
+          {{
+            importProgress >= 100
+              ? "文件已上传，正在等待服务端处理，请勿关闭弹窗或重复提交。"
+              : "正在上传文件，服务端尚未返回处理结果；完成前不会显示导入结果。"
+          }}
+        </p>
+
+        <div v-if="importFailure || (importResult && importOutcome)" ref="importResultAnchor" class="import-outcome">
+          <el-alert v-if="importFailure" :title="importFailure" type="error" show-icon :closable="false" />
+          <template v-else-if="importResult && importOutcome">
+            <el-alert
+              :title="`${importOutcome.title}：${importSummary}`"
+              :type="importOutcome.type"
+              show-icon
+              :closable="false"
+              data-testid="import-result-summary"
+            />
+            <p v-if="importResult.successCount > 0" class="import-readback-hint">
+              已成功的成员已写入服务端，列表已回到第一页并保留当前筛选条件。
+            </p>
+            <el-alert
+              v-if="loadError && importResult.successCount > 0"
+              title="成员列表回读失败，导入结果仍然有效"
+              type="warning"
+              show-icon
+              :closable="false"
+              class="import-readback-error"
+            >
+              <template #default>
+                <p>导入结果不受列表刷新失败影响，请稍后在列表重试或重新搜索确认。</p>
+              </template>
+            </el-alert>
+            <template v-if="importResult.errors?.length"
+              ><el-table :data="importResult.errors" max-height="240" stripe class="import-error-table"
+                ><el-table-column prop="row" label="Excel 行号" width="110" /><el-table-column
+                  prop="reason"
+                  label="失败原因" /></el-table
+              ><el-button :icon="Download" @click="downloadErrors">下载错误报告</el-button></template
+            >
+          </template>
+        </div>
       </div>
       <template #footer
         ><el-button :disabled="importing" @click="importVisible = false">关闭</el-button
-        ><el-button type="primary" :loading="importing" @click="submitImport">开始导入</el-button></template
+        ><el-button type="primary" :loading="importing" :disabled="importing" @click="submitImport"
+          >开始导入</el-button
+        ></template
       >
     </el-dialog>
   </div>
@@ -576,21 +943,104 @@ function downloadErrors() {
 .full-row {
   grid-column: 1 / -1;
 }
-.import-hint {
+.import-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* 窄屏或长支部名称时只滚动内容区，保留底部提交按钮可见。 */
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+/* 禁止子项被压缩，否则 el-alert 会裁掉文字而不是让内容区滚动。 */
+.import-dialog > * {
+  flex: 0 0 auto;
+}
+.rule-list {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+.rule-link {
+  color: var(--party-red);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.import-branches {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-base);
+  padding: 12px 14px;
+}
+.import-branches-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.import-branches-state {
   color: var(--text-secondary);
+  font-size: 13px;
+}
+.import-branch-filter {
+  margin-bottom: 10px;
+}
+.import-branch-list {
+  margin: 0;
+  padding: 0 0 0 18px;
+  max-height: 160px;
+  overflow-y: auto;
+  line-height: 1.8;
+  word-break: break-all;
+}
+.import-branch-alert {
+  margin-top: 4px;
+}
+.import-branch-empty {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.import-submit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.import-file-name {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin: 0;
+  word-break: break-all;
+}
+.import-waiting,
+.import-readback-hint {
+  color: var(--text-secondary);
+  font-size: 13px;
   line-height: 1.6;
+  margin: 8px 0 0;
+}
+.import-readback-error {
+  margin-top: 10px;
 }
 .file-input {
   display: block;
-  margin: 18px 0;
+  margin: 0;
   max-width: 100%;
 }
 .progress,
-.import-result {
-  margin-top: 18px;
+.import-outcome {
+  margin-top: 0;
 }
-.import-result .el-table {
-  margin: 12px 0;
+.import-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.import-outcome .el-table {
+  margin: 0;
+}
+.import-error-table {
+  width: 100%;
 }
 @media (max-width: 768px) {
   .members-page.page-container {
