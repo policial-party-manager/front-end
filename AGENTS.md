@@ -25,8 +25,12 @@ npm is the package manager (CI uses `npm ci`). Scripts from `package.json`:
 | `npm run check:permissions`       | Check page permissions, session fences and development preview policy                      |
 | `npm run lint`                    | `eslint src --ext .vue,.ts,.js --fix` (auto-fixes; `no-console` is an error in production) |
 | `npm run format` / `format:check` | Prettier write / check (`printWidth: 120`, double quotes, semicolons)                      |
+| `npm run test:branches`           | 支部表单浏览器回归（Node.js 测试运行器 + `playwright-core`）                               |
+| `npm run test:member-import`      | 成员 Excel 导入浏览器回归（同上）                                                          |
 
-No test framework is configured. CI (`.github/workflows/ci.yml`) runs `format:check` → eslint → `typecheck` → `build` on push/PR to `main`.
+No general unit/e2e framework is configured. Two browser regression scripts exist — `scripts/branch-form-regressions.test.mjs` and `scripts/member-import-regressions.test.mjs`. Both start their own Vite server, intercept business HTTP inside an isolated browser context, and never reach the real backend. Install Chromium first (`npx playwright-core install chromium`) or pass `PLAYWRIGHT_CHROMIUM_EXECUTABLE` with an existing binary path.
+
+CI (`.github/workflows/ci.yml`) runs `format:check` → eslint → `typecheck` → `branch-regressions` → `member-import-regressions` → `build` on push/PR to `main`; the build job needs both regression jobs to pass.
 
 ## Architecture
 

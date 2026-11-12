@@ -47,6 +47,12 @@ export interface MemberFilters {
   status?: number;
 }
 
+/** 正常状态支部下拉项；成员筛选与导入前名称核对共用。 */
+export interface BranchOption {
+  id: number;
+  branchName: string;
+}
+
 export interface ImportResult {
   total: number;
   successCount: number;
@@ -61,7 +67,7 @@ export const createMember = (data: UserSaveRequest) => post<void>("/v4/admin/use
 export const updateMember = (id: number, data: UserSaveRequest) => put<void>(`/v4/admin/users/${id}`, data);
 export const updateMemberStatus = (id: number, status: number) =>
   put<void>(`/v4/admin/users/${id}/status`, undefined, { params: { status } });
-export const listBranches = () => get<{ id: number; branchName: string }[]>("/v4/admin/branches/options");
+export const listBranches = () => get<BranchOption[]>("/v4/admin/branches/options");
 export const listRoles = () => get<{ id: number; roleCode: string }[]>("/v4/admin/roles");
 export const downloadMemberTemplate = () => get<Blob>("/v4/admin/users/template", undefined, { responseType: "blob" });
 export const importMembers = (file: File, onProgress: (percent: number) => void) => {
