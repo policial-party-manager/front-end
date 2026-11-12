@@ -17,13 +17,17 @@ export interface BranchFilters {
   keyword?: string;
 }
 
-/** 支部新增/编辑请求体。 */
+/**
+ * 支部新增/编辑请求体。
+ * - secretaryId 表单编辑过程中允许为 null，提交前必须校验为真实用户的正数 ID；后端要求非空且该用户持有 branch_admin。
+ * - status 仅创建时传 1（正常）；普通编辑不传，后端 updateBranch 不使用传入 status 修改状态。
+ */
 export interface BranchSaveRequest {
   branchName: string;
   college: string;
   description: string;
   secretaryId: number | null;
-  status: number;
+  status?: number;
 }
 
 /** 支部列表分页响应。 */
