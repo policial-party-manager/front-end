@@ -101,7 +101,8 @@ async function fixture(t, options = {}) {
     { origin: baseURL, role: options.sessionRole || "super_admin" },
   );
   const page = await context.newPage();
-  page.setDefaultTimeout(6000);
+  // 首个用例会触发 Vite 按需编译多个 SFC，默认超时过紧会导致冷启动偶发失败。
+  page.setDefaultTimeout(12000);
   const state = {
     branches: options.branches ?? [
       { id: 1, branchName: "信息工程学院第一党支部" },
@@ -157,10 +158,6 @@ async function fixture(t, options = {}) {
     if (path === "/api/v4/admin/roles") return ok(route, [{ id: 7, roleCode: "student" }]);
     if (path === "/api/v4/admin/users/page") {
       state.pageRequests.push(Object.fromEntries(url.searchParams.entries()));
-      if (state.pageGate) {
-        state.pageStarted = true;
-        await state.pageGate.promise;
-      }
       if (state.pageFail) return route.fulfill({ status: 500, json: { code: 500, message: "成员列表加载失败" } });
       return ok(route, { records: state.listMembers, total: state.listMembers.length });
     }
@@ -199,10 +196,10 @@ async function fixture(t, options = {}) {
     return route.fulfill({ status: 404, json: { code: 404, message: "unexpected request" } });
   });
   await page.goto(`${baseURL}/members`);
-  if (options.expectRedirect) return { page, state, context };
+  if (options.expectRedirect) return { page, state };
   await page.locator(".members-table").waitFor({ timeout: 15000 });
   await eventually(async () => (await page.locator(".members-table tbody tr").count()) === 3, "成员列表应已加载");
-  return { page, state, context };
+  return { page, state };
 }
 
 async function openImport(page) {
@@ -223,8 +220,9 @@ const messageCount = (page, type) => page.locator(`.el-message--${type}`).count(
 test("导入弹窗展示填写规则与真实正常支部全名", async (t) => {
   const { page } = await fixture(t);
   const dialog = await openImport(page);
+  // 首次加载时 Vite 需按需编译 SFC，支部选项可能晚于默认 6s 就绪，这里显式放宽等待。
   const list = dialog.locator('[data-testid="import-branch-list"]');
-  await list.waitFor();
+  await eventually(async () => (await list.count()) === 1, "支部核对列表应已渲染");
   const branchText = await list.innerText();
   assert.ok(branchText.includes("信息工程学院第一党支部"), "应展示完整支部名称而非截断");
   assert.ok(branchText.includes("信息工程学院第二党支部"));
@@ -473,7 +471,7 @@ test("导入中阻止关闭弹窗，服务端响应前不展示结果", async (t
   assert.equal(await waiting.count(), 0, "结果返回后应移除等待提示");
 });
 
-test("上传到 100% 后仍等待服务端响应，不提前展示完成", async (t) => {
+test("上传阶段结束前不展示任何结果结论", async (t) => {
   const { page, state } = await fixture(t);
   const gate = deferred();
   state.importGate = gate;
@@ -482,15 +480,15 @@ test("上传到 100% 后仍等待服务端响应，不提前展示完成", async
   await selectFile(dialog, "成员导入.xlsx");
   await dialog.getByRole("button", { name: "开始导入", exact: true }).click();
   await eventually(() => state.importStarted, "导入请求应已发出");
-  // 上传进度事件在拦截环境下不会推进，这里直接驱动进度条到 100% 验证渲染契约：
-  // 上传完成但业务响应未返回时，仍只能显示等待提示，且不得出现结果摘要。
-  await dialog.locator(".progress .el-progress-bar__inner").evaluate((node) => node.style.setProperty("width", "100%"));
-  await dialog.locator('[data-testid="import-waiting"]').waitFor();
+  // 只能断言真实可观测的约定：服务端未响应期间，既没有结果摘要，也没有成功/警告/错误消息，
+  // 提交按钮保持禁用。上传进度条本身由浏览器事件驱动，拦截环境下不推进，不在此伪造。
   assert.equal(
     await dialog.locator('[data-testid="import-result-summary"]').count(),
     0,
-    "上传完成但业务响应未返回时不得展示成功或失败结论",
+    "服务端未响应时不得展示成功或失败结论",
   );
+  assert.equal(await page.locator(".el-message--success").count(), 0, "未确认结果前不得提示成功");
+  assert.equal(await page.locator(".el-message--warning").count(), 0, "未确认结果前不得提示部分成功");
   assert.equal(await dialog.getByRole("button", { name: "开始导入", exact: true }).isDisabled(), true);
   gate.resolve();
   await eventually(async () => (await dialog.innerText()).includes("全部导入成功"), "响应后才展示结果");

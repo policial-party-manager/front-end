@@ -5,6 +5,7 @@ import type { FormInstance, FormRules } from "element-plus";
 import { Download, Plus, Upload } from "@element-plus/icons-vue";
 import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
+import { getApiErrorMessage } from "@/utils/apiError";
 import {
   captureSessionIdentity,
   isSessionIdentityCurrent,
@@ -22,6 +23,7 @@ import {
   pageMembers,
   updateMember,
   updateMemberStatus,
+  type BranchOption,
   type ImportResult,
   type MemberFilters,
   type UserSaveRequest,
@@ -32,7 +34,7 @@ const store = useAppStore();
 const router = useRouter();
 const canManage = computed(() => store.currentRole === "super_admin" && sessionHasAccessToken.value);
 const rows = ref<UserVo[]>([]);
-const branches = ref<{ id: number; branchName: string }[]>([]);
+const branches = ref<BranchOption[]>([]);
 const roles = ref<{ id: number; roleCode: string }[]>([]);
 const loading = ref(false);
 const loadError = ref(false);
@@ -266,7 +268,7 @@ const importProgress = ref(0);
 const importResult = ref<ImportResult | null>(null);
 const importFailure = ref("");
 const importBranchState = ref<OptionState>("idle");
-const importBranches = ref<{ id: number; branchName: string }[]>([]);
+const importBranches = ref<BranchOption[]>([]);
 const importBranchKeyword = ref("");
 const importBranchOptions = computed(() => {
   const keyword = importBranchKeyword.value.trim();
@@ -366,6 +368,13 @@ async function loadImportBranches() {
     }
   }
 }
+/** 校验导入文件；不通过时返回应展示的提示，通过时返回 null。 */
+function validateImportFile(file: File): string | null {
+  if (!/\.xlsx$/i.test(file.name)) return "请上传 .xlsx 格式文件";
+  if (file.size === 0) return "文件内容为空，请选择包含数据的 .xlsx 文件";
+  if (file.size > MAX_IMPORT_SIZE) return `文件不能超过 ${MAX_IMPORT_SIZE / 1024 / 1024} MB`;
+  return null;
+}
 function chooseFile(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0] ?? null;
@@ -373,23 +382,11 @@ function chooseFile(event: Event) {
   clearImportReport();
   importFile.value = file;
   if (!file) return;
-  if (!/\.xlsx$/i.test(file.name)) {
+  const invalid = validateImportFile(file);
+  if (invalid) {
     importFile.value = null;
     resetImportFileInput();
-    ElMessage.warning("请上传 .xlsx 格式文件");
-    return;
-  }
-  if (file.size === 0) {
-    importFile.value = null;
-    resetImportFileInput();
-    ElMessage.warning("文件内容为空，请选择包含数据的 .xlsx 文件");
-    return;
-  }
-  if (file.size > MAX_IMPORT_SIZE) {
-    importFile.value = null;
-    resetImportFileInput();
-    ElMessage.warning("文件不能超过 10 MB");
-    return;
+    ElMessage.warning(invalid);
   }
 }
 const toCount = (value: unknown): number | null =>
@@ -415,33 +412,33 @@ function parseImportResult(raw: unknown): ImportResult | null {
   }
   return { total, successCount, failCount, errors };
 }
-function notifyImportResult(result: ImportResult) {
-  if (result.total === 0) {
-    ElMessage.info("文件中没有可导入的数据行");
-    return;
-  }
-  if (result.failCount === 0 && result.successCount > 0) {
-    ElMessage.success(`导入完成：共 ${result.total} 行，全部成功`);
-    return;
-  }
-  if (result.successCount > 0) {
-    ElMessage.warning(`导入部分成功：成功 ${result.successCount} 行，失败 ${result.failCount} 行，请下载错误报告核对`);
-    return;
-  }
-  if (result.failCount > 0) {
-    ElMessage.error(`导入失败：共 ${result.total} 行，全部失败，请下载错误报告核对`);
-    return;
-  }
-  ElMessage.warning("导入结果未包含成功或失败行，请核对成员列表确认实际写入情况");
-}
-const importOutcome = computed<{ type: "success" | "warning" | "error" | "info"; title: string } | null>(() => {
-  const result = importResult.value;
-  if (!result) return null;
+/** 结果分类：通知文案与弹窗摘要共用同一套判定，避免两处级联各写一遍。 */
+type ImportOutcome = { type: "success" | "warning" | "error" | "info"; title: string };
+function classifyImportResult(result: ImportResult): ImportOutcome {
   if (result.total === 0) return { type: "info", title: "文件中没有可导入的数据行" };
   if (result.failCount === 0 && result.successCount > 0) return { type: "success", title: "全部导入成功" };
   if (result.successCount > 0) return { type: "warning", title: "部分导入成功" };
   if (result.failCount > 0) return { type: "error", title: "全部导入失败" };
   return { type: "info", title: "导入结果未包含成功或失败计数" };
+}
+function notifyImportResult(result: ImportResult) {
+  const outcome = classifyImportResult(result);
+  if (outcome.type === "success") {
+    ElMessage.success(`导入完成：共 ${result.total} 行，全部成功`);
+  } else if (outcome.type === "warning") {
+    ElMessage.warning(`导入部分成功：成功 ${result.successCount} 行，失败 ${result.failCount} 行，请下载错误报告核对`);
+  } else if (outcome.type === "error") {
+    ElMessage.error(`导入失败：共 ${result.total} 行，全部失败，请下载错误报告核对`);
+  } else if (result.total === 0) {
+    ElMessage.info(outcome.title);
+  } else {
+    ElMessage.warning("导入结果未包含成功或失败行，请核对成员列表确认实际写入情况");
+  }
+}
+const importOutcome = computed<ImportOutcome | null>(() => {
+  const result = importResult.value;
+  if (!result) return null;
+  return classifyImportResult(result);
 });
 const importSummary = computed(() => {
   const result = importResult.value;
@@ -456,14 +453,22 @@ function isTimeoutError(error: unknown): boolean {
 }
 /** 读取服务端返回的业务原因，用于区分「确定性拒绝」与「结果未知」。 */
 function readServerRejection(error: unknown): { status: number; message: string } | null {
-  if (typeof error !== "object" || error === null) return null;
-  const response = (error as { response?: { status?: unknown; data?: { message?: unknown } } }).response;
-  const status = typeof response?.status === "number" ? response.status : 0;
-  // 4xx 表示服务端已明确拒绝本次请求，没有进入逐行写入；
-  // 5xx、断网与超时都可能发生在写入过程中，结果未知。
-  if (status < 400 || status >= 500) return null;
-  const message = typeof response?.data?.message === "string" ? response.data.message.trim() : "";
-  return { status, message };
+  const status = readHttpStatus(error);
+  // 明确拒绝类 4xx 表示服务端没有进入逐行写入：400 参数/格式问题、403 无权限、
+  // 404/405/413/415/422 等同类确定性拒绝。
+  // 但 408 超时与 429 限流说明请求可能已到达或被节流，401 在开发预览下会被请求层跳过，
+  // 这些都不能断言「未写入」，仍按结果未知处理。
+  if (!isDefiniteRejection(status)) return null;
+  return { status, message: getApiErrorMessage(error, "") };
+}
+function readHttpStatus(error: unknown): number {
+  if (typeof error !== "object" || error === null) return 0;
+  const response = (error as { response?: { status?: unknown } }).response;
+  return typeof response?.status === "number" ? response.status : 0;
+}
+/** 该状态码是否足以断言服务端未执行导入。 */
+function isDefiniteRejection(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429;
 }
 async function submitImport() {
   // 同步置位，避免校验与异步阶段中双击产生第二次导入请求。
@@ -473,16 +478,9 @@ async function submitImport() {
     ElMessage.warning("请选择 Excel 文件");
     return;
   }
-  if (!/\.xlsx$/i.test(file.name)) {
-    ElMessage.warning("请上传 .xlsx 格式文件");
-    return;
-  }
-  if (file.size === 0) {
-    ElMessage.warning("文件内容为空，请选择包含数据的 .xlsx 文件");
-    return;
-  }
-  if (file.size > MAX_IMPORT_SIZE) {
-    ElMessage.warning("文件不能超过 10 MB");
+  const invalid = validateImportFile(file);
+  if (invalid) {
+    ElMessage.warning(invalid);
     return;
   }
   const epoch = importEpoch;
@@ -501,6 +499,7 @@ async function submitImport() {
     if (!result) {
       importFailure.value =
         "服务端返回的导入结果不完整，无法确认成功与失败行数。请先核对成员列表，再决定是否重新导入。";
+      scrollImportResultIntoView();
       return;
     }
     importResult.value = result;
@@ -518,6 +517,7 @@ async function submitImport() {
     // 此时既没有逐行写入，也不能归为「网络失败」或「结果未确认」，需原样转达服务端原因。
     const rejection = readServerRejection(error);
     if (rejection) {
+      // 请求层已对同一原因弹过错误提示，这里在弹窗内保留持久说明，便于核对后再处理。
       importFailure.value = rejection.message
         ? `导入未执行：${rejection.message}`
         : `导入未执行：服务端拒绝了本次请求（HTTP ${rejection.status}），未写入任何成员。`;
@@ -733,14 +733,13 @@ function downloadErrors() {
       v-model="importVisible"
       title="Excel 导入成员"
       width="min(680px, calc(100vw - 32px))"
-      class="import-dialog-shell"
       :close-on-click-modal="!importing"
       :close-on-press-escape="!importing"
       :show-close="!importing"
       @opened="scrollImportTop"
       @closed="onImportClosed"
     >
-      <div ref="importDialogBody" class="import-dialog" data-testid="import-dialog-body">
+      <div ref="importDialogBody" class="import-dialog">
         <el-alert title="填写规则" type="info" show-icon :closable="false" class="import-rule">
           <template #default>
             <ul class="rule-list">
