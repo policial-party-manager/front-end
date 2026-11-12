@@ -236,6 +236,18 @@ test("导入弹窗展示填写规则与真实正常支部全名", async (t) => {
   assert.ok(text.includes("共 2 个正常支部"), "应显示支部选项数量");
 });
 
+test("规则中的支部管理链接可用键盘聚焦并可跳转", async (t) => {
+  const { page } = await fixture(t);
+  const dialog = await openImport(page);
+  const link = dialog.getByRole("button", { name: "支部管理", exact: true });
+  await link.waitFor();
+  await link.focus();
+  assert.equal(await link.evaluate((node) => node === document.activeElement), true, "支部管理入口应可键盘聚焦");
+  await page.keyboard.press("Enter");
+  await page.waitForURL((url) => new URL(url).pathname === "/branches");
+  assert.equal(await page.locator(".branches-table").count(), 1);
+});
+
 test("支部选项加载失败提示无法核对并可刷新重试", async (t) => {
   const { page, state } = await fixture(t);
   state.branchFailures = 1;

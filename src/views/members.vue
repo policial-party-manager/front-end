@@ -723,7 +723,16 @@ function downloadErrors() {
         <el-alert title="填写规则" type="info" show-icon :closable="false" class="import-rule">
           <template #default>
             <ul class="rule-list">
-              <li>填写所属支部前，请先在<a class="rule-link" @click="goToBranches">支部管理</a>中维护对应支部。</li>
+              <li>
+                填写所属支部前，请先在<button
+                  type="button"
+                  class="rule-link"
+                  :disabled="importing"
+                  @click="goToBranches"
+                >
+                  支部管理</button
+                >中维护对应支部。
+              </li>
               <li>填写时须匹配系统中正常支部的名称；首尾空格由服务端处理，名称不一致的行会逐行失败。</li>
               <li>所属支部可以留空，留空表示未分配支部。</li>
               <li>重复的账号/学号、手机号或邮箱会按行失败，不会覆盖已有成员。</li>
@@ -962,9 +971,18 @@ function downloadErrors() {
   line-height: 1.7;
 }
 .rule-link {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
   color: var(--party-red);
   cursor: pointer;
   text-decoration: underline;
+}
+.rule-link:disabled {
+  color: var(--text-secondary);
+  cursor: not-allowed;
 }
 .import-branches {
   border: 1px solid var(--border-color);
