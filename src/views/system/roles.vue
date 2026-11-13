@@ -47,24 +47,31 @@ function current(snapshot: SessionIdentitySnapshot) {
 }
 
 let requestSequence = 0;
-/** 回读列表；返回是否成功，供写操作区分「写入失败」与「写入成功但回读失败」。 */
-async function loadRoles(): Promise<boolean> {
-  if (!canManage.value || disposed) return false;
+/**
+ * 回读列表。
+ * 返回 "ok" 表示已更新 rows；"stale" 表示被新请求/会话变更抢占（不是失败，不得提示回读失败）；
+ * "failed" 表示真正的接口失败。
+ */
+async function loadRoles(): Promise<"ok" | "stale" | "failed"> {
+  if (!canManage.value || disposed) return "stale";
   const sequence = ++requestSequence;
   const snapshot = captureSessionIdentity();
   loading.value = true;
   loadError.value = false;
   try {
     const result = await listRoles();
-    if (sequence !== requestSequence || !current(snapshot)) return false;
+    // 被抢占说明已有更新的加载在跑，由它负责回写与提示。
+    if (sequence !== requestSequence) return "stale";
+    if (!current(snapshot)) return "stale";
     rows.value = Array.isArray(result) ? result : [];
-    return true;
+    return "ok";
   } catch {
     if (sequence === requestSequence && isSessionIdentityCurrent(snapshot)) {
       rows.value = [];
       loadError.value = true;
+      return "failed";
     }
-    return false;
+    return "stale";
   } finally {
     if (sequence === requestSequence && isSessionIdentityCurrent(snapshot)) loading.value = false;
   }
@@ -206,8 +213,8 @@ async function saveRole(): Promise<void> {
     ElMessage.success(isCreate ? "角色已新增" : "角色已更新");
     invalidateForm();
     const readback = await loadRoles();
-    // 写入已经成功，回读失败只是列表陈旧，不能把它当成保存失败。
-    if (!readback && current(snapshot))
+    // 写入已经成功；只有真正回读失败才提示，被抢占的新加载不算失败。
+    if (readback === "failed" && current(snapshot))
       ElMessage.warning("角色已保存，但列表回读失败：请点击列表上方的「重试」确认最新数据");
   } catch {
     // 请求层已提示具体错误；保留表单内容与弹窗，便于修正后重试。
@@ -277,8 +284,8 @@ async function retryDictionary(): Promise<void> {
   const epoch = permEpoch;
   const ready = await loadPermissionNames();
   if (epoch !== permEpoch || !permVisible.value || !current(snapshot) || !target) return;
-  // 字典补齐后重新判定字典外权限，避免把合法权限误标成未知。
-  permUnknown.value = ready ? permOriginal.value.filter((name) => !permissionNames.value.includes(name)) : [];
+  // 仅在字典真正可用时重算字典外权限；重试仍失败时保留原有提示，不摸掉已告知的信息。
+  if (ready) permUnknown.value = permOriginal.value.filter((name) => !permissionNames.value.includes(name));
 }
 
 /** 提交结果 = 勾选值 + 字典外的既有权限（这些项没有对应勾选框，不能被悄悄清掉）。 */
@@ -323,7 +330,7 @@ async function savePermissions(): Promise<void> {
     ElMessage.success("权限已保存");
     invalidatePermissions();
     const readback = await loadRoles();
-    if (!readback && current(snapshot))
+    if (readback === "failed" && current(snapshot))
       ElMessage.warning("权限已保存，但角色列表回读失败：请点击列表上方的「重试」确认");
   } catch {
     // 请求层已提示错误；保留勾选结果便于重试。
@@ -375,6 +382,7 @@ function invalidate(): void {
   rows.value = [];
   loading.value = false;
   loadError.value = false;
+  filters.keyword = "";
   permissionNames.value = [];
   permDictState.value = "loading";
 }

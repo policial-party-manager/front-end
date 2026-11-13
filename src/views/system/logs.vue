@@ -77,15 +77,19 @@ const codeLabel = (value: number | null) => (value == null ? "—" : String(valu
 /**
  * 判断失败是否源于日志服务不可用。
  * ES 未就绪时后端同步返回 HTTP 500（毫秒级），前端 15s 超时则完全没有 response，
- * 两者都归入不可用；后端若改用 HTTP 200 + code!=200 包装，则靠 message 关键字兜底。
- * 400/403 等业务拒绝不归入服务故障。
+ * 两者都归入不可用。
+ * 注意：请求层对「HTTP 200 + code!=200」会 reject 一个普通 Error（既无 response 也无 isAxiosError），
+ * 那属服务端明确应答的业务失败，不能靠「无 response」就判成服务故障。
+ * 400/403 等业务拒绝同理。
  */
 function isServiceUnavailable(error: unknown): boolean {
   const status = (error as { response?: { status?: number } })?.response?.status;
-  // 没有 response 说明请求根本没拿到应答（断网、超时），一律按服务不可用处理。
-  if (status === undefined) return true;
-  // 400/403 等业务拒绝是后端明确应答，不能谎报成 ES 故障。
-  return status >= 500;
+  // 有应答：只有 5xx 才算服务故障。
+  if (status !== undefined) return status >= 500;
+  // 无应答：仅传输层失败（断网/超时）按不可用处理。
+  if ((error as { isAxiosError?: boolean })?.isAxiosError === true) return true;
+  const message = (error as { message?: string })?.message || "";
+  return /Elasticsearch|日志服务/i.test(message);
 }
 
 let disposed = false;
@@ -216,7 +220,17 @@ function invalidate() {
   loading.value = false;
   loadError.value = false;
   serviceUnavailable.value = false;
+  // 清空筛选条件与分页：否则换号后仍显示上个账号的条件，列表结果却是不带条件的。
+  filters.logType = undefined;
+  filters.module = undefined;
+  filters.operatorName = "";
+  filters.ip = "";
+  filters.keyword = "";
+  filters.success = undefined;
+  filters.errorType = "";
+  timeRange.value = null;
   page.value = 1;
+  size.value = 10;
   applied.value = {};
   stats.value = null;
   statsLoading.value = false;

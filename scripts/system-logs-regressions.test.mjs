@@ -83,6 +83,7 @@ async function fixture(t, options = {}) {
     requests: [],
     statsRequests: 0,
     pageFail: null,
+    pageBusinessFail: false,
     statsFail: false,
     statsRaw: null,
     pageGate: null,
@@ -113,6 +114,8 @@ async function fixture(t, options = {}) {
     }
     if (path === "/api/v4/admin/logs/page") {
       if (state.pageGate) await state.pageGate.promise;
+      // 业务失败：HTTP 200 但 code!=200，请求层会 reject 一个没有 response 的普通 Error。
+      if (state.pageBusinessFail) return route.fulfill({ status: 200, json: { code: 400, message: "查询参数不合法" } });
       if (state.pageFail)
         return route.fulfill({
           status: state.pageFail,
@@ -180,12 +183,19 @@ test("日志服务 500 提示服务不可用并隐藏空表，不谎称无数据
 
 test("参数或权限被拒（400/403）不当成服务故障", async (t) => {
   for (const status of [400, 403]) {
-    const { page } = await fixture(t, { pageFail: status });
+    const { page } = await fixture(t, { pageFail: status, pageMessage: status === 403 ? "权限不足" : "参数不合法" });
     const alert = page.locator(".el-alert--error").filter({ hasText: "日志数据加载失败" });
     await alert.waitFor();
     assert.doesNotMatch(await alert.innerText(), /Elasticsearch/);
     assert.match(await alert.innerText(), /权限不足|参数不合法/);
   }
+});
+
+test("HTTP 200 但 code!=200 的业务失败也不谎报成日志服务不可用", async (t) => {
+  const { page } = await fixture(t, { pageBusinessFail: true });
+  const alert = page.locator(".el-alert--error").filter({ hasText: "日志数据加载失败" });
+  await alert.waitFor();
+  assert.doesNotMatch(await alert.innerText(), /Elasticsearch|日志服务未就绪/);
 });
 
 test("筛选收敛空值后提交，翻页与筛选不重复请求统计", async (t) => {
@@ -295,6 +305,23 @@ test("同角色换号清空统计与列表并重新拉取，旧响应不写回",
   state.statsGate.resolve();
   await page.waitForTimeout(200);
   assert.equal(await page.evaluate(() => localStorage.getItem("party_access_token")), "other");
+});
+
+test("同角色换号清空筛选条件与分页，不把上个账号的条件带到新会话", async (t) => {
+  const { page, state } = await fixture(t);
+  await chooseFilter(page, 0, "登录");
+  await page.getByRole("textbox", { name: "操作人", exact: true }).fill("超级管理员");
+  await page.getByRole("button", { name: "搜索", exact: true }).click();
+  await eventually(() => state.requests.some((r) => r.path.endsWith("/logs/page") && r.params.logType === "LOGIN"));
+  await page.evaluate(async () => {
+    const s = await import("/src/utils/session.ts");
+    s.applySession({ accessToken: "other", refreshToken: "other-refresh", role: "super_admin", username: "other" });
+  });
+  // 换号后重新拉取应是不带旧条件的全量请求，UI 条件也不能残留。
+  await eventually(() => state.requests.filter((r) => r.path.endsWith("/logs/page") && !r.params.logType).length > 1);
+  assert.equal(await page.getByRole("textbox", { name: "操作人", exact: true }).inputValue(), "");
+  const last = state.requests.filter((r) => r.path.endsWith("/logs/page")).at(-1);
+  assert.equal("operatorName" in last.params, false);
 });
 
 test("390px 窄屏下筛选区不把页面撑出横向滚动", async (t) => {
