@@ -105,11 +105,39 @@ jobs:
       - name: 权限与预览策略
         run: npm run check:permissions
       - name: 回归脚本与 CI 格式
-        run: npx prettier scripts/check-permissions.mjs scripts/member-management-regressions.test.mjs scripts/member-import-regressions.test.mjs .github/workflows/ci.yml --check
+        run: npx prettier scripts/check-permissions.mjs scripts/member-management-regressions.test.mjs scripts/member-import-regressions.test.mjs scripts/system-roles-regressions.test.mjs scripts/system-logs-regressions.test.mjs .github/workflows/ci.yml --check
+
+  system-management-regressions:
+    name: 系统管理回归
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: 安装依赖
+        run: npm ci
+      - name: 安装 Chromium
+        run: npx playwright-core install --with-deps chromium
+      - name: 角色与日志浏览器回归
+        run: npm run test:system
+      - name: 权限与预览策略
+        run: npm run check:permissions
 
   build:
     name: 生产构建
-    needs: [lint, typecheck, branch-regressions, member-import-regressions, member-management-regressions]
+    needs:
+      [
+        lint,
+        typecheck,
+        branch-regressions,
+        member-import-regressions,
+        member-management-regressions,
+        system-management-regressions,
+      ]
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
