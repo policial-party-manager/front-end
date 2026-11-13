@@ -55,5 +55,31 @@ export interface LogFilters {
   endTime?: string;
 }
 
+/** 后端 LogType 常量，也是 stats 接口的固定四个 key。 */
+export const LOG_TYPES = ["LOGIN", "LOGOUT", "OPERATION", "ERROR"] as const;
+export type LogType = (typeof LOG_TYPES)[number];
+/** 全局日志统计：四类日志的总条数，与列表筛选条件无关。 */
+export type LogStats = Record<LogType, number>;
+
 export const pageLogs = (params: LogFilters & { page: number; size: number }) =>
   get<LogPageResult>("/v4/admin/logs/page", params);
+
+/**
+ * 校验统计响应：四个 key 必须齐全且均为非负安全整数。
+ * 缺失、null、字符串、负数与 NaN 一律视为异常响应，绝不默认补 0 冒充真实计数。
+ */
+export function parseLogStats(payload: unknown): LogStats {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("日志统计响应格式不正确");
+  const source = payload as Record<string, unknown>;
+  const result = {} as LogStats;
+  for (const type of LOG_TYPES) {
+    const value = source[type];
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0)
+      throw new Error(`日志统计缺少或包含非法的 ${type} 计数`);
+    result[type] = value;
+  }
+  return result;
+}
+
+/** 全局统计；不接收 keyword、时间范围或分页参数。 */
+export const getLogStats = async (): Promise<LogStats> => parseLogStats(await get<unknown>("/v4/admin/logs/stats"));

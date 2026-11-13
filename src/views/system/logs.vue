@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { ElMessage } from "element-plus";
 import { useAppStore } from "@/stores/app";
-import { sessionHasAccessToken } from "@/utils/session";
-import { pageLogs, type LogFilters, type OperationLogVo } from "@/api/logs";
+import {
+  captureSessionIdentity,
+  isSessionIdentityCurrent,
+  sessionHasAccessToken,
+  sessionIdentity,
+  type SessionIdentitySnapshot,
+} from "@/utils/session";
+import { getLogStats, pageLogs, type LogFilters, type LogStats, type LogType, type OperationLogVo } from "@/api/logs";
 
 const store = useAppStore();
 const canManage = computed(() => store.currentRole === "super_admin" && sessionHasAccessToken.value);
 
 /** logType 取值与后端 LogType 常量一致，也是 stats 接口的 4 个 key。 */
-const LOG_TYPES = [
+const LOG_TYPES: { label: string; value: LogType }[] = [
   { label: "登录", value: "LOGIN" },
   { label: "登出", value: "LOGOUT" },
   { label: "操作", value: "OPERATION" },
@@ -65,39 +72,73 @@ const roleLabel = (role: string | null) => ROLE_LABELS[role || ""] || role || "�
 const resultLabel = (value: boolean) => (value ? "成功" : "失败");
 /** 数值字段用 == null 而非 falsy：durationMs / resultCode 的 0 是合法值，不能显示成 —。 */
 const durationLabel = (value: number | null) => (value == null ? "—" : `${value} ms`);
+const codeLabel = (value: number | null) => (value == null ? "—" : String(value));
 
 /**
  * 判断失败是否源于日志服务不可用。
  * ES 未就绪时后端同步返回 HTTP 500（毫秒级），前端 15s 超时则完全没有 response，
  * 两者都归入不可用；后端若改用 HTTP 200 + code!=200 包装，则靠 message 关键字兜底。
+ * 400/403 等业务拒绝不归入服务故障。
  */
 function isServiceUnavailable(error: unknown): boolean {
-  const message = (error as { message?: string })?.message || "";
-  if (/Elasticsearch|日志服务/i.test(message)) return true;
   const status = (error as { response?: { status?: number } })?.response?.status;
+  // 没有 response 说明请求根本没拿到应答（断网、超时），一律按服务不可用处理。
   if (status === undefined) return true;
+  // 400/403 等业务拒绝是后端明确应答，不能谎报成 ES 故障。
   return status >= 500;
+}
+
+let disposed = false;
+function current(snapshot: SessionIdentitySnapshot) {
+  return !disposed && canManage.value && isSessionIdentityCurrent(snapshot);
 }
 
 let requestSequence = 0;
 async function loadLogs() {
+  if (!canManage.value || disposed) return;
   const sequence = ++requestSequence;
+  const snapshot = captureSessionIdentity();
   loading.value = true;
   loadError.value = false;
   try {
     const result = await pageLogs({ page: page.value, size: size.value, ...applied.value });
-    if (sequence !== requestSequence) return;
+    if (sequence !== requestSequence || !current(snapshot)) return;
     rows.value = result.records;
     total.value = result.total;
     serviceUnavailable.value = false;
   } catch (error) {
-    if (sequence !== requestSequence) return;
+    if (sequence !== requestSequence || !current(snapshot)) return;
     rows.value = [];
     total.value = 0;
     loadError.value = true;
     serviceUnavailable.value = isServiceUnavailable(error);
   } finally {
-    if (sequence === requestSequence) loading.value = false;
+    if (sequence === requestSequence && isSessionIdentityCurrent(snapshot)) loading.value = false;
+  }
+}
+
+// ============ 全局统计（独立数据流，与列表失败互不覆盖） ============
+const stats = ref<LogStats | null>(null);
+const statsLoading = ref(false);
+const statsError = ref(false);
+let statsSequence = 0;
+async function loadStats() {
+  if (!canManage.value || disposed) return;
+  const sequence = ++statsSequence;
+  const snapshot = captureSessionIdentity();
+  statsLoading.value = true;
+  // 刷新失败不得让旧值冒充最新结果：进入加载即作废旧值，失败后停在错误态。
+  stats.value = null;
+  statsError.value = false;
+  try {
+    const result = await getLogStats();
+    if (sequence !== statsSequence || !current(snapshot)) return;
+    stats.value = result;
+  } catch {
+    if (sequence !== statsSequence || !isSessionIdentityCurrent(snapshot)) return;
+    statsError.value = true;
+  } finally {
+    if (sequence === statsSequence && isSessionIdentityCurrent(snapshot)) statsLoading.value = false;
   }
 }
 
@@ -113,11 +154,18 @@ function buildFilters(): LogFilters {
     // el-select 清空时不同版本会给出 "" 或 undefined，这里只放行真正的布尔值。
     success: typeof filters.success === "boolean" ? filters.success : undefined,
     errorType: filters.errorType.trim() || undefined,
-    startTime,
-    endTime,
+    startTime: startTime || undefined,
+    endTime: endTime || undefined,
   };
 }
 function search() {
+  if (!canManage.value) return;
+  const [startTime, endTime] = timeRange.value || [];
+  // 服务端不校验范围先后，反向区间会静默返回空集；前端直接拒绝并保留已应用条件。
+  if (startTime && endTime && startTime > endTime) {
+    ElMessage.warning("开始时间不能晚于结束时间，已应用条件未改变");
+    return;
+  }
   applied.value = buildFilters();
   page.value = 1;
   void loadLogs();
@@ -134,32 +182,74 @@ function reset() {
   search();
 }
 function changePage(value: number) {
+  if (!canManage.value) return;
   page.value = value;
   void loadLogs();
 }
 function changeSize(value: number) {
+  if (!canManage.value) return;
   size.value = value;
   page.value = 1;
   void loadLogs();
+}
+function retryAll() {
+  void loadLogs();
+}
+function refreshStats() {
+  void loadStats();
 }
 
 /** 列表接口已返回全字段，详情直接复用行数据，不再单独请求。 */
 const detailVisible = ref(false);
 const detail = ref<OperationLogVo | null>(null);
 function openDetail(row: OperationLogVo) {
+  if (!canManage.value) return;
   detail.value = row;
   detailVisible.value = true;
 }
 
-onMounted(() => {
-  if (canManage.value) void loadLogs();
-});
-watch(canManage, (enabled) => {
+function invalidate() {
+  requestSequence++;
+  statsSequence++;
   rows.value = [];
   total.value = 0;
+  loading.value = false;
+  loadError.value = false;
+  serviceUnavailable.value = false;
+  page.value = 1;
+  applied.value = {};
+  stats.value = null;
+  statsLoading.value = false;
+  statsError.value = false;
+  detail.value = null;
   detailVisible.value = false;
-  if (enabled) void loadLogs();
+}
+
+onMounted(() => {
+  if (!canManage.value) return;
+  void loadLogs();
+  void loadStats();
 });
+watch([canManage, sessionIdentity], () => {
+  // 退出、换号或权限变化：清除上一个会话的列表、统计、详情与在途回调。
+  invalidate();
+  if (canManage.value) {
+    void loadLogs();
+    void loadStats();
+  }
+});
+onBeforeUnmount(() => {
+  disposed = true;
+  invalidate();
+});
+
+/** 统计卡片展示值：仅在成功时渲染数字，加载与失败都不显示旧数字。 */
+const statsCards = computed(() =>
+  LOG_TYPES.map((item) => ({
+    ...item,
+    count: stats.value ? stats.value[item.value] : null,
+  })),
+);
 </script>
 
 <template>
@@ -185,6 +275,28 @@ watch(canManage, (enabled) => {
       :closable="false"
     />
     <div v-else class="content-card">
+      <section class="stats-section" aria-label="全局日志统计">
+        <div class="stats-header">
+          <div>
+            <strong>全部日志统计</strong>
+            <span class="stats-scope">全部日志统计，不随下方列表筛选变化</span>
+          </div>
+          <el-button link type="primary" :disabled="statsLoading" @click="refreshStats">刷新统计</el-button>
+        </div>
+        <div v-if="statsError" class="stats-error" role="alert">
+          <span>日志统计加载失败，计数暂时不可用</span>
+          <el-button link type="primary" :disabled="statsLoading" @click="refreshStats">重试</el-button>
+        </div>
+        <div v-else class="stats-cards" :class="{ loading: statsLoading }">
+          <div v-for="card in statsCards" :key="card.value" class="stats-card" :data-type="card.value">
+            <span class="stats-label">{{ card.label }}</span>
+            <span v-if="statsLoading" class="stats-value">统计中…</span>
+            <span v-else class="stats-value">{{ card.count ?? "—" }}</span>
+            <span class="stats-unit">条</span>
+          </div>
+        </div>
+      </section>
+
       <div class="card-header">
         <div>
           <strong>日志列表</strong>
@@ -236,7 +348,7 @@ watch(canManage, (enabled) => {
         <template #default>
           <p v-if="serviceUnavailable">后端日志服务（Elasticsearch）未就绪，不是无数据。请确认日志服务已启动后重试。</p>
           <p v-else>请求已到达后端但被拒绝，常见原因是筛选参数不合法或当前账号权限不足。</p>
-          <el-button link type="primary" @click="loadLogs">重试</el-button>
+          <el-button link type="primary" @click="retryAll">重试</el-button>
         </template>
       </el-alert>
       <!-- loadError 时不渲染表格：空表的「暂无日志数据」会和上方的服务不可用告警自相矛盾。 -->
@@ -305,10 +417,10 @@ watch(canManage, (enabled) => {
         <el-descriptions-item label="模块">{{ detail.module || "—" }}</el-descriptions-item>
         <el-descriptions-item label="动作" :span="2">{{ detail.action || "—" }}</el-descriptions-item>
         <el-descriptions-item label="请求方法">{{ detail.method || "—" }}</el-descriptions-item>
-        <el-descriptions-item label="状态码">{{ detail.resultCode ?? "—" }}</el-descriptions-item>
+        <el-descriptions-item label="状态码">{{ codeLabel(detail.resultCode) }}</el-descriptions-item>
         <el-descriptions-item label="请求路径" :span="2">{{ detail.path || "—" }}</el-descriptions-item>
         <el-descriptions-item label="操作人">{{ detail.operatorName || "—" }}</el-descriptions-item>
-        <el-descriptions-item label="操作人 ID">{{ detail.operatorId ?? "—" }}</el-descriptions-item>
+        <el-descriptions-item label="操作人 ID">{{ codeLabel(detail.operatorId) }}</el-descriptions-item>
         <el-descriptions-item label="角色">{{ roleLabel(detail.role) }}</el-descriptions-item>
         <el-descriptions-item label="IP">{{ detail.ipAddress || "—" }}</el-descriptions-item>
         <el-descriptions-item label="结果">{{ resultLabel(detail.success) }}</el-descriptions-item>
@@ -347,6 +459,66 @@ watch(canManage, (enabled) => {
   color: var(--party-red);
   font-size: 13px;
   white-space: nowrap;
+}
+.stats-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--bg-page);
+  border-radius: var(--radius-base);
+}
+.stats-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.stats-scope {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.stats-cards.loading {
+  opacity: 0.75;
+}
+.stats-card {
+  background: #fff;
+  border: 1px solid var(--border-base, #ebeef5);
+  border-radius: var(--radius-base);
+  padding: 12px 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.stats-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-right: auto;
+}
+.stats-value {
+  color: var(--party-red);
+  font-size: 20px;
+  font-weight: 600;
+  word-break: break-all;
+}
+.stats-unit {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.stats-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: #c45656;
+  font-size: 13px;
 }
 .card-header {
   display: flex;
@@ -396,6 +568,7 @@ watch(canManage, (enabled) => {
 .pagination {
   justify-content: flex-end;
   margin-top: 20px;
+  flex-wrap: wrap;
 }
 @media (max-width: 768px) {
   .logs-page.page-container {
@@ -404,11 +577,22 @@ watch(canManage, (enabled) => {
   .page-header {
     flex-direction: column;
   }
+  .stats-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .filters .filter-type,
   .filters .filter-input,
   .filters .filter-keyword,
   .filters .filter-time {
     width: 100%;
+  }
+}
+@media (max-width: 420px) {
+  .stats-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pagination {
+    justify-content: center;
   }
 }
 </style>
