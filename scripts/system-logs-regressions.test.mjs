@@ -65,14 +65,14 @@ async function fixture(t, options = {}) {
     assert.deepEqual(errors, []);
     assert.deepEqual(unexpected, []);
   });
-  await context.addInitScript(() => {
+  await context.addInitScript((role) => {
     if (location.protocol !== "http:") return;
     if (!localStorage.getItem("party_access_token")) {
       localStorage.setItem("party_access_token", "test-access");
       localStorage.setItem("party_refresh_token", "test-refresh");
-      localStorage.setItem("party_user_session", JSON.stringify({ name: "管理员", avatar: "", role: "super_admin" }));
+      localStorage.setItem("party_user_session", JSON.stringify({ name: "管理员", avatar: "", role }));
     }
-  });
+  }, options.role || "super_admin");
   const page = await context.newPage();
   page.setDefaultTimeout(8000);
   page.on("pageerror", (e) => errors.push(e.message));
@@ -101,6 +101,9 @@ async function fixture(t, options = {}) {
         role: "super_admin",
         username: "admin",
       });
+    // 未授权角色会被路由守卫踢回首页，首页自身的资讯接口需要给出可渲染响应。
+    if (path === "/api/v2/content/news/page" || path === "/api/v2/content/notices/page")
+      return ok(route, { records: [], total: 0 });
     if (path === "/api/v4/admin/logs/stats") {
       state.statsRequests++;
       if (state.statsGate) await state.statsGate.promise;
@@ -121,7 +124,7 @@ async function fixture(t, options = {}) {
     return route.abort();
   });
   await page.goto(`${baseURL}/system/logs`);
-  await page.locator(".stats-section").waitFor();
+  if (!(options.role && options.role !== "super_admin")) await page.locator(".stats-section").waitFor();
   return { page, state, context };
 }
 
@@ -305,4 +308,17 @@ test("390px 窄屏下筛选区不把页面撑出横向滚动", async (t) => {
   assert.equal(overflow.scrollWidth, overflow.clientWidth);
   const timeBox = await page.locator(".filters .filter-time").boundingBox();
   assert.ok(timeBox.x + timeBox.width <= overflow.clientWidth + 1, JSON.stringify(timeBox));
+});
+
+test("非超管角色直访日志页被路由拦截，统计与列表都不请求也不渲染", async (t) => {
+  const { page, state } = await fixture(t, { role: "party_member" });
+  await eventually(async () => new URL(page.url()).pathname === "/");
+  assert.match(await page.locator(".el-message").first().innerText(), /当前身份无权访问该页面/);
+  assert.equal(await page.locator(".stats-section").count(), 0);
+  assert.equal(await page.locator(".logs-table").count(), 0);
+  assert.equal(
+    state.requests.filter((r) => r.path.startsWith("/api/v4/admin")).length,
+    0,
+    JSON.stringify(state.requests),
+  );
 });

@@ -52,14 +52,14 @@ async function fixture(t, options = {}) {
     assert.deepEqual(errors, []);
     assert.deepEqual(unexpected, []);
   });
-  await context.addInitScript(() => {
+  await context.addInitScript((role) => {
     if (location.protocol !== "http:") return;
     if (!localStorage.getItem("party_access_token")) {
       localStorage.setItem("party_access_token", "test-access");
       localStorage.setItem("party_refresh_token", "test-refresh");
-      localStorage.setItem("party_user_session", JSON.stringify({ name: "管理员", avatar: "", role: "super_admin" }));
+      localStorage.setItem("party_user_session", JSON.stringify({ name: "管理员", avatar: "", role }));
     }
-  });
+  }, options.role || "super_admin");
   const page = await context.newPage();
   page.setDefaultTimeout(8000);
   page.on("pageerror", (e) => errors.push(e.message));
@@ -98,13 +98,19 @@ async function fixture(t, options = {}) {
         role: "super_admin",
         username: "admin",
       });
+    // 未授权角色会被路由守卫踢回首页，首页自身的资讯接口需要给出可渲染响应。
+    if (path === "/api/v2/content/news/page" || path === "/api/v2/content/notices/page")
+      return ok(route, { records: [], total: 0 });
     if (path === "/api/v4/admin/roles/permission-names")
       return state.dictFail
         ? route.fulfill({ status: 500, json: { message: "字典失败" } })
         : ok(route, state.dictionary);
     if (path === "/api/v4/admin/roles" && method === "GET")
       return state.listFail || state.readbackFail
-        ? route.fulfill({ status: 500, json: { message: "角色列表失败" } })
+        ? route.fulfill({
+            status: typeof state.listFail === "number" ? state.listFail : 500,
+            json: { code: 403, message: "无权访问该接口" },
+          })
         : ok(route, state.rows);
     if (path === "/api/v4/admin/roles" && method === "POST") {
       state.writes.push({ method, path, body: req.postDataJSON() });
@@ -139,8 +145,10 @@ async function fixture(t, options = {}) {
     return route.abort();
   });
   await page.goto(`${baseURL}/system/roles`);
-  await page.locator(".roles-table").waitFor();
-  await eventually(async () => (await page.locator(".roles-table tbody tr").count()) === state.rows.length);
+  if (!(options.role && options.role !== "super_admin") && !state.listFail && !state.readbackFail) {
+    await page.locator(".roles-table").waitFor();
+    await eventually(async () => (await page.locator(".roles-table tbody tr").count()) === state.rows.length);
+  }
   return { page, state, context };
 }
 
@@ -372,4 +380,30 @@ test("角色详情读取失败不展示半成品表单，避免用旧快照覆�
   await page.waitForTimeout(300);
   assert.equal(await dialog(page, "编辑角色").count(), 0);
   assert.equal(state.writes.length, 0);
+});
+
+test("非超管角色直访系统管理被路由拦截，且不发起管理接口请求", async (t) => {
+  const { page, state } = await fixture(t, { role: "party_secretary" });
+  // 路由守卫应跳到首页，不渲染角色页，也不请求需超管权限的管理接口。
+  await eventually(async () => new URL(page.url()).pathname === "/");
+  assert.equal(await page.locator(".roles-table").count(), 0);
+  assert.match(await page.locator(".el-message").first().innerText(), /当前身份无权访问该页面/);
+  assert.deepEqual(
+    state.requests.filter((r) => r.path.startsWith("/api/v4/admin")),
+    [],
+  );
+  // 直接访问日志页同样被拦。
+  await page.goto(`${baseURL}/system/logs`);
+  await eventually(async () => new URL(page.url()).pathname === "/");
+  assert.equal(await page.locator(".stats-section").count(), 0);
+  assert.match(await page.locator(".el-message").first().innerText(), /当前身份无权访问该页面/);
+});
+
+test("服务端返回 403 时展示真实错误，不冒充空数据也不自行展示权限", async (t) => {
+  const { page, state } = await fixture(t, { listFail: 403 });
+  await page.locator(".load-error").waitFor();
+  assert.match(await page.locator(".load-error").innerText(), /角色数据加载失败/);
+  assert.equal(await page.locator(".roles-table tbody tr").count(), 0);
+  await page.getByRole("button", { name: "重试", exact: true }).click();
+  await eventually(() => state.requests.filter((r) => r.path === "/api/v4/admin/roles").length >= 2);
 });
