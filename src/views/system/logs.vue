@@ -539,6 +539,8 @@ const statsCards = computed(() =>
   margin-bottom: 18px;
   border-radius: var(--radius-base);
   display: grid;
+  /* 未声明列宽时隐式列为 auto，窄屏下会按 max-content 撑宽，百分宽子项跟着溢出。 */
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
 .filters-row {
@@ -546,6 +548,7 @@ const statsCards = computed(() =>
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+  min-width: 0;
 }
 .filters .filter-type {
   width: 140px;
@@ -585,6 +588,15 @@ const statsCards = computed(() =>
   .filters .filter-keyword,
   .filters .filter-time {
     width: 100%;
+  }
+  /* datetimerange 内部两段输入各有内容最小宽度，窄屏下会把整行撑出视口。 */
+  .filters .filter-time {
+    min-width: 0;
+  }
+  .filters .filter-time :deep(.el-range-input) {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
   }
 }
 @media (max-width: 420px) {

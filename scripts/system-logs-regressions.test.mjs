@@ -293,3 +293,16 @@ test("同角色换号清空统计与列表并重新拉取，旧响应不写回",
   await page.waitForTimeout(200);
   assert.equal(await page.evaluate(() => localStorage.getItem("party_access_token")), "other");
 });
+
+test("390px 窄屏下筛选区不把页面撑出横向滚动", async (t) => {
+  const { page } = await fixture(t, { viewport: { width: 390, height: 844 } });
+  await eventually(async () => (await tableRows(page).count()) === 2);
+  // 日期区间内部两段输入有内容最小宽度，grid/flex 未约束时会把整行顶出视口。
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  assert.equal(overflow.scrollWidth, overflow.clientWidth);
+  const timeBox = await page.locator(".filters .filter-time").boundingBox();
+  assert.ok(timeBox.x + timeBox.width <= overflow.clientWidth + 1, JSON.stringify(timeBox));
+});
