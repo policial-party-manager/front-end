@@ -105,7 +105,7 @@ jobs:
       - name: 权限与预览策略
         run: npm run check:permissions
       - name: 回归脚本与 CI 格式
-        run: npx prettier scripts/member-management-regressions.test.mjs scripts/member-import-regressions.test.mjs .github/workflows/ci.yml --check
+        run: npx prettier scripts/check-permissions.mjs scripts/member-management-regressions.test.mjs scripts/member-import-regressions.test.mjs .github/workflows/ci.yml --check
 
   build:
     name: 生产构建

@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
-import { hasPermission, isRole, roleFromBackend } from "../src/config/permissions.ts";
-import * as permissions from "../src/config/permissions.ts";
-import * as authMode from "../src/config/auth-mode.ts";
-import { getRouteViewKey } from "../src/utils/route-view.ts";
-import { getFallbackRole, shouldRedirectToLogin, shouldSkipUnauthorizedRefresh } from "../src/config/auth-mode.ts";
-import { SessionFence } from "../src/config/session-fence.ts";
+import { createJiti } from "jiti";
+
+// CI 使用 Node.js 20，不能直接导入 TypeScript；复用已有开发依赖，不依赖本机原生类型擦除。
+const jiti = createJiti(import.meta.url);
+const [permissions, authMode, routeView, sessionFence] = await Promise.all([
+  jiti.import("../src/config/permissions.ts"),
+  jiti.import("../src/config/auth-mode.ts"),
+  jiti.import("../src/utils/route-view.ts"),
+  jiti.import("../src/config/session-fence.ts"),
+]);
+const { hasPermission, isRole, roleFromBackend } = permissions;
+const { getFallbackRole, shouldRedirectToLogin, shouldSkipUnauthorizedRefresh } = authMode;
+const { getRouteViewKey } = routeView;
+const { SessionFence } = sessionFence;
 
 const managerRoles = ["super_admin", "party_secretary"];
 const memberRoles = ["party_member", "activist"];
@@ -63,10 +71,18 @@ assert.equal(authMode.canSwitchPreviewRole(false, false), false, "非开发免�
 assert.equal(typeof permissions.resolvePreviewRole, "function", "应提供预览身份解析策略");
 assert.equal(permissions.resolvePreviewRole("super_admin", "party_member", true), "party_member");
 assert.equal(permissions.resolvePreviewRole("super_admin", "unknown", true), "super_admin", "未知身份应保留当前身份");
-assert.equal(permissions.resolvePreviewRole("super_admin", "party_member", false), "super_admin", "禁止切换时应保留当前身份");
+assert.equal(
+  permissions.resolvePreviewRole("super_admin", "party_member", false),
+  "super_admin",
+  "禁止切换时应保留当前身份",
+);
 
 const signTabRoute = { path: "/activity/1", fullPath: "/activity/1?tab=sign", query: { tab: "sign" } };
-const statisticsTabRoute = { path: "/activity/1", fullPath: "/activity/1?tab=statistics", query: { tab: "statistics" } };
+const statisticsTabRoute = {
+  path: "/activity/1",
+  fullPath: "/activity/1?tab=statistics",
+  query: { tab: "statistics" },
+};
 assert.equal(
   getRouteViewKey(signTabRoute, "party_member"),
   getRouteViewKey(statisticsTabRoute, "party_member"),
