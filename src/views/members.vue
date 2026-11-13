@@ -268,13 +268,17 @@ let formEpoch = 0;
 const original = ref<UserVo | null>(null);
 const formLoading = ref(false);
 function closeForm() {
+  if (saving.value) return;
+  invalidateForm();
+}
+function invalidateForm() {
   formEpoch++;
   formVisible.value = false;
   saving.value = false;
   formLoading.value = false;
 }
 function addMember() {
-  if (!canManage.value) return;
+  if (!canManage.value || saving.value) return;
   closeForm();
   original.value = null;
   editingId.value = null;
@@ -282,7 +286,7 @@ function addMember() {
   formVisible.value = true;
 }
 async function editMember(row: UserVo) {
-  if (!canManage.value) return;
+  if (!canManage.value || saving.value) return;
   closeForm();
   const epoch = formEpoch,
     snapshot = captureSessionIdentity();
@@ -349,7 +353,7 @@ async function saveMember() {
     } else await createMember({ ...form });
     if (epoch !== formEpoch || !current(snapshot)) return;
     ElMessage.success(editingId.value === null ? "成员添加成功" : "成员信息已更新");
-    closeForm();
+    invalidateForm();
     await loadMembers();
   } catch (error) {
     if (epoch === formEpoch && current(snapshot))
@@ -404,7 +408,7 @@ function invalidateManagement() {
   identitySequence++;
   detailEpoch++;
   operationEpoch++;
-  closeForm();
+  invalidateForm();
   Object.assign(form, emptyForm());
   original.value = null;
   detailVisible.value = false;
@@ -1082,6 +1086,8 @@ function downloadErrors() {
       :title="editingId === null ? '新增成员' : '编辑成员'"
       width="min(720px, calc(100vw - 24px))"
       :close-on-click-modal="false"
+      :close-on-press-escape="!saving"
+      :show-close="!saving"
       @update:model-value="!$event && closeForm()"
       @closed="!formVisible && formRef?.clearValidate()"
     >
@@ -1150,7 +1156,7 @@ function downloadErrors() {
         /></el-form-item>
       </el-form>
       <template #footer
-        ><el-button @click="closeForm">取消</el-button
+        ><el-button :disabled="saving" @click="closeForm">取消</el-button
         ><el-button type="primary" :disabled="formLoading" :loading="saving" @click="saveMember"
           >保存</el-button
         ></template

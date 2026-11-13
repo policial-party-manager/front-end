@@ -55,5 +55,5 @@ export function roleFromBackend(role: string): Role {
     branch_admin: "party_secretary",
     student: "party_member",
   };
-  return roleMap[role] || "party_member";
+  return Object.prototype.hasOwnProperty.call(roleMap, role) ? roleMap[role] : "party_member";
 }

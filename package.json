@@ -9,6 +9,7 @@
     "check:permissions": "node scripts/check-permissions.mjs",
     "test:branches": "node --test scripts/branch-form-regressions.test.mjs",
     "test:member-import": "node --test scripts/member-import-regressions.test.mjs",
+    "test:members": "node --test scripts/member-management-regressions.test.mjs",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint src --ext .vue,.ts,.js --fix",
