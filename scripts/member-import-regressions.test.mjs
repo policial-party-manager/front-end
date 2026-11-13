@@ -156,6 +156,7 @@ async function fixture(t, options = {}) {
       return ok(route, state.branches);
     }
     if (path === "/api/v4/admin/roles") return ok(route, [{ id: 7, roleCode: "student" }]);
+    if (path === "/api/v2/content/identities/page") return ok(route, { records: [], total: 0 });
     if (path === "/api/v4/admin/users/page") {
       state.pageRequests.push(Object.fromEntries(url.searchParams.entries()));
       if (state.pageFail) return route.fulfill({ status: 500, json: { code: 500, message: "成员列表加载失败" } });
@@ -328,7 +329,7 @@ test("全部失败给出失败反馈，不出现成功提示且保留原始行�
 test("全成功提示成功并回读第一页成员列表", async (t) => {
   const { page, state } = await fixture(t);
   state.importResult = { total: 2, successCount: 2, failCount: 0, errors: [] };
-  await page.locator(".filters input").first().fill("成员");
+  await page.getByPlaceholder("姓名 / 用户名 / 学号 / 手机 / 邮箱").fill("成员");
   await page.getByRole("button", { name: "搜索", exact: true }).click();
   await eventually(() => state.pageRequests.at(-1)?.keyword === "成员", "筛选应生效");
   const dialog = await openImport(page);
@@ -657,12 +658,12 @@ test("另一会话的延迟支部响应在关闭重开后不得回写", async (t
 
 test("重置筛选只清空查询条件，不发送删除或撤销请求", async (t) => {
   const { page, state } = await fixture(t);
-  await page.locator(".filters input").first().fill("成员");
+  await page.getByPlaceholder("姓名 / 用户名 / 学号 / 手机 / 邮箱").fill("成员");
   await page.getByRole("button", { name: "搜索", exact: true }).click();
   await eventually(() => state.pageRequests.at(-1)?.keyword === "成员", "筛选应生效");
   await page.getByRole("button", { name: "重置筛选", exact: true }).click();
   await eventually(() => state.pageRequests.at(-1)?.keyword === undefined, "重置后应重新查询全部成员");
-  assert.equal(await page.locator(".filters input").first().inputValue(), "");
+  assert.equal(await page.getByPlaceholder("姓名 / 用户名 / 学号 / 手机 / 邮箱").inputValue(), "");
   assert.deepEqual(state.writes, [], "重置筛选不得发送任何写请求");
   assert.deepEqual(state.unexpected, [], "不应出现未预期的接口请求");
 });

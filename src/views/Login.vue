@@ -7,12 +7,13 @@
  * 右侧表单（邮箱登录 / 密码登录 双 Tab）。
  * 品牌文案从「川农e认证 / 四川农业大学」替换为「党建云平台」。
  */
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import QRCode from "qrcode";
 import { ElMessage } from "element-plus";
 import { useAppStore } from "@/stores/app";
 import { loginUserpass, loginEmail, sendVerifyCode } from "@/api/auth";
+import { captureSession, isSessionCurrent } from "@/utils/session";
 
 const store = useAppStore();
 const router = useRouter();
@@ -39,6 +40,12 @@ let timer: ReturnType<typeof setInterval> | undefined;
 const account = ref("");
 const password = ref("");
 const showPwd = ref(false);
+const loggingIn = ref(false);
+let disposed = false;
+onBeforeUnmount(() => {
+  disposed = true;
+  if (timer) clearInterval(timer);
+});
 
 // 邮箱格式校验（与后端 openapi 一致）
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
@@ -73,6 +80,7 @@ async function handleGetCode(): Promise<void> {
 }
 
 async function handleLogin(): Promise<void> {
+  if (loggingIn.value) return;
   if (activeTab.value === "email") {
     if (!EMAIL_RE.test(email.value)) {
       ElMessage.warning("请输入正确的邮箱");
@@ -82,27 +90,27 @@ async function handleLogin(): Promise<void> {
       ElMessage.warning("请输入邮箱验证码");
       return;
     }
-    try {
-      const res = await loginEmail({ email: email.value, verifyCode: emailCode.value.trim() });
-      store.setSession(res);
-      ElMessage.success("登录成功");
-      router.push("/");
-    } catch {
-      // 失败提示由请求层拦截器统一处理
-    }
   } else {
     if (!account.value.trim() || !password.value.trim()) {
       ElMessage.warning("请输入账号和密码");
       return;
     }
-    try {
-      const res = await loginUserpass({ username: account.value.trim(), password: password.value });
-      store.setSession(res);
-      ElMessage.success("登录成功");
-      router.push("/");
-    } catch {
-      // 失败提示由请求层拦截器统一处理
-    }
+  }
+  const snapshot = captureSession();
+  loggingIn.value = true;
+  try {
+    const res =
+      activeTab.value === "email"
+        ? await loginEmail({ email: email.value, verifyCode: emailCode.value.trim() })
+        : await loginUserpass({ username: account.value.trim(), password: password.value });
+    if (disposed || !isSessionCurrent(snapshot)) return;
+    store.setSession(res);
+    ElMessage.success("登录成功");
+    void router.push("/");
+  } catch {
+    // 失败提示由请求层拦截器统一处理。
+  } finally {
+    if (!disposed) loggingIn.value = false;
   }
 }
 </script>
@@ -186,7 +194,7 @@ async function handleLogin(): Promise<void> {
             </div>
 
             <!-- 登录按钮 -->
-            <button class="login-btn" type="submit">登 录</button>
+            <button class="login-btn" type="submit" :disabled="loggingIn">{{ loggingIn ? "登录中…" : "登 录" }}</button>
           </form>
         </div>
       </section>
