@@ -128,6 +128,16 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "编辑活动 - 党建云平台", permission: "activity:manage", roles: ["super_admin"] },
   },
   {
+    path: "/activity/:id/participation",
+    name: "ActivityParticipation",
+    component: () => import("@/views/activity/ActivityParticipation.vue"),
+    meta: {
+      title: "活动参与管理 - 党建云平台",
+      permission: "activity:manage",
+      roles: ["super_admin", "party_secretary"],
+    },
+  },
+  {
     path: "/activity/:id",
     name: "ActivityDetail",
     component: () => import("@/views/activity/ActivityDetail.vue"),
