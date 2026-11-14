@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { ArrowDown, ArrowLeft, Delete, Edit } from "@element-plus/icons-vue";
+import { ArrowDown, ArrowLeft, Delete, Edit, User } from "@element-plus/icons-vue";
 import {
   deleteAdminActivity,
   getAdminActivity,
@@ -12,6 +12,7 @@ import {
   type ActivityVo,
 } from "@/api/activities";
 import { getApiErrorMessage as getErrorMessage } from "@/utils/apiError";
+import { sessionHasAccessToken } from "@/utils/session";
 import { useAppStore } from "@/stores/app";
 import {
   activityStatusClass as statusClass,
@@ -25,6 +26,15 @@ const store = useAppStore();
 const isSuperAdmin = computed(() => store.currentRole === "super_admin");
 const activityId = computed(() => Number(route.params.id));
 const activity = ref<ActivityVo | null>(null);
+/** 参与管理入口：仅管理侧角色、真实登录且活动编号有效时展示；服务端仍做最终授权。 */
+const canOpenParticipation = computed(
+  () =>
+    (store.currentRole === "super_admin" || store.currentRole === "party_secretary") &&
+    sessionHasAccessToken.value &&
+    !!activity.value &&
+    Number.isSafeInteger(activityId.value) &&
+    activityId.value > 0,
+);
 const loading = ref(false);
 const errorMessage = ref("");
 const coverLoadFailed = ref(false);
@@ -108,6 +118,11 @@ function goBack(): void {
 
 function goToEdit(): void {
   if (activity.value) void router.push("/activity/edit/" + activity.value.id);
+}
+
+function goToParticipation(): void {
+  if (!canOpenParticipation.value) return;
+  void router.push({ name: "ActivityParticipation", params: { id: String(activityId.value) } });
 }
 
 onMounted(() => void loadActivity());
@@ -221,7 +236,23 @@ watch([activityId, isSuperAdmin], () => void loadActivity());
                 <span>签到时间配置</span>
                 <strong>{{ formatDateTime(activity.signStart) }} — {{ formatDateTime(activity.signEnd) }}</strong>
               </div>
-              <p class="schedule-note">页面仅展示服务端保存的签到时间配置，不提供报名、签到、二维码或签到记录操作。</p>
+              <p class="schedule-note">
+                {{
+                  canOpenParticipation
+                    ? "页面仅展示服务端保存的签到时间配置；实际报名与签到记录请从下方“参与管理”进入。"
+                    : "页面仅展示服务端保存的签到时间配置，不提供报名、签到、二维码或签到记录操作。"
+                }}
+              </p>
+            </section>
+
+            <section v-if="canOpenParticipation" class="participation-entry" aria-label="活动参与管理">
+              <div class="actions-copy">
+                <strong>参与管理</strong>
+                <span>查看本活动的真实报名与签到记录，并导出完整签到名单；读写范围由服务端按账号判定。</span>
+              </div>
+              <el-button type="primary" plain :icon="User" data-testid="open-participation" @click="goToParticipation">
+                进入参与管理
+              </el-button>
             </section>
 
             <section v-if="isSuperAdmin" class="detail-actions-panel" aria-label="活动管理操作">
@@ -594,6 +625,23 @@ watch([activityId, isSuperAdmin], () => void loadActivity());
   font-size: 13px;
 }
 
+.participation-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 22px;
+  padding: 17px 18px;
+  border: 1px solid #e9e2d7;
+  border-radius: 9px;
+  background: #faf8f2;
+}
+
+.participation-entry :deep(.el-button) {
+  margin-left: 0;
+  border-radius: 6px;
+}
+
 .detail-actions-panel {
   display: flex;
   align-items: center;
@@ -741,6 +789,11 @@ watch([activityId, isSuperAdmin], () => void loadActivity());
   }
 
   .detail-actions-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .participation-entry {
     align-items: flex-start;
     flex-direction: column;
   }
