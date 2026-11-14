@@ -113,6 +113,8 @@ async function fixture(t, options = {}) {
     signRows: [sign(1, 101), sign(2, 102, { signType: "makeup", signTime: null, device: null, location: null })],
     signTotal: 2,
     signupGate: null,
+    signupUnauthorized: 0,
+    refreshGate: null,
     exportError: false,
     exportMessage: "导出失败",
     exportMime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -122,9 +124,16 @@ async function fixture(t, options = {}) {
     const req = route.request(),
       url = new URL(req.url()),
       path = url.pathname;
-    state.requests.push({ path, method: req.method(), params: Object.fromEntries(url.searchParams) });
-    if (path === "/api/v1/auth/refresh")
+    state.requests.push({
+      path,
+      method: req.method(),
+      params: Object.fromEntries(url.searchParams),
+      authorization: req.headers().authorization,
+    });
+    if (path === "/api/v1/auth/refresh") {
+      if (state.refreshGate) await state.refreshGate.promise;
       return ok(route, { accessToken: "new-access", refreshToken: "new-refresh", role: "super_admin" });
+    }
     // 非授权角色会被守卫踢回首页，首页资讯接口需给出可渲染响应。
     if (path === "/api/v2/content/news/page" || path === "/api/v2/content/notices/page")
       return ok(route, { records: [], total: 0 });
@@ -138,13 +147,19 @@ async function fixture(t, options = {}) {
     const publishedDetail = path.match(/^\/api\/v2\/content\/activities\/(\d+)$/);
     if (publishedDetail) return ok(route, activity(Number(publishedDetail[1])));
     if (/^\/api\/v4\/activities\/\d+\/signups\/page$/.test(path)) {
-      if (state.signupGate) await state.signupGate.promise;
-      return ok(route, {
+      if (state.signupUnauthorized > 0) {
+        state.signupUnauthorized--;
+        return route.fulfill({ status: 401, json: { code: 401, message: "登录令牌已过期" } });
+      }
+      // 在请求到达时冻结响应，避免延迟期间的新会话数据污染旧请求的测试样本。
+      const response = {
         records: state.signupRows,
         total: state.signupTotal,
         page: Number(url.searchParams.get("page") || 1),
         size: Number(url.searchParams.get("size") || 10),
-      });
+      };
+      if (state.signupGate) await state.signupGate.promise;
+      return ok(route, response);
     }
     if (/^\/api\/v4\/activities\/\d+\/signs\/page$/.test(path))
       return ok(route, {
@@ -174,6 +189,28 @@ async function fixture(t, options = {}) {
 }
 
 const listCalls = (state, kind) => state.requests.filter((r) => r.path.endsWith(`/${kind}/page`));
+
+async function switchAccount(page) {
+  await page.evaluate(async () => {
+    const s = await import("/src/utils/session.ts");
+    s.applySession({ accessToken: "other", refreshToken: "other-refresh", role: "super_admin", username: "other" });
+  });
+}
+
+async function navigate(page, path) {
+  await page.evaluate(async (path) => {
+    const { default: router } = await import("/src/router/index.ts");
+    await router.push(path);
+  }, path);
+}
+
+async function releaseResponse(page, gate, path) {
+  const response = page.waitForResponse((response) => new URL(response.url()).pathname === path);
+  gate.resolve();
+  await (await response).finished();
+  // 响应体接收后等待页面提交渲染，再断言旧响应没有覆盖页面或触发下载。
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
 
 test("预检失败时停止名单与导出请求，并说明跨支部与不存在同文案", async (t) => {
   const { page, state } = await fixture(t, { detailFail: true, detailMessage: "活动不存在" });
@@ -300,24 +337,151 @@ test("导出只出一次请求，进行中重复点击不重复下载", async (t
 });
 
 test("换号后清空名单并重新预检，旧响应不写回新会话", async (t) => {
+  const oldRequest = delay();
+  t.after(() => oldRequest.resolve());
+  const { page, state } = await fixture(t, {
+    signupGate: oldRequest,
+    signupRows: [signup(7, 777)],
+    signupTotal: 77,
+  });
+  await eventually(() => listCalls(state, "signups").length === 1);
+
+  state.signupGate = null;
+  state.signupRows = [signup(8, 888)];
+  state.signupTotal = 1;
+  await switchAccount(page);
+  await eventually(async () => (await page.getByTestId("signup-table").innerText()).includes("888"));
+  await releaseResponse(page, oldRequest, "/api/v4/activities/9/signups/page");
+  const text = await page.getByTestId("signup-table").innerText();
+  assert.match(text, /888/);
+  assert.doesNotMatch(text, /777/);
+  assert.match(await page.getByTestId("signup-total").innerText(), /共 1 条报名记录/);
+  assert.equal(listCalls(state, "signups").at(-1).authorization, "Bearer other");
+});
+
+test("活动 A/B/A 切换后，首个 A 的迟到名单不能覆盖新 A", async (t) => {
+  const gate = delay();
+  t.after(() => gate.resolve());
+  const { page, state } = await fixture(t, {
+    signupGate: gate,
+    signupRows: [signup(7, 777)],
+    signupTotal: 77,
+  });
+  await eventually(() => listCalls(state, "signups").length === 1);
+  state.signupGate = null;
+  state.signupRows = [signup(8, 888)];
+  state.signupTotal = 1;
+  await navigate(page, "/activity/10/participation");
+  await eventually(async () => (await page.getByTestId("signup-table").innerText()).includes("888"));
+  await navigate(page, "/activity/9/participation");
+  await eventually(() => listCalls(state, "signups").length === 3);
+  await eventually(async () => (await page.getByTestId("signup-table").innerText()).includes("888"));
+  await releaseResponse(page, gate, "/api/v4/activities/9/signups/page");
+  assert.match(await page.locator(".subtitle").innerText(), /活动编号 9/);
+  assert.doesNotMatch(await page.getByTestId("signup-table").innerText(), /777/);
+  assert.match(await page.getByTestId("signup-total").innerText(), /共 1 条报名记录/);
+});
+
+test("筛选请求交错及页签往返后，保留最新筛选结果与独立签到名单", async (t) => {
   const { page, state } = await fixture(t);
   await eventually(async () => (await page.locator("[data-testid='signup-table'] tbody tr").count()) === 2);
-  const before = listCalls(state, "signups").length;
-  state.signupGate = delay();
-  await page.evaluate(async () => {
-    const s = await import("/src/utils/session.ts");
-    s.applySession({ accessToken: "other", refreshToken: "other-refresh", role: "super_admin", username: "other" });
-  });
-  await eventually(() => listCalls(state, "signups").length > before);
-  // 旧会话的在途响应回来时不能覆盖新会话的数据。
-  state.signupRows = [];
-  state.signupTotal = 0;
-  state.signupGate.resolve();
-  await page.waitForTimeout(200);
-  assert.equal(await page.evaluate(() => localStorage.getItem("party_access_token")), "other");
-  const prechecks = state.requests.filter((r) => /^\/api\/v4\/activities\/\d+$/.test(r.path));
-  assert.ok(prechecks.length >= 2);
+  const gate = delay();
+  t.after(() => gate.resolve());
+  state.signupGate = gate;
+  state.signupRows = [signup(7, 777)];
+  state.signupTotal = 77;
+  await page.getByTestId("signup-user-filter").fill("777");
+  await page.getByTestId("signup-search").click();
+  await eventually(() => listCalls(state, "signups").length === 2);
+  state.signupGate = null;
+  state.signupRows = [signup(8, 888)];
+  state.signupTotal = 1;
+  await page.getByTestId("signup-user-filter").fill("888");
+  await page.getByTestId("signup-search").click();
+  await eventually(async () => (await page.getByTestId("signup-table").innerText()).includes("888"));
+  await page.getByRole("tab", { name: "签到记录" }).click();
+  await eventually(async () => (await page.locator("[data-testid='sign-table'] tbody tr").count()) === 2);
+  await releaseResponse(page, gate, "/api/v4/activities/9/signups/page");
+  assert.match(await page.getByTestId("sign-total").innerText(), /共 2 条签到记录/);
+  await page.getByRole("tab", { name: "报名记录" }).click();
+  assert.equal(await page.getByTestId("signup-user-filter").inputValue(), "888");
+  assert.match(await page.getByTestId("signup-table").innerText(), /888/);
+  assert.doesNotMatch(await page.getByTestId("signup-table").innerText(), /777/);
+  assert.match(await page.getByTestId("signup-total").innerText(), /共 1 条报名记录/);
 });
+
+test("正常 401 刷新重放名单请求，保留筛选、分页和会话身份", async (t) => {
+  const { page, state } = await fixture(t, { signupTotal: 90 });
+  await eventually(async () => (await page.getByTestId("signup-total").innerText()).includes("90"));
+  await page.getByTestId("signup-user-filter").fill("101");
+  await page.getByTestId("signup-search").click();
+  await eventually(() => listCalls(state, "signups").length === 2);
+  await eventually(async () => !(await page.locator(".el-loading-mask:visible").count()));
+  const identity = await page.evaluate(() => localStorage.getItem("party_session_identity"));
+  const prechecks = state.requests.filter((r) => r.path === "/api/v4/activities/9").length;
+  const refreshGate = delay();
+  t.after(() => refreshGate.resolve());
+  state.signupUnauthorized = 1;
+  state.refreshGate = refreshGate;
+  state.signupRows = [signup(3, 303)];
+  await page.locator("[data-testid='signup-pagination'] .el-pager li").filter({ hasText: /^2$/ }).click();
+  await eventually(() => state.requests.some((r) => r.path === "/api/v1/auth/refresh"));
+  assert.equal(await page.getByTestId("signup-user-filter").inputValue(), "101");
+  assert.equal(new URL(page.url()).pathname, "/activity/9/participation");
+  await releaseResponse(page, refreshGate, "/api/v1/auth/refresh");
+  await eventually(async () => (await page.getByTestId("signup-table").innerText()).includes("303"));
+  const attempts = listCalls(state, "signups").slice(-2);
+  assert.deepEqual(
+    attempts.map((r) => r.params),
+    [
+      { page: "2", size: "10", userId: "101" },
+      { page: "2", size: "10", userId: "101" },
+    ],
+  );
+  assert.deepEqual(
+    attempts.map((r) => r.authorization),
+    ["Bearer test-access", "Bearer new-access"],
+  );
+  assert.equal(state.requests.filter((r) => r.path === "/api/v1/auth/refresh").length, 1);
+  assert.equal(state.requests.filter((r) => r.path === "/api/v4/activities/9").length, prechecks);
+  assert.equal(await page.evaluate(() => localStorage.getItem("party_session_identity")), identity);
+  assert.equal(await page.getByTestId("signup-user-filter").inputValue(), "101");
+  assert.match(await page.locator("[data-testid='signup-pagination'] .el-pager li.is-active").innerText(), /^2$/);
+  assert.match(await page.getByTestId("signup-total").innerText(), /共 90 条报名记录/);
+});
+
+for (const boundary of ["换号", "活动切换", "退出", "卸载"]) {
+  test(`${boundary}后旧下载不触发`, async (t) => {
+    const { page, state } = await fixture(t);
+    await page.getByTestId("export-signs").waitFor();
+    const gate = delay();
+    t.after(() => gate.resolve());
+    let requested = false;
+    await page.route("**/api/v4/activities/9/signs/export", async (route) => {
+      requested = true;
+      await gate.promise;
+      await route.fulfill({ contentType: "application/octet-stream", body: xlsxBody() });
+    });
+    await page.getByTestId("export-signs").click();
+    await eventually(() => requested);
+    if (boundary === "换号") {
+      state.signupRows = [signup(8, 888)];
+      await switchAccount(page);
+      await eventually(async () => (await page.getByTestId("signup-table").innerText()).includes("888"));
+    } else if (boundary === "活动切换") {
+      await navigate(page, "/activity/10/participation");
+      await eventually(async () => (await page.locator(".subtitle").innerText()).includes("活动编号 10"));
+    } else if (boundary === "退出") {
+      await page.evaluate(async () => (await import("/src/utils/session.ts")).clearSession());
+      await eventually(async () => (await page.getByTestId("export-signs").count()) === 0);
+    } else {
+      await navigate(page, "/");
+      await eventually(async () => (await page.locator(".participation-page").count()) === 0);
+    }
+    await releaseResponse(page, gate, "/api/v4/activities/9/signs/export");
+    assert.equal(await page.evaluate(() => window.downloads.length), 0);
+  });
+}
 
 test("非管理角色直访参与页被路由拦截，不发起任何参与接口请求", async (t) => {
   const { page, state } = await fixture(t, { role: "party_member" });
