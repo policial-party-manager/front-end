@@ -300,6 +300,9 @@ test("完整档案渲染：基本信息、服务端摘要与七个区块", async
   assert.doesNotMatch(await section(page, "my-dev-identity-changes").innerText(), /null/);
   assert.match(await section(page, "my-dev-thought-reports").innerText(), /第一季度思想汇报/);
   assert.match(await section(page, "my-dev-thought-reports").innerText(), /通过/);
+  // 说明文案必须与实际行为一致：内部路径不下发，文案不得声称仅作文字记录。
+  assert.doesNotMatch(await section(page, "my-dev-thought-reports").innerText(), /仅作文字记录/);
+  assert.match(await section(page, "my-dev-thought-reports").innerText(), /不展示其路径/);
   assert.match(await section(page, "my-dev-signs").innerText(), /本人签到/);
   assert.match(await section(page, "my-dev-signs").innerText(), /活动编号 9/);
   assert.match(await section(page, "my-dev-leaves").innerText(), /外出实习/);
@@ -546,6 +549,10 @@ test("材料与证书的内部路径不渲染也不生成可点击链接", async
   assert.equal(await page.locator('a[href*="file:"]').count(), 0);
   assert.equal(await section(page, "my-dev-materials").locator("a").count(), 0);
   assert.equal(await section(page, "my-dev-studies").locator("a").count(), 0);
+
+  // 学习区块的说明不得声称会展示证书路径：文案与实现一旦脱节，会误导用户以为能看到附件。
+  assert.doesNotMatch(studyText, /仅作为文字记录/);
+  assert.match(studyText, /不展示其路径/);
 });
 
 test("首次加载失败显示错误与重试，重试成功后渲染数据", async (t) => {

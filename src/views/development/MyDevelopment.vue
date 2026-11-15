@@ -38,8 +38,8 @@ import {
  *
  * 数据来源只有 `GET /v4/cultivation-profiles/me`，服务端按登录态决定查询对象。
  * 页面不接收前端传入的用户标识，也不为补齐活动标题、课程名、联系人姓名而额外请求接口；
- * 记录里的关联对象只有编号时按编号展示；材料的 `file:` 内部路径与学习证书地址只作为文字记录，
- * 不生成可点击地址、不提供下载。
+ * 记录里的关联对象只有编号时按编号展示；材料的 `file:` 内部路径与学习证书地址一律不渲染其值，
+ * 也不生成可点击地址、不提供下载。
  */
 const store = useAppStore();
 
@@ -387,7 +387,7 @@ onBeforeUnmount(() => {
             <span class="section-index">05 / REPORTS</span>
             <h2 id="my-dev-reports-title">思想汇报</h2>
           </div>
-          <p>正文为纯文本展示；附件内部路径仅作文字记录，本页不提供下载。</p>
+          <p>正文按纯文本渲染；附件保存在服务端内部，本页不展示其路径，也不提供下载。</p>
         </div>
         <el-empty v-if="thoughtReports.length === 0" description="暂无思想汇报记录" :image-size="64" />
         <template v-else>
@@ -488,7 +488,7 @@ onBeforeUnmount(() => {
             <span class="section-index">08 / STUDIES</span>
             <h2 id="my-dev-studies-title">学习记录</h2>
           </div>
-          <p>学时按记录时长统计，成绩原样展示；证书地址仅作为文字记录，不提供跳转。</p>
+          <p>学时按记录时长统计，成绩原样展示；证书文件保存在服务端内部，本页不展示其路径，也不提供跳转。</p>
         </div>
         <el-empty v-if="studyRecords.length === 0" description="暂无学习记录" :image-size="64" />
         <template v-else>
