@@ -246,8 +246,7 @@ async function fixture(t, options = {}) {
     }
     return ok(route, state.profile);
   });
-  const page_ = page;
-  await page_.goto(`${baseURL}${options.path || "/my-development"}`);
+  await page.goto(`${baseURL}${options.path || "/my-development"}`);
   return { page, state, context };
 }
 
@@ -259,6 +258,13 @@ async function switchAccount(page, role = "party_member") {
     const s = await import("/src/utils/session.ts");
     s.applySession({ accessToken: "other", refreshToken: "other-refresh", role: nextRole, username: "other" });
   }, role);
+}
+
+async function signOut(page) {
+  await page.evaluate(async () => {
+    const s = await import("/src/utils/session.ts");
+    s.clearSession();
+  });
 }
 
 test("完整档案渲染：基本信息、服务端摘要与七个区块", async (t) => {
@@ -275,18 +281,23 @@ test("完整档案渲染：基本信息、服务端摘要与七个区块", async
 
   // 摘要必须与服务端 summary 完全一致，前端不得自行统计。
   assert.match(await section(page, "my-dev-summary-thought").innerText(), /2 条/);
-  assert.match(await section(page, "my-dev-summary-thought").innerText(), /已通过 1 条/);
+  assert.match(await section(page, "my-dev-summary-thought").innerText(), /其中已通过 1 条/);
   assert.match(await section(page, "my-dev-summary-sign").innerText(), /1 次/);
-  assert.match(await section(page, "my-dev-summary-study").innerText(), /1 小时 30 分钟/);
+  // 学时以分钟为口径；不足 1 小时的样本不得出现小时换算。
+  assert.match(await section(page, "my-dev-summary-study").innerText(), /90 分钟/);
+  assert.match(await section(page, "my-dev-summary-study").innerText(), /约 1 小时 30 分钟/);
   assert.match(await section(page, "my-dev-summary-material").innerText(), /1 份/);
-  assert.match(await section(page, "my-dev-summary-sign").innerText(), /签到次数/);
-  assert.doesNotMatch(await section(page, "my-dev-summary-sign").innerText(), /报名/);
+  assert.match(await section(page, "my-dev-summary-sign").innerText(), /仅签到次数/);
+  // 「签到次数」不得被当成报名数或全部参与次数。
+  assert.doesNotMatch(await section(page, "my-dev-summary-sign").innerText(), /\d+ 人报名|报名人数/);
 
   assert.match(await section(page, "my-dev-mentors").innerText(), /李老师/);
   // 缺 realName 时用 username 兜底，但绝不补造姓名。
   assert.match(await section(page, "my-dev-mentors").innerText(), /wang/);
   assert.match(await section(page, "my-dev-identity-changes").innerText(), /已生效/);
-  assert.match(await section(page, "my-dev-identity-changes").innerText(), /编号不可用/);
+  // 首次登记 fromIdentity 为空，不能渲染成 "null → n"。
+  assert.match(await section(page, "my-dev-identity-changes").innerText(), /编号不可用 → 2/);
+  assert.doesNotMatch(await section(page, "my-dev-identity-changes").innerText(), /null/);
   assert.match(await section(page, "my-dev-thought-reports").innerText(), /第一季度思想汇报/);
   assert.match(await section(page, "my-dev-thought-reports").innerText(), /通过/);
   assert.match(await section(page, "my-dev-signs").innerText(), /本人签到/);
@@ -294,7 +305,7 @@ test("完整档案渲染：基本信息、服务端摘要与七个区块", async
   assert.match(await section(page, "my-dev-leaves").innerText(), /外出实习/);
   assert.match(await section(page, "my-dev-leaves").innerText(), /生效/);
   assert.match(await section(page, "my-dev-studies").innerText(), /课程编号 7/);
-  assert.match(await section(page, "my-dev-studies").innerText(), /1 小时 30 分钟/);
+  assert.match(await section(page, "my-dev-studies").innerText(), /90 分钟/);
   assert.match(await section(page, "my-dev-studies").innerText(), /92\.5/);
   assert.match(await section(page, "my-dev-materials").innerText(), /入党申请书\.pdf/);
 
@@ -358,9 +369,27 @@ test("摘要缺失时显示暂无统计，不用数组长度冒充服务端统�
   const { page } = await fixture(t, { state: { profile: profile({ summary: null }) } });
   await eventually(async () => (await section(page, "my-dev-summary").count()) === 1);
   const summaryText = await section(page, "my-dev-summary").innerText();
-  assert.match(summaryText, /暂无统计/);
+  assert.match(summaryText, /未统计/);
   assert.match(summaryText, /服务端未返回摘要/);
   assert.doesNotMatch(summaryText, /\d+ 次|\d+ 份/);
+});
+
+test("摘要字段部分缺失时显示未统计，不输出 undefined", async (t) => {
+  // 服务端新增字段或旧版返回缺字段时，计数位为空而不能拼成 "undefined 条"。
+  const { page } = await fixture(t, {
+    state: {
+      profile: profile({
+        summary: { thoughtReportCount: null, thoughtReportApproved: undefined, signCount: 0, studyMinutes: null },
+      }),
+    },
+  });
+  await eventually(async () => (await section(page, "my-dev-summary").count()) === 1);
+  const summaryText = await section(page, "my-dev-summary").innerText();
+  assert.doesNotMatch(summaryText, /undefined|NaN|null/);
+  // 0 是合法计数，不得被当成缺失。
+  assert.match(await section(page, "my-dev-summary-sign").innerText(), /0 次/);
+  assert.match(await section(page, "my-dev-summary-thought").innerText(), /未统计/);
+  assert.match(await section(page, "my-dev-summary-study").innerText(), /未统计/);
 });
 
 test("未知枚举显示未知状态，不落入通过或已生效", async (t) => {
@@ -469,7 +498,7 @@ test("服务端 HTML 文本按纯文本渲染，不产生可执行节点", async
   assert.equal(await page.evaluate(() => window.__xss), undefined);
 });
 
-test("材料与证书路径只作文本，不生成可点击链接", async (t) => {
+test("材料与证书的内部路径不渲染也不生成可点击链接", async (t) => {
   const { page } = await fixture(t, {
     state: {
       profile: profile({
@@ -502,11 +531,18 @@ test("材料与证书路径只作文本，不生成可点击链接", async (t) =
     },
   });
   await eventually(async () => (await section(page, "my-dev-materials").count()) === 1);
-  assert.match(await section(page, "my-dev-materials").innerText(), /file:secret\/x\.pdf/);
-  assert.match(await section(page, "my-dev-studies").innerText(), /file:private\/cert\.pdf/);
+  const materialText = await section(page, "my-dev-materials").innerText();
+  const studyText = await section(page, "my-dev-studies").innerText();
+  // 规格只允许展示材料类型、文件名、时间与备注，内部存储路径不得下发到页面。
+  assert.doesNotMatch(materialText, /file:secret/);
+  assert.doesNotMatch(studyText, /file:private/);
+  assert.doesNotMatch(materialText, /file:/);
+  assert.doesNotMatch(studyText, /file:/);
+  assert.match(materialText, /政审材料\.pdf/);
+  assert.match(materialText, /政审材料/);
   // 成绩是字符串小数，必须原样展示，不能出现精度丢失或 NaN。
-  assert.match(await section(page, "my-dev-studies").innerText(), /88\.50/);
-  assert.match(await section(page, "my-dev-studies").innerText(), /45 分钟/);
+  assert.match(studyText, /88\.50/);
+  assert.match(studyText, /45 分钟/);
   assert.equal(await page.locator('a[href*="file:"]').count(), 0);
   assert.equal(await section(page, "my-dev-materials").locator("a").count(), 0);
   assert.equal(await section(page, "my-dev-studies").locator("a").count(), 0);
@@ -558,6 +594,50 @@ test("换号后旧会话的迟到成功响应不写回旧档案", async (t) => {
   const basicText = await section(page, "my-dev-basic").innerText();
   assert.match(basicText, /第二个会话/);
   assert.doesNotMatch(basicText, /张同学/);
+});
+
+test("退出登录后立即清除已渲染档案并停止请求", async (t) => {
+  const gate = delay();
+  const { page, state } = await fixture(t, { state: { freezeFirst: true, firstGate: gate } });
+  await eventually(() => state.meCalls === 1);
+  await signOut(page);
+  // 退出后页面上不得残留上一账号的姓名、支部等个人信息，并转为未登录提示。
+  await eventually(async () => (await page.getByText("张同学").count()) === 0);
+  await eventually(async () => (await section(page, "my-dev-basic").count()) === 0);
+  await eventually(async () => (await page.locator(".el-alert").first().innerText()).includes("我的培养需要登录"));
+  // 解冻在途响应：页面已无登录令牌，不得再渲染任何档案区块。
+  gate.resolve();
+  await page.waitForTimeout(300);
+  assert.equal(await page.getByText("张同学").count(), 0);
+  assert.equal(await section(page, "my-dev-summary").count(), 0);
+  assert.equal(await section(page, "my-dev-basic").count(), 0);
+  assert.equal(state.meCalls, 1, "退出后不得再拉取档案");
+});
+
+test("离开页面后重新进入会自己重新拉取，不依赖旧实例的在途响应", async (t) => {
+  const gate = delay();
+  const { page, state } = await fixture(t, { state: { freezeFirst: true, firstGate: gate } });
+  await eventually(() => state.meCalls === 1);
+  await page.evaluate(async () => {
+    const { default: router } = await import("/src/router/index.ts");
+    // /resources 是未接接口的占位页，用它可以验证卸载而不引入其它业务请求。
+    await router.push("/resources");
+  });
+  await eventually(async () => new URL(page.url()).pathname === "/resources");
+  // 卸载后回到本页：新实例必须自己再请求一次，而不是等上一个实例的响应。
+  state.freezeFirst = false;
+  state.profile = profile({ basic: basic({ realName: "重新进入成员", studentId: "2023017777" }) });
+  await page.evaluate(async () => {
+    const { default: router } = await import("/src/router/index.ts");
+    await router.push("/my-development");
+  });
+  await eventually(async () => (await page.getByText("重新进入成员").count()) === 1);
+  assert.equal(state.meCalls, 2, "重新进入必须重新拉取本人档案");
+  // 解冻上一个实例的响应：新版不得渲染旧数据（teardown 另断言零 pageerror）。
+  gate.resolve();
+  await page.waitForTimeout(300);
+  assert.match(await section(page, "my-dev-basic").innerText(), /重新进入成员/);
+  assert.equal(await page.getByText("张同学").count(), 0);
 });
 
 test("401 触发刷新后恰好重放一次本人档案请求", async (t) => {

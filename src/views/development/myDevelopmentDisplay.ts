@@ -1,5 +1,3 @@
-import { formatRecordTime } from "@/views/activity/participationDisplay";
-
 /**
  * 我的培养（本人电子培养档案）展示层纯函数。
  *
@@ -7,24 +5,25 @@ import { formatRecordTime } from "@/views/activity/participationDisplay";
  * - 枚举只映射后端已经明确的取值；未知取值一律显示「未知状态（x）」，不许兜底成成功语义。
  * - 时间为服务端 LocalDateTime / LocalTime 文本，按原值裁剪，不做时区换算。
  * - 关联对象只有编号时展示编号，不猜测名称、不额外请求。
+ * - 统计数字一律按服务端原值展示，缺失时显示「未统计」，不使用 `undefined`、`NaN` 或前端重算。
  */
 
-/** 服务端时间文本裁剪到分钟；空值显示「未记录」。与服务端 LocalDateTime 序列化格式一致。 */
-export function formatProfileTime(value: string | null | undefined): string {
-  return formatRecordTime(value);
-}
-
 /**
- * 累计学时（分钟）展示。
- * 后端 `summary.studyMinutes` 由每条学习记录的 `studyTime` 累加 hour*60+minute 得到，单位就是分钟。
+ * 累计学时展示。后端 `summary.studyMinutes` 由每条学习记录的 `studyTime` 累加
+ * hour*60+minute 得到，单位就是分钟，因此页面按分钟呈现，不换算成其它单位。
  */
 export function formatStudyMinutes(minutes: number | null | undefined): string {
   if (minutes == null || !Number.isFinite(minutes) || minutes < 0) return "未统计";
+  return Math.floor(minutes) + " 分钟";
+}
+
+/** 学时的小时口径提示；不足 1 小时返回空串，由调用方决定是否展示。 */
+export function studyMinutesHint(minutes: number | null | undefined): string {
+  if (minutes == null || !Number.isFinite(minutes) || minutes < 60) return "";
   const total = Math.floor(minutes);
-  if (total < 60) return total + " 分钟";
   const hours = Math.floor(total / 60);
   const rest = total % 60;
-  return rest === 0 ? hours + " 小时" : hours + " 小时 " + rest + " 分钟";
+  return rest === 0 ? "约 " + hours + " 小时" : "约 " + hours + " 小时 " + rest + " 分钟";
 }
 
 /**
@@ -41,6 +40,12 @@ export function formatStudyDuration(studyTime: string | null | undefined): strin
   const minutes = Number(matched[2]);
   if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes > 59) return "未记录";
   return formatStudyMinutes(hours * 60 + minutes);
+}
+
+/** 服务端计数展示：字段缺失时显示「未统计」，不把 undefined 拼进文案。 */
+export function countLabel(value: number | null | undefined, unit: string): string {
+  if (value == null || !Number.isFinite(value) || value < 0) return "未统计";
+  return Math.floor(value) + " " + unit;
 }
 
 /** 状态缺失时的统一文案：区分「后端没给」与「后端给了没见过的值」。 */
@@ -86,13 +91,6 @@ export function leaveStatusLabel(status: number | null | undefined): string {
   return unknownStatusLabel(status);
 }
 
-/** 培养材料状态：1 正常 / 0 已删除（后端 CultivationMaterial.status）。 */
-export function materialStatusLabel(status: number | null | undefined): string {
-  if (status === 1) return "正常";
-  if (status === 0) return "已删除";
-  return unknownStatusLabel(status);
-}
-
 /**
  * 关联编号展示：档案记录只带外键，没有活动标题、课程名、人员姓名。
  * 编号可用时展示真实编号，不可用时不猜、不显示 "null"。
@@ -115,8 +113,12 @@ export function joinTexts(...parts: (string | null | undefined)[]): string {
   return values.join(" · ");
 }
 
-/** 签到补充信息：设备与备注只在真实存在时拼接，与参与管理页保持同一口径。 */
-export function signExtraText(device: string | null | undefined, remark: string | null | undefined): string {
+/**
+ * 签到补充信息：设备与备注只在真实存在时拼接，与参与管理页保持同一口径。
+ * 与 `participationDisplay.signExtraText(record)` 的区别是本函数接收字段值而非签到记录，
+ * 因为档案里的签到记录来自聚合 DTO、与参与管理端的 SignRecord 不是同一类型。
+ */
+export function signRemarkText(device: string | null | undefined, remark: string | null | undefined): string {
   return joinTexts(device ? "设备：" + device : "", remark ? "备注：" + remark : "");
 }
 

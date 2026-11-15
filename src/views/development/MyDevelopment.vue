@@ -16,16 +16,19 @@ import {
   signTypeLabel,
   signTypeTagType,
 } from "@/views/activity/participationDisplay";
+import LocalPager from "@/components/development/LocalPager.vue";
 import {
-  formatProfileTime,
-  formatStudyDuration,
-  formatStudyMinutes,
+  countLabel,
   identityChangeStatusLabel,
   identityChangeTagType,
+  identityShiftLabel,
   leaveStatusLabel,
   relationLabel,
   scoreLabel,
-  signExtraText,
+  signRemarkText,
+  studyMinutesHint,
+  formatStudyDuration,
+  formatStudyMinutes,
   thoughtReportStatusLabel,
   thoughtReportTagType,
 } from "./myDevelopmentDisplay";
@@ -35,7 +38,8 @@ import {
  *
  * 数据来源只有 `GET /v4/cultivation-profiles/me`，服务端按登录态决定查询对象。
  * 页面不接收前端传入的用户标识，也不为补齐活动标题、课程名、联系人姓名而额外请求接口；
- * 记录里的关联对象只有编号时按编号展示。
+ * 记录里的关联对象只有编号时按编号展示；材料的 `file:` 内部路径与学习证书地址只作为文字记录，
+ * 不生成可点击地址、不提供下载。
  */
 const store = useAppStore();
 
@@ -134,33 +138,32 @@ function toggleReport(id: number): void {
   expandedReports[id] = !expandedReports[id];
 }
 
-// ============ 摘要 ============
+// ============ 摘要（全部取服务端 summary，缺失时明确「未统计」） ============
 const summaryCards = computed(() => {
   const value = summary.value;
-  const missing = "暂无统计";
   return [
     {
       key: "thought",
       label: "思想汇报",
-      value: value ? value.thoughtReportCount + " 条" : missing,
-      note: value ? "已通过 " + value.thoughtReportApproved + " 条" : "服务端未返回摘要",
+      value: value ? countLabel(value.thoughtReportCount, "条") : "未统计",
+      note: value ? "其中已通过 " + countLabel(value.thoughtReportApproved, "条") : "服务端未返回摘要",
     },
     {
       key: "sign",
       label: "活动签到",
-      value: value ? value.signCount + " 次" : missing,
-      note: "签到次数",
+      value: value ? countLabel(value.signCount, "次") : "未统计",
+      note: "仅签到次数，不含报名与请假",
     },
     {
       key: "study",
       label: "累计学习时长",
-      value: value ? formatStudyMinutes(value.studyMinutes) : missing,
-      note: "按学习记录累计",
+      value: value ? formatStudyMinutes(value.studyMinutes) : "未统计",
+      note: value ? studyMinutesHint(value.studyMinutes) || "按学习记录已登记的学时累计" : "服务端未返回摘要",
     },
     {
       key: "material",
       label: "培养材料",
-      value: value ? value.materialCount + " 份" : missing,
+      value: value ? countLabel(value.materialCount, "份") : "未统计",
       note: "仅统计正常状态材料",
     },
   ];
@@ -340,18 +343,7 @@ onBeforeUnmount(() => {
               </div>
             </li>
           </ul>
-          <div v-if="mentors.length > PAGE_SIZE" class="pager">
-            <el-pagination
-              v-model:current-page="pages.mentors"
-              :page-size="PAGE_SIZE"
-              :total="mentors.length"
-              :pager-count="5"
-              layout="prev, pager, next"
-              small
-              background
-            />
-            <span class="pager-note">本地分页：服务端一次返回全部记录</span>
-          </div>
+          <LocalPager v-model:page="pages.mentors" :total="mentors.length" :page-size="PAGE_SIZE" />
         </template>
       </section>
 
@@ -365,7 +357,7 @@ onBeforeUnmount(() => {
             <span class="section-index">04 / IDENTITY</span>
             <h2 id="my-dev-identity-title">身份变更历史</h2>
           </div>
-          <p>按发起时间倒序；已作废的变更单不在此展示。</p>
+          <p>按发起时间倒序；已作废的变更单不在此展示。身份编号对应后台身份字典，本页不额外取名称。</p>
         </div>
         <el-empty v-if="identityChanges.length === 0" description="暂无身份变更记录" :image-size="64" />
         <template v-else>
@@ -373,32 +365,19 @@ onBeforeUnmount(() => {
             <li v-for="item in pagedSlice('identityChanges', identityChanges)" :key="item.id" class="row-card">
               <div class="row-main">
                 <div class="row-line">
-                  <span class="row-title"
-                    >身份编号 {{ relationLabel(item.fromIdentity) }} → {{ relationLabel(item.toIdentity) }}</span
-                  >
+                  <span class="row-title">身份 {{ identityShiftLabel(item.fromIdentity, item.toIdentity) }}</span>
                   <el-tag :type="identityChangeTagType(item.status)" size="small" effect="plain">
                     {{ identityChangeStatusLabel(item.status) }}
                   </el-tag>
                 </div>
-                <span class="row-meta">发起时间 {{ formatProfileTime(item.createTime) }}</span>
+                <span class="row-meta">发起时间 {{ formatRecordTime(item.createTime) }}</span>
                 <p class="row-text">变更原因：{{ formatOptionalText(item.reason) }}</p>
                 <p v-if="(item.reviewRemark ?? '').trim()" class="row-text">审批意见：{{ item.reviewRemark }}</p>
-                <p v-if="item.reviewTime" class="row-meta">审批时间 {{ formatProfileTime(item.reviewTime) }}</p>
+                <p v-if="item.reviewTime" class="row-meta">审批时间 {{ formatRecordTime(item.reviewTime) }}</p>
               </div>
             </li>
           </ul>
-          <div v-if="identityChanges.length > PAGE_SIZE" class="pager">
-            <el-pagination
-              v-model:current-page="pages.identityChanges"
-              :page-size="PAGE_SIZE"
-              :total="identityChanges.length"
-              :pager-count="5"
-              layout="prev, pager, next"
-              small
-              background
-            />
-            <span class="pager-note">本地分页：服务端一次返回全部记录</span>
-          </div>
+          <LocalPager v-model:page="pages.identityChanges" :total="identityChanges.length" :page-size="PAGE_SIZE" />
         </template>
       </section>
 
@@ -408,7 +387,7 @@ onBeforeUnmount(() => {
             <span class="section-index">05 / REPORTS</span>
             <h2 id="my-dev-reports-title">思想汇报</h2>
           </div>
-          <p>正文为纯文本展示，附件地址仅作为文字记录。</p>
+          <p>正文为纯文本展示；附件内部路径仅作文字记录，本页不提供下载。</p>
         </div>
         <el-empty v-if="thoughtReports.length === 0" description="暂无思想汇报记录" :image-size="64" />
         <template v-else>
@@ -421,7 +400,7 @@ onBeforeUnmount(() => {
                     {{ thoughtReportStatusLabel(report.status) }}
                   </el-tag>
                 </div>
-                <span class="row-meta">提交时间 {{ formatProfileTime(report.submitTime) }}</span>
+                <span class="row-meta">提交时间 {{ formatRecordTime(report.submitTime) }}</span>
                 <p
                   class="row-text report-content"
                   :class="{ collapsed: reportIsLong(report.content) && !expandedReports[report.id] }"
@@ -438,23 +417,12 @@ onBeforeUnmount(() => {
                   {{ expandedReports[report.id] ? "收起" : "展开全文" }}
                 </el-button>
                 <p v-if="(report.reviewRemark ?? '').trim()" class="row-text">审阅建议：{{ report.reviewRemark }}</p>
-                <p v-if="report.reviewTime" class="row-meta">审阅时间 {{ formatProfileTime(report.reviewTime) }}</p>
-                <p v-if="(report.file ?? '').trim()" class="row-meta">附件：{{ report.file }}</p>
+                <p v-if="report.reviewTime" class="row-meta">审阅时间 {{ formatRecordTime(report.reviewTime) }}</p>
+                <p v-if="(report.file ?? '').trim()" class="row-meta">含附件材料（内部保存，本页不展示路径与下载）</p>
               </div>
             </li>
           </ul>
-          <div v-if="thoughtReports.length > PAGE_SIZE" class="pager">
-            <el-pagination
-              v-model:current-page="pages.thoughtReports"
-              :page-size="PAGE_SIZE"
-              :total="thoughtReports.length"
-              :pager-count="5"
-              layout="prev, pager, next"
-              small
-              background
-            />
-            <span class="pager-note">本地分页：服务端一次返回全部记录</span>
-          </div>
+          <LocalPager v-model:page="pages.thoughtReports" :total="thoughtReports.length" :page-size="PAGE_SIZE" />
         </template>
       </section>
 
@@ -478,24 +446,13 @@ onBeforeUnmount(() => {
                   </el-tag>
                 </div>
                 <span class="row-meta">签到时间 {{ formatRecordTime(record.signTime) }}</span>
-                <p v-if="signExtraText(record.device, record.remark)" class="row-text">
-                  {{ signExtraText(record.device, record.remark) }}
+                <p v-if="signRemarkText(record.device, record.remark)" class="row-text">
+                  {{ signRemarkText(record.device, record.remark) }}
                 </p>
               </div>
             </li>
           </ul>
-          <div v-if="signRecords.length > PAGE_SIZE" class="pager">
-            <el-pagination
-              v-model:current-page="pages.signRecords"
-              :page-size="PAGE_SIZE"
-              :total="signRecords.length"
-              :pager-count="5"
-              layout="prev, pager, next"
-              small
-              background
-            />
-            <span class="pager-note">本地分页：服务端一次返回全部记录</span>
-          </div>
+          <LocalPager v-model:page="pages.signRecords" :total="signRecords.length" :page-size="PAGE_SIZE" />
         </template>
       </section>
 
@@ -516,23 +473,12 @@ onBeforeUnmount(() => {
                   <span class="row-title">活动编号 {{ relationLabel(leave.activityId) }}</span>
                   <el-tag type="info" size="small" effect="plain">{{ leaveStatusLabel(leave.status) }}</el-tag>
                 </div>
-                <span class="row-meta">申请时间 {{ formatProfileTime(leave.createTime) }}</span>
+                <span class="row-meta">申请时间 {{ formatRecordTime(leave.createTime) }}</span>
                 <p class="row-text">请假原因：{{ formatOptionalText(leave.reason) }}</p>
               </div>
             </li>
           </ul>
-          <div v-if="leaves.length > PAGE_SIZE" class="pager">
-            <el-pagination
-              v-model:current-page="pages.leaves"
-              :page-size="PAGE_SIZE"
-              :total="leaves.length"
-              :pager-count="5"
-              layout="prev, pager, next"
-              small
-              background
-            />
-            <span class="pager-note">本地分页：服务端一次返回全部记录</span>
-          </div>
+          <LocalPager v-model:page="pages.leaves" :total="leaves.length" :page-size="PAGE_SIZE" />
         </template>
       </section>
 
@@ -542,7 +488,7 @@ onBeforeUnmount(() => {
             <span class="section-index">08 / STUDIES</span>
             <h2 id="my-dev-studies-title">学习记录</h2>
           </div>
-          <p>学时按记录时长统计，成绩原样展示；证书地址仅作为文字记录。</p>
+          <p>学时按记录时长统计，成绩原样展示；证书地址仅作为文字记录，不提供跳转。</p>
         </div>
         <el-empty v-if="studyRecords.length === 0" description="暂无学习记录" :image-size="64" />
         <template v-else>
@@ -555,25 +501,14 @@ onBeforeUnmount(() => {
                     >学时 {{ formatStudyDuration(record.studyTime) }}</el-tag
                   >
                 </div>
-                <span class="row-meta">记录时间 {{ formatProfileTime(record.createTime) }}</span>
+                <span class="row-meta">记录时间 {{ formatRecordTime(record.createTime) }}</span>
                 <p class="row-text">成绩：{{ scoreLabel(record.score) }}</p>
                 <p v-if="(record.remark ?? '').trim()" class="row-text">备注：{{ record.remark }}</p>
-                <p v-if="(record.url ?? '').trim()" class="row-meta">证书地址：{{ record.url }}</p>
+                <p v-if="(record.url ?? '').trim()" class="row-meta">含证书材料（内部保存，本页不展示路径与跳转）</p>
               </div>
             </li>
           </ul>
-          <div v-if="studyRecords.length > STUDY_PAGE_SIZE" class="pager">
-            <el-pagination
-              v-model:current-page="pages.studyRecords"
-              :page-size="STUDY_PAGE_SIZE"
-              :total="studyRecords.length"
-              :pager-count="5"
-              layout="prev, pager, next"
-              small
-              background
-            />
-            <span class="pager-note">本地分页：服务端一次返回全部记录</span>
-          </div>
+          <LocalPager v-model:page="pages.studyRecords" :total="studyRecords.length" :page-size="STUDY_PAGE_SIZE" />
         </template>
       </section>
 
@@ -596,24 +531,13 @@ onBeforeUnmount(() => {
                     {{ (item.materialType ?? "").trim() || "未标注类型" }}
                   </el-tag>
                 </div>
-                <span class="row-meta">上传时间 {{ formatProfileTime(item.createTime) }}</span>
+                <span class="row-meta">上传时间 {{ formatRecordTime(item.createTime) }}</span>
                 <p v-if="(item.remark ?? '').trim()" class="row-text">备注：{{ item.remark }}</p>
-                <p v-if="(item.file ?? '').trim()" class="row-meta">材料存放路径：{{ item.file }}</p>
+                <p v-if="(item.file ?? '').trim()" class="row-meta">材料文件保存在服务端内部，需查看请联系支部管理员</p>
               </div>
             </li>
           </ul>
-          <div v-if="materials.length > PAGE_SIZE" class="pager">
-            <el-pagination
-              v-model:current-page="pages.materials"
-              :page-size="PAGE_SIZE"
-              :total="materials.length"
-              :pager-count="5"
-              layout="prev, pager, next"
-              small
-              background
-            />
-            <span class="pager-note">本地分页：服务端一次返回全部记录</span>
-          </div>
+          <LocalPager v-model:page="pages.materials" :total="materials.length" :page-size="PAGE_SIZE" />
         </template>
       </section>
     </template>
@@ -641,19 +565,6 @@ onBeforeUnmount(() => {
   gap: 16px;
   flex-wrap: wrap;
 
-  h1 {
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 6px 0 8px;
-  }
-
-  p {
-    color: var(--text-regular);
-    line-height: 1.7;
-    max-width: 720px;
-  }
-
   .eyebrow {
     font-size: 12px;
     letter-spacing: 0.14em;
@@ -661,16 +572,27 @@ onBeforeUnmount(() => {
     font-weight: 600;
   }
 
+  h1 {
+    font-size: 26px;
+    color: var(--text-primary);
+    margin: 6px 0 8px;
+  }
+
+  p {
+    font-size: 13px;
+    color: var(--text-regular);
+    line-height: 1.7;
+    max-width: 640px;
+  }
+
   .readonly-tag {
-    border-color: var(--party-red);
-    color: var(--party-red);
+    flex: 0 0 auto;
   }
 }
 
 .surface {
   padding: 22px 24px;
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
   min-width: 0;
 }
 
@@ -680,13 +602,12 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  border-bottom: 2px solid var(--party-red);
-  padding-bottom: 12px;
   margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
 
   h2 {
-    font-size: 18px;
-    font-weight: 600;
+    font-size: 17px;
     color: var(--text-primary);
     margin-top: 4px;
   }
@@ -695,6 +616,7 @@ onBeforeUnmount(() => {
     font-size: 12px;
     color: var(--text-secondary);
     line-height: 1.6;
+    max-width: 460px;
   }
 
   .section-index {
@@ -879,19 +801,6 @@ onBeforeUnmount(() => {
   line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.pager {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-
-  .pager-note {
-    font-size: 12px;
-    color: var(--text-secondary);
-  }
 }
 
 @media (max-width: 768px) {
