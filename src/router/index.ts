@@ -66,7 +66,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/my-development",
     name: "MyDevelopment",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    component: () => import("@/views/development/MyDevelopment.vue"),
     meta: { title: "我的培养 - 党建云平台", permission: "home:view", roles: ["party_member", "activist"] },
   },
   {

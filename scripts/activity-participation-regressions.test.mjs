@@ -236,6 +236,8 @@ test("报名名单按服务端分页展示，total 取自分页响应而非当�
   assert.equal(listCalls(state, "signs").length, 0);
   await page.getByRole("tab", { name: "签到记录" }).click();
   await eventually(() => listCalls(state, "signs").length === 1);
+  // 请求已发出不等于已渲染：先等签到行落到 DOM，再断言 total 文案，否则慢机器上会读到「尚未加载」。
+  await eventually(async () => (await page.locator("[data-testid='sign-table'] tbody tr").count()) === 2);
   assert.match(await page.getByTestId("sign-total").innerText(), /共 2 条签到记录/);
 });
 
