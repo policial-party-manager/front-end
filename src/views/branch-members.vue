@@ -60,6 +60,8 @@ const applied = ref<BranchMemberFilters>({});
 // ============ 身份字典（branchName / identityName 恒 null 时的降级依据） ============
 const identities = ref<IdentityOption[]>([]);
 const identityState = ref<"loading" | "ready" | "error">("loading");
+/** 身份字典因页数上限被截断：此时部分成员只能显示「身份 #id」。 */
+const identityTruncated = ref(false);
 
 function branchLabel(value: Pick<UserVo, "branchId" | "branchName">): string {
   if (value.branchId == null) return "未分配";
@@ -118,26 +120,31 @@ async function loadIdentities(): Promise<void> {
   identityState.value = "loading";
   try {
     const values: IdentityOption[] = [];
-    // 身份字典只用于显示名称映射，最多翻 20 页，避免异常 total 造成死循环。
+    // 身份字典只用于名称映射：最多翻 20 页，超过时明确降级为「身份 #id」而不是静默截断。
+    let truncated = false;
     for (let next = 1; next <= 20; next++) {
       const result = await pageIdentities(next, 100);
       if (sequence !== identitySequence || !sessionOk(snapshot)) return;
       if (!Array.isArray(result.records) || !Number.isSafeInteger(result.total) || result.total < 0)
         throw new Error("身份字典响应异常");
       values.push(...result.records);
-      if (!result.records.length || values.length >= result.total) break;
+      if (!result.records.length) break;
+      if (values.length >= result.total) break;
+      if (next === 20) truncated = true;
     }
     identities.value = values;
     identityState.value = "ready";
+    identityTruncated.value = truncated;
   } catch {
     if (sequence === identitySequence && sessionOk(snapshot)) {
       identities.value = [];
+      identityTruncated.value = false;
       identityState.value = "error";
     }
   }
 }
 
-/** 清空上一会话/上一次条件的可见结果；旧响应因序号变化不再写回。 */
+/** 清空上一会话的可见结果与筛选状态；旧响应因序号变化不再写回。 */
 function invalidate(): void {
   requestSequence++;
   identitySequence++;
@@ -149,6 +156,7 @@ function invalidate(): void {
   loadError.value = "";
   identities.value = [];
   identityState.value = "loading";
+  identityTruncated.value = false;
   exporting.value = false;
   exportFailure.value = "";
   detailVisible.value = false;
@@ -158,6 +166,11 @@ function invalidate(): void {
   saving.value = false;
   originalContact.value = null;
   resetContactForm();
+  // 筛选条件也回到默认：新账号的支部范围不同，沿用旧关键词与页码会直接落入空态。
+  filters.keyword = "";
+  statusChoice.value = "enabled";
+  applied.value = {};
+  page.value = 1;
 }
 
 function search(): void {
@@ -202,15 +215,25 @@ const contactForm = reactive({ phone: "", email: "", remark: "" });
 const originalContact = ref<{ phone: string; email: string; remark: string } | null>(null);
 
 const contactRules: FormRules = {
-  // 允许空串：后端契约里空串表示「清空」，null 表示「不动」。
-  phone: [{ pattern: /^$|^1\d{10}$/, message: "手机号格式不正确", trigger: "blur" }],
+  // 允许空串：后端接口的意图是「空串清空」。
+  // 校验与提交必须用同一个值（都先 trim），否则「 13800138000」会校验失败而被提交却合法。
+  phone: [
+    {
+      validator: (_rule, value, callback) =>
+        /^$|^1\d{10}$/.test(typeof value === "string" ? value.trim() : "")
+          ? callback()
+          : callback(new Error("手机号格式不正确")),
+      trigger: "blur",
+    },
+  ],
   email: [
     {
       validator: (_rule, value, callback) => {
         const text = typeof value === "string" ? value.trim() : "";
         if (!text) return callback();
         if (text.length > 25) return callback(new Error("邮箱长度不能超过 25"));
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) return callback(new Error("邮箱格式不正确"));
+        // 与后端 @Email 同级别：不额外要求域名含点号，避免拒绝后端合法值。
+        if (!/^[^\s@]+@[^\s@]+$/.test(text)) return callback(new Error("邮箱格式不正确"));
         return callback();
       },
       trigger: "blur",
@@ -262,18 +285,19 @@ async function openDetail(row: UserVo): Promise<void> {
     if (sequence !== detailSequence || !sessionOk(snapshot)) return;
     detailError.value = getApiErrorMessage(error, "暂时无法加载成员详情");
   } finally {
-    if (sequence === detailSequence) detailLoading.value = false;
+    if (sequence === detailSequence && isSessionIdentityCurrent(snapshot)) detailLoading.value = false;
   }
 }
 
 /** 只提交用户实际改过的字段：省略即「不动」，空串即「清空」。 */
 function buildContactPayload(): ContactUpdateRequest {
   const payload: ContactUpdateRequest = {};
+  const current = originalContact.value ?? { phone: "", email: "", remark: "" };
+  // 比较与提交都基于 trim 后的值：未修改时不会因首尾空白被误判为变更而重写。
   const phone = contactForm.phone.trim();
   const email = contactForm.email.trim();
-  const current = originalContact.value ?? { phone: "", email: "", remark: "" };
-  if (phone !== current.phone) payload.phone = phone;
-  if (email !== current.email) payload.email = email;
+  if (phone !== current.phone.trim()) payload.phone = phone;
+  if (email !== current.email.trim()) payload.email = email;
   if (contactForm.remark !== current.remark) payload.remark = contactForm.remark;
   return payload;
 }
@@ -325,7 +349,7 @@ async function saveContact(): Promise<void> {
     if (epoch === operationSequence && isSessionIdentityCurrent(snapshot))
       ElMessage.error(getApiErrorMessage(error, "保存失败，请稍后重试"));
   } finally {
-    if (epoch === operationSequence) saving.value = false;
+    if (epoch === operationSequence && isSessionIdentityCurrent(snapshot)) saving.value = false;
   }
 }
 
@@ -369,7 +393,7 @@ async function exportCurrent(): Promise<void> {
     if (epoch === operationSequence && isSessionIdentityCurrent(snapshot))
       exportFailure.value = `导出未完成：${getApiErrorMessage(error, "下载失败，请手动重试")}`;
   } finally {
-    if (epoch === operationSequence) exporting.value = false;
+    if (epoch === operationSequence && isSessionIdentityCurrent(snapshot)) exporting.value = false;
   }
 }
 
@@ -466,6 +490,9 @@ onBeforeUnmount(() => {
         </p>
         <p v-if="identityState === 'error'" class="toolbar-hint" data-testid="branch-member-identity-error">
           政治身份字典加载失败，身份列将按编号显示，成员列表仍可使用。
+        </p>
+        <p v-else-if="identityTruncated" class="toolbar-hint" data-testid="branch-member-identity-truncated">
+          身份字典超过 2000 条，仅加载了前 2000 条；未覆盖到的成员将按「身份 #编号」显示。
         </p>
       </section>
 

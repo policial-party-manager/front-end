@@ -22,7 +22,6 @@ const range = computed(() =>
   store.currentRole === "super_admin" ? "全院" : store.currentRole === "party_secretary" ? "本支部" : "本人",
 );
 const description = computed(() => {
-  if (route.meta.placeholder === "branch") return "本支部成员接口和数据范围校验完善后，将在这里提供成员查询与管理。";
   if (isProfile.value) return "个人资料、培养档案和活动记录将在完成接口接入后集中展示。";
   return `${section.value}的页面入口已经就位，业务数据和操作将在接口接入后开放。`;
 });

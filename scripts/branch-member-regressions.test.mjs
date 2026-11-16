@@ -151,6 +151,7 @@ async function fixture(t, options = {}) {
     detailGate: null,
     /** 保存后回读失败次数。 */
     readbackFail: 0,
+    saveFail: null,
     saveGate: null,
     contactWrites: [],
     exportJson: false,
@@ -231,6 +232,11 @@ async function fixture(t, options = {}) {
       const id = Number(path.split("/").at(-2));
       const payload = JSON.parse(req.postData() || "{}");
       state.contactWrites.push({ id, payload });
+      if (state.saveFail)
+        return route.fulfill({
+          status: state.saveFail.status,
+          json: { code: state.saveFail.status, message: state.saveFail.message },
+        });
       if (state.saveGate) await state.saveGate.promise;
       const row = state.rows.find((item) => item.id === id);
       // 复刻后端部分更新语义：缺省字段不动，空串清空（服务端 trimToNull 后写 null）。
@@ -677,6 +683,100 @@ test("支委未归属支部时原样转达服务端 400 原因", async (t) => {
   // 服务端原因必须原样转达，不能改写成通用的「加载失败」。
   assert.match(text, /您尚未归属任何党支部，请联系管理员/);
   assert.equal(await panel(page).count(), 0);
+});
+
+test("身份字典失败时提示按编号显示，列表仍可用", async (t) => {
+  const { page } = await fixture(t, { state: { identitiesFail: true } });
+  await waitTable(page);
+  const hint = page.getByTestId("branch-member-identity-error");
+  await hint.waitFor();
+  assert.match(await hint.innerText(), /身份列将按编号显示/);
+  // 字典失败不得把整页推进错误态：列表仍然渲染成员。
+  assert.equal(await page.getByTestId("branch-member-error").count(), 0);
+  const first = await tableRow(page, 0).innerText();
+  // identityId=1 但字典缺失：降级为「身份 #1」，不空也不编造名称。
+  assert.match(first, /身份 #1/);
+});
+
+test("身份字典请求失败不是空字典：仍显示编号而不是「未登记」", async (t) => {
+  const { page } = await fixture(t, { state: { identitiesFail: true } });
+  await waitTable(page);
+  const third = await tableRow(page, 2).innerText();
+  // identityId 本身为 null 的成员必须仍然是「未登记」，与字典失败无关。
+  assert.match(third, /身份 #99/);
+  const second = await tableRow(page, 1).innerText();
+  assert.match(second, /未登记/);
+});
+
+test("未经搜索的输入不进入导出参数（只用已应用条件）", async (t) => {
+  const { page, state } = await fixture(t);
+  await waitTable(page);
+  // 只在输入框里打字、不点搜索：导出必须仍用上一次已应用的条件（此处为默认无条件）。
+  await page.getByTestId("branch-member-keyword").fill("未提交的关键词");
+  await page.getByTestId("branch-member-export").click();
+  await eventually(() => state.requests.some((r) => r.path === "/api/v4/members/export"));
+  const exportRequest = state.requests.find((r) => r.path === "/api/v4/members/export");
+  assert.equal("keyword" in exportRequest.params, false, JSON.stringify(exportRequest.params));
+  assert.deepEqual(exportRequest.params, {});
+});
+
+test("保存请求失败时保留用户输入且不误报成功", async (t) => {
+  const { page, state } = await fixture(t);
+  await waitTable(page);
+  await page.getByTestId("branch-member-view").first().click();
+  await eventually(async () => (await detailDialog(page).innerText()).includes("张三"));
+  state.saveFail = { status: 500, message: "手机号已被使用" };
+  await page.getByTestId("contact-phone").fill("13900139000");
+  await page.getByTestId("contact-save").click();
+  await eventually(async () =>
+    (await page.locator(".el-message").allInnerTexts()).join(" ").includes("手机号已被使用"),
+  );
+  const messages = (await page.locator(".el-message").allInnerTexts()).join(" | ");
+  // 失败不得出现成功提示，输入必须保留供用户修正后重试。
+  assert.doesNotMatch(messages, /联系方式已保存/);
+  assert.equal(await page.getByTestId("contact-phone").inputValue(), "13900139000");
+  assert.equal(await page.getByTestId("contact-save").isDisabled(), false);
+});
+
+test("390px 窄屏下表格与筛选控件可用键盘操作", async (t) => {
+  const { page } = await fixture(t, { viewport: { width: 390, height: 844 } });
+  await waitTable(page);
+  // 关键词输入框可聚焦并用键盘输入，回车触发查询。
+  const keyword = page.getByTestId("branch-member-keyword");
+  await keyword.focus();
+  assert.equal(await keyword.evaluate((el) => el === document.activeElement), true);
+  await keyword.fill("张");
+  // 导出与搜索按钮可被键盘聚焦（不是纯装饰元素）。
+  const focusable = await page.evaluate(() => {
+    const ids = ["branch-member-search", "branch-member-reset", "branch-member-export"];
+    return ids.map((id) => {
+      const el = document.querySelector(`[data-testid="${id}"]`);
+      if (!el) return { id, found: false };
+      const button = el.tagName === "BUTTON" ? el : el.querySelector("button") || el;
+      button.focus();
+      return { id, found: true, focusable: button === document.activeElement || button.tabIndex >= 0 };
+    });
+  });
+  for (const item of focusable) {
+    assert.equal(item.found, true, `${item.id} 应存在`);
+    assert.equal(item.focusable, true, `${item.id} 应可用键盘聚焦`);
+  }
+  // 窄屏下页码与状态切换仍可见可读。
+  assert.match(await page.getByTestId("branch-member-status").innerText(), /停用/);
+});
+
+test("换号后筛选条件回到默认，不沿用旧账号的关键词", async (t) => {
+  const { page, state } = await fixture(t);
+  await waitTable(page);
+  await page.getByTestId("branch-member-keyword").fill("旧关键词");
+  await page.getByTestId("branch-member-search").click();
+  await eventually(() => pageRequests(state).length === 2);
+  await switchAccount(page);
+  await eventually(() => pageRequests(state).length === 3);
+  const last = pageRequests(state).at(-1);
+  // 新账号的支部范围不同，沿用旧关键词会直接落入空态。
+  assert.equal("keyword" in last.params, false, JSON.stringify(last.params));
+  assert.equal(await page.getByTestId("branch-member-keyword").inputValue(), "");
 });
 
 test("无令牌的开发预览态零业务请求", async (t) => {

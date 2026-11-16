@@ -103,16 +103,17 @@ export const getScopedMember = (id: number) => get<UserVo>(`/v4/members/${id}`);
 export const updateScopedContact = (id: number, data: ContactUpdateRequest) =>
   put<void>(`/v4/members/${id}/contact`, data);
 /**
- * 支委工作台的成员分页与导出。
+ * 支委工作台的成员分页。
  *
- * 身份查询（`pageIdentityMembers`/`exportMembers`）要求显式传 `status`；
- * 支委工作台默认不传 `status` 以表示「仅启用」，两者可选的参数不同，
- * 因此单独封装而不改动已在用的导出签名。
+ * 复用 `pageIdentityMembers` 的 URL 与响应形状，只把 `status` 放宽为可选：
+ * 身份查询必须显式给 1/2，支委工作台不传即表示「仅启用」。
  */
-export const pageBranchMembers = (params: BranchMemberFilters & { page: number; size: number }) =>
-  get<{ records: UserVo[]; total: number }>("/v4/members/page", params);
-export const exportBranchMembers = (params: BranchMemberFilters) =>
-  get<Blob>("/v4/members/export", params, { responseType: "blob" });
+export const pageBranchMembers = (
+  params: Omit<IdentityMemberFilters, "status"> & BranchMemberFilters & { page: number; size: number },
+) => pageIdentityMembers(params as IdentityMemberFilters & { page: number; size: number });
+/** 支委工作台导出；同样只放宽 `status` 可选性，不复制 URL 与 responseType。 */
+export const exportBranchMembers = (params: Omit<IdentityMemberFilters, "status"> & BranchMemberFilters) =>
+  exportMembers(params as IdentityMemberFilters);
 export const pageIdentities = (page: number, size: number) =>
   get<{ records: IdentityOption[]; total: number }>("/v2/content/identities/page", { page, size });
 export const batchMemberStatus = (ids: number[], status: 1 | 2) =>
