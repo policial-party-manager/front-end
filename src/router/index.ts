@@ -146,7 +146,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/statistics",
     name: "Statistics",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    component: () => import("@/views/statistics/index.vue"),
     meta: { title: "数据统计 - 党建云平台", permission: "statistics:view" },
   },
   {
