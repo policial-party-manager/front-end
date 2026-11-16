@@ -67,6 +67,28 @@ jobs:
       - name: 浏览器回归
         run: npm run test:branches
 
+  branch-import-regressions:
+    name: 支部导入回归
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: 安装依赖
+        run: npm ci
+      - name: 安装 Chromium
+        run: npx playwright-core install --with-deps chromium
+      - name: 浏览器回归
+        run: npm run test:branch-import
+      - name: 权限与预览策略
+        run: npm run check:permissions
+      - name: 回归脚本与 CI 格式
+        run: npx prettier scripts/branch-import-regressions.test.mjs .github/workflows/ci.yml --check
+
   activity-participation-regressions:
     name: 活动参与管理回归
     runs-on: ubuntu-latest
@@ -220,6 +242,7 @@ jobs:
         lint,
         typecheck,
         branch-regressions,
+        branch-import-regressions,
         activity-participation-regressions,
         member-import-regressions,
         member-management-regressions,

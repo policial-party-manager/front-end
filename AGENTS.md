@@ -26,6 +26,7 @@ npm is the package manager (CI uses `npm ci`). Scripts from `package.json`:
 | `npm run lint`                    | `eslint src --ext .vue,.ts,.js --fix` (auto-fixes; `no-console` is an error in production) |
 | `npm run format` / `format:check` | Prettier write / check (`printWidth: 120`, double quotes, semicolons)                      |
 | `npm run test:branches`           | 支部表单浏览器回归（Node.js 测试运行器 + `playwright-core`）                               |
+| `npm run test:branch-import`      | 支部模板下载与 Excel 导入浏览器回归（同上）                                                |
 | `npm run test:member-import`      | 成员 Excel 导入浏览器回归（同上）                                                          |
 | `npm run test:members`            | 成员管理浏览器回归（同上）                                                                 |
 | `npm run test:branch-members`     | 支委成员工作台浏览器回归（同上）                                                           |
@@ -34,7 +35,7 @@ npm is the package manager (CI uses `npm ci`). Scripts from `package.json`:
 
 No general unit/e2e framework is configured. Browser regression scripts live in `scripts/` and follow one pattern: they start their own Vite server, intercept business HTTP inside an isolated browser context, and never reach the real backend. Install Chromium first (`npx playwright-core install chromium`) or pass `PLAYWRIGHT_CHROMIUM_EXECUTABLE` with an existing binary path.
 
-CI (`.github/workflows/ci.yml`) runs `format:check` → eslint → `typecheck` → `branch-regressions` → `activity-participation-regressions` → `member-import-regressions` → `member-management-regressions` → `branch-members-regressions` → `system-management-regressions` → `my-development-regressions` → `statistics-regressions` → `build` on push/PR to `main`; the build job needs every regression job to pass.
+CI (`.github/workflows/ci.yml`) runs `format:check` → eslint → `typecheck` → `branch-regressions` → `branch-import-regressions` → `activity-participation-regressions` → `member-import-regressions` → `member-management-regressions` → `branch-members-regressions` → `system-management-regressions` → `my-development-regressions` → `statistics-regressions` → `build` on push/PR to `main`; the build job needs every regression job to pass.
 
 ## Architecture
 

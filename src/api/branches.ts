@@ -1,4 +1,8 @@
 import { del, get, post, put } from "@/api/request";
+import type { ImportResult } from "@/api/members";
+
+/** 支部导入与成员导入共用后端同一个 `ImportResult` DTO，这里只做类型复用，不复制结构。 */
+export type { ImportResult };
 
 /** 支部视图对象。 */
 export interface Branch {
@@ -46,7 +50,20 @@ export const updateBranch = (id: number, data: BranchSaveRequest) => put<void>(`
 /** 软删除：后端将支部置为停用，不从列表移除。 */
 export const deleteBranch = (id: number) => del<void>(`/v4/admin/branches/${id}`);
 
-// TODO: 支部模板下载（GET /v4/admin/branches/template，responseType: "blob"，
-//   参考 members.ts 的 downloadMemberTemplate）
-// TODO: 支部 Excel 导入（POST /v4/admin/branches/import，multipart/form-data，
-//   返回 ImportResult，参考 members.ts 的 importMembers）
+/** 后端生成的支部导入模板（真实 xlsx），列：支部名称、所属学院、简介、书记用户id。 */
+export const downloadBranchTemplate = () =>
+  get<Blob>("/v4/admin/branches/template", undefined, { responseType: "blob" });
+/** Excel 批量导入支部。
+ * 返回结构复用成员导入的 `ImportResult`（后端同一个 DTO）；`errors[].row` 是 Excel 实际行号（表头为第 1 行）。
+ * 后端导入路径不校验书记是否持有 branch_admin，前端不得比后端更严格。
+ */
+export const importBranches = (file: File, onProgress: (percent: number) => void) => {
+  const data = new FormData();
+  data.append("file", file);
+  return post<ImportResult>("/v4/admin/branches/import", data, {
+    timeout: 60000,
+    onUploadProgress: (event) => {
+      if (event.total) onProgress(Math.round((event.loaded / event.total) * 100));
+    },
+  });
+};

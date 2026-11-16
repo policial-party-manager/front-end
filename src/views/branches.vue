@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
-import { Plus } from "@element-plus/icons-vue";
+import { Download, Plus, Upload } from "@element-plus/icons-vue";
 import { useAppStore } from "@/stores/app";
 import {
   captureSessionIdentity,
@@ -11,17 +11,21 @@ import {
   sessionIdentity,
 } from "@/utils/session";
 import type { SessionIdentitySnapshot } from "@/utils/session";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { listRoles, type RoleVo } from "@/api/roles";
 import { getMember, pageMembers, type UserVo } from "@/api/members";
 import {
   createBranch,
   deleteBranch,
+  downloadBranchTemplate,
   getBranch,
+  importBranches,
   pageBranches,
   updateBranch,
   type Branch,
   type BranchFilters,
   type BranchSaveRequest,
+  type ImportResult,
 } from "@/api/branches";
 
 // 字段上限以 tb_branch DDL 为准：branch_name varchar(20)、college varchar(10)。
@@ -487,12 +491,267 @@ async function removeBranch(row: Branch) {
   }
 }
 
+// ---------------- 模板下载与 Excel 导入 ----------------
+const MAX_IMPORT_SIZE = 10 * 1024 * 1024;
+
+function saveFile(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** xlsx 是 ZIP；返回错误文案（文件头不符）或 null（合法 xlsx）。拒绝误标 MIME 的 JSON/HTML 错误页，避免伪装成 Excel 保存。只检查文件头，不声称已验证工作簿内容。 */
+async function xlsxHeaderError(blob: Blob, fallback: string): Promise<string | null> {
+  const signature = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+  if (signature[0] === 0x50 && signature[1] === 0x4b && signature[2] === 0x03 && signature[3] === 0x04) return null;
+  try {
+    const error: unknown = JSON.parse(await blob.text());
+    if (error && typeof error === "object" && "message" in error && typeof error.message === "string")
+      return error.message;
+  } catch {
+    /* 非 JSON 错误页沿用 fallback。 */
+  }
+  return fallback;
+}
+
+const downloading = ref(false);
+async function downloadTemplate() {
+  if (!canManage.value || downloading.value) return;
+  const snapshot = captureSessionIdentity();
+  downloading.value = true;
+  try {
+    const blob = await downloadBranchTemplate();
+    if (!isSessionIdentityCurrent(snapshot) || !canManage.value) return;
+    // HTTP/JSON 错误页由请求层提示；这里只补文件类型校验失败这一种，避免重复弹错。
+    const failure = await xlsxHeaderError(blob, "模板下载失败：返回内容不是 Excel 文件，请重试");
+    if (failure) {
+      ElMessage.error(failure);
+      return;
+    }
+    saveFile(blob, "党支部导入模板.xlsx");
+  } catch {
+    /* 请求层提示错误 */
+  } finally {
+    // 换号后旧会话不得改写新会话状态；新会话的 downloading 已在 watch 里复位。
+    if (isSessionIdentityCurrent(snapshot)) downloading.value = false;
+  }
+}
+
+const importVisible = ref(false);
+const importOutcomeAnchor = ref<HTMLElement>();
+const importFileInput = ref<HTMLInputElement>();
+const importFile = ref<File | null>(null);
+const importing = ref(false);
+const importProgress = ref(0);
+const importResult = ref<ImportResult | null>(null);
+const importFailure = ref("");
+
+// importEpoch 标识一次导入实例；关闭弹窗、退出或换号都会让它失效，旧回调因此不会污染新会话。
+let importEpoch = 0;
+let importSession: SessionIdentitySnapshot | null = null;
+function isImportActive(epoch: number): boolean {
+  return (
+    importVisible.value &&
+    epoch === importEpoch &&
+    importSession !== null &&
+    isSessionIdentityCurrent(importSession) &&
+    canManage.value
+  );
+}
+/** 结果出现后滚到结果区，避免窄屏下需要手动滚动才能看到反馈。 */
+function scrollImportResultIntoView() {
+  void nextTick(() => {
+    importOutcomeAnchor.value?.scrollIntoView({ block: "nearest" });
+  });
+}
+function resetImportFileInput() {
+  if (importFileInput.value) importFileInput.value.value = "";
+}
+function clearImportReport() {
+  importResult.value = null;
+  importFailure.value = "";
+  importProgress.value = 0;
+}
+function invalidateImport() {
+  importEpoch += 1;
+  importSession = null;
+  importing.value = false;
+  clearImportReport();
+  importFile.value = null;
+  resetImportFileInput();
+}
+function openImport() {
+  if (!canManage.value) return;
+  invalidateImport();
+  importSession = captureSessionIdentity();
+  importVisible.value = true;
+}
+function onImportClosed() {
+  // 关闭动画结束前若已重新打开，不清理新实例的数据。
+  if (!importVisible.value) invalidateImport();
+}
+
+const toCount = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
+/** 只接受结构完整的 ImportResult；结构不符时不得编造计数。 */
+function parseImportResult(raw: unknown): ImportResult | null {
+  if (!raw || typeof raw !== "object") return null;
+  const source = raw as Partial<ImportResult>;
+  const total = toCount(source.total);
+  const successCount = toCount(source.successCount);
+  const failCount = toCount(source.failCount);
+  if (total === null || successCount === null || failCount === null) return null;
+  const errors: { row: number; reason: string }[] = [];
+  if (Array.isArray(source.errors)) {
+    for (const item of source.errors) {
+      if (!item || typeof item !== "object") continue;
+      const row = toCount((item as { row?: unknown }).row);
+      const reason = (item as { reason?: unknown }).reason;
+      // row 是 Excel 行号，只能原样展示与导出，不能按数组下标重排。
+      if (row === null || typeof reason !== "string") continue;
+      errors.push({ row, reason });
+    }
+  }
+  return { total, successCount, failCount, errors };
+}
+type ImportOutcome = { type: "success" | "warning" | "error" | "info"; title: string };
+function classifyImportResult(result: ImportResult): ImportOutcome {
+  if (result.total === 0) return { type: "info", title: "文件中没有数据行" };
+  if (result.failCount === 0 && result.successCount > 0) return { type: "success", title: "全部导入成功" };
+  if (result.successCount > 0) return { type: "warning", title: "部分导入成功" };
+  if (result.failCount > 0) return { type: "error", title: "全部导入失败" };
+  return { type: "info", title: "导入结果未包含成功或失败计数" };
+}
+const importOutcome = computed(() => (importResult.value ? classifyImportResult(importResult.value) : null));
+const importSummary = computed(() => {
+  const result = importResult.value;
+  return result ? `共 ${result.total} 行，成功 ${result.successCount} 行，失败 ${result.failCount} 行` : "";
+});
+
+function validateImportFile(file: File): string | null {
+  if (!/\.xlsx$/i.test(file.name)) return "请上传 .xlsx 格式文件";
+  if (file.size === 0) return "文件内容为空，请选择包含数据的 .xlsx 文件";
+  if (file.size > MAX_IMPORT_SIZE) return `文件不能超过 ${MAX_IMPORT_SIZE / 1024 / 1024} MB`;
+  return null;
+}
+function chooseFile(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] ?? null;
+  // 换文件必须先清除上一份文件的报告与进度，避免旧结果被当成新文件的结果。
+  clearImportReport();
+  importFile.value = file;
+  if (!file) return;
+  const invalid = validateImportFile(file);
+  if (invalid) {
+    importFile.value = null;
+    resetImportFileInput();
+    ElMessage.warning(invalid);
+  }
+}
+async function submitImport() {
+  // 同步置位，避免校验与异步阶段中双击产生第二次导入请求。
+  if (importing.value) return;
+  const file = importFile.value;
+  if (!file) {
+    ElMessage.warning("请选择 Excel 文件");
+    return;
+  }
+  const invalid = validateImportFile(file);
+  if (invalid) {
+    ElMessage.warning(invalid);
+    return;
+  }
+  const epoch = importEpoch;
+  const snapshot = captureSessionIdentity();
+  importSession = snapshot;
+  importing.value = true;
+  clearImportReport();
+  try {
+    const response = await importBranches(file, (percent) => {
+      if (!isImportActive(epoch)) return;
+      const next = Number.isFinite(percent) ? Math.min(100, Math.max(0, Math.round(percent))) : 0;
+      if (next > importProgress.value) importProgress.value = next;
+    });
+    if (!isImportActive(epoch)) return;
+    const result = parseImportResult(response);
+    if (!result) {
+      importFailure.value =
+        "服务端返回的导入结果不完整，无法确认成功与失败行数。请先核对支部列表，再决定是否重新导入。";
+      scrollImportResultIntoView();
+      return;
+    }
+    importResult.value = result;
+    importProgress.value = 100;
+    notifyImportResult(result);
+    scrollImportResultIntoView();
+    if (result.successCount > 0) {
+      // 只回读服务端列表；回读失败不得篡改已获得的导入报告。
+      await loadBranches();
+    }
+  } catch (error) {
+    if (!isImportActive(epoch)) return;
+    // 4xx 是服务端明确拒绝（未写入任何行），5xx/超时/断网可能发生在写入过程中，两者不能混为一谈。
+    const status = readHttpStatus(error);
+    if (isDefiniteRejection(status)) {
+      const message = getApiErrorMessage(error, "");
+      importFailure.value = message
+        ? `导入未执行：${message}`
+        : `导入未执行：服务端拒绝了本次请求（HTTP ${status}），未写入任何支部。`;
+    } else if (isTimeoutError(error)) {
+      importFailure.value =
+        "导入请求超时，尚未确认处理结果。请先核对支部列表确认是否已写入，再决定是否重新导入；请勿重复提交。";
+    } else {
+      importFailure.value = `导入未完成：${getApiErrorMessage(error, "请求失败，请核对网络或权限后重试")}。已保留所选文件，请核对支部列表后再决定是否重试。`;
+    }
+    scrollImportResultIntoView();
+  } finally {
+    // 换号或关闭重开会推进 importEpoch，旧操作不得清除新操作的状态。
+    if (epoch === importEpoch) importing.value = false;
+  }
+}
+/** 该状态码是否足以断言服务端未执行导入（4xx 确定拒绝；401/408/429 仍可能已到达或已节流）。 */
+function isDefiniteRejection(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429;
+}
+function readHttpStatus(error: unknown): number {
+  if (typeof error !== "object" || error === null) return 0;
+  const response = (error as { response?: { status?: unknown } }).response;
+  return typeof response?.status === "number" ? response.status : 0;
+}
+function notifyImportResult(result: ImportResult) {
+  const outcome = classifyImportResult(result);
+  if (outcome.type === "success") ElMessage.success(`导入完成：共 ${result.total} 行，全部成功`);
+  else if (outcome.type === "warning")
+    ElMessage.warning(`导入部分成功：成功 ${result.successCount} 行，失败 ${result.failCount} 行，请核对失败原因`);
+  else if (outcome.type === "error") ElMessage.error(`导入失败：共 ${result.total} 行，全部失败，请核对失败原因`);
+  else if (result.total === 0) ElMessage.info(outcome.title);
+  else ElMessage.warning("导入结果未包含成功或失败行，请核对支部列表确认实际写入情况");
+}
+function downloadErrors() {
+  if (!importResult.value) return;
+  const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const lines = [
+    "行号,失败原因",
+    ...importResult.value.errors.map(({ row, reason }) => `${row},${quote(reason.replace(/\r?\n/g, " "))}`),
+  ];
+  saveFile(new Blob(["\uFEFF", lines.join("\r\n")], { type: "text/csv;charset=utf-8" }), "支部导入错误报告.csv");
+}
+
 onMounted(() => {
   if (canManage.value) void loadBranches();
 });
 watch([canManage, sessionIdentity], () => {
   // 退出、重新登录或角色变化后，旧请求不得回写新会话页面。
   invalidateFormRequests();
+  invalidateImport();
+  // 下载可能因换号而失去回写时机（finally 里的会话校验会拦住），这里显式复位。
+  downloading.value = false;
+  importVisible.value = false;
   formVisible.value = false;
   saving.value = false;
   rows.value = [];
@@ -520,6 +779,7 @@ watch(
 onBeforeUnmount(() => {
   detailSequence += 1;
   invalidateFormRequests();
+  invalidateImport();
 });
 </script>
 
@@ -527,7 +787,7 @@ onBeforeUnmount(() => {
   <div class="branches-page page-container">
     <div class="page-header">
       <h2 class="section-title">支部管理</h2>
-      <p>维护党支部基础信息，支持新增、编辑与删除。</p>
+      <p>维护党支部基础信息，支持新增、编辑、删除，以及模板下载与 Excel 批量导入。</p>
     </div>
     <el-alert v-if="!sessionHasAccessToken" title="支部管理需要登录" type="warning" show-icon :closable="false">
       <template #default>
@@ -548,7 +808,9 @@ onBeforeUnmount(() => {
           <strong>支部列表</strong><span class="total-label">共 {{ total }} 条</span>
         </div>
         <div class="actions">
-          <el-button v-if="canManage" type="primary" :icon="Plus" @click="addBranch">新增支部</el-button>
+          <el-button :icon="Download" :loading="downloading" @click="downloadTemplate">下载模板</el-button
+          ><el-button :icon="Upload" @click="openImport">导入支部</el-button
+          ><el-button v-if="canManage" type="primary" :icon="Plus" @click="addBranch">新增支部</el-button>
         </div>
       </div>
       <div class="filters">
@@ -746,6 +1008,88 @@ onBeforeUnmount(() => {
       >
     </el-dialog>
 
+    <el-dialog
+      v-model="importVisible"
+      title="Excel 导入支部"
+      width="min(680px, calc(100vw - 32px))"
+      :close-on-click-modal="!importing"
+      :close-on-press-escape="!importing"
+      :show-close="!importing"
+      @closed="onImportClosed"
+    >
+      <div class="import-dialog">
+        <el-alert title="填写规则" type="info" show-icon :closable="false">
+          <template #default>
+            <ul class="rule-list">
+              <li>模板固定 4 列：支部名称、所属学院、简介、书记用户id。</li>
+              <li>
+                书记用户id 必须填 tb_user.id（用户管理里显示的成员 ID），不是学号、用户名或角色
+                ID；该列不能为空，否则整行失败。
+              </li>
+              <li>支部名称不能与现有支部重复（含已软删除的支部），否则该行失败。</li>
+              <li>模板自带的「第一党支部」是示例行，导入前必须删除，否则会按行失败。</li>
+              <li>
+                导入不校验书记是否持有支委（branch_admin）角色，但手工新增/编辑会校验；若导入成功后在编辑时提示「未持有支委角色」，需先在成员管理中为该用户分配支委角色。
+              </li>
+              <li>单行失败不影响其他行；导入的支部状态一律为正常。</li>
+            </ul>
+          </template>
+        </el-alert>
+
+        <section class="import-submit">
+          <el-button :icon="Download" :disabled="importing" :loading="downloading" @click="downloadTemplate"
+            >下载导入模板</el-button
+          >
+          <input
+            ref="importFileInput"
+            class="file-input"
+            data-testid="branch-import-file-input"
+            type="file"
+            accept=".xlsx"
+            :disabled="importing"
+            @change="chooseFile"
+          />
+          <p v-if="importFile" class="import-file-name">已选择：{{ importFile.name }}</p>
+          <p v-else class="import-file-name">请选择 .xlsx 文件，大小不超过 10 MB。</p>
+        </section>
+
+        <el-progress v-if="importing" :percentage="importProgress" />
+        <p v-if="importing" class="import-waiting" data-testid="branch-import-waiting">
+          {{
+            importProgress >= 100
+              ? "文件已上传，正在等待服务端处理，请勿关闭弹窗或重复提交。"
+              : "正在上传文件，完成前不会显示导入结果。"
+          }}
+        </p>
+
+        <div v-if="importFailure || (importResult && importOutcome)" ref="importOutcomeAnchor" class="import-outcome">
+          <el-alert v-if="importFailure" :title="importFailure" type="error" show-icon :closable="false" />
+          <template v-else-if="importResult && importOutcome">
+            <el-alert
+              :title="`${importOutcome.title}：${importSummary}`"
+              :type="importOutcome.type"
+              show-icon
+              :closable="false"
+              data-testid="branch-import-result-summary"
+            />
+            <template v-if="importResult.errors.length"
+              ><el-table :data="importResult.errors" max-height="240" stripe class="import-error-table"
+                ><el-table-column prop="row" label="Excel 行号" width="110" /><el-table-column
+                  prop="reason"
+                  label="失败原因" /></el-table
+              ><el-button :icon="Download" @click="downloadErrors">下载错误报告</el-button></template
+            >
+          </template>
+        </div>
+      </div>
+      <template #footer
+        ><el-button :disabled="importing" @click="importVisible = false">关闭</el-button
+        ><el-button type="primary" :loading="importing" :disabled="importing" @click="submitImport"
+          >开始导入</el-button
+        ></template
+      >
+    </el-dialog>
+
     <el-dialog v-model="detailVisible" title="支部详情" width="min(520px, calc(100vw - 32px))"
       ><el-descriptions v-if="detail" :column="2" border>
         <el-descriptions-item label="支部名称" :span="2">{{ detail.branchName }}</el-descriptions-item
@@ -860,6 +1204,50 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   font-size: 13px;
   color: var(--text-secondary);
+}
+.import-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* 窄屏时只滚动内容区，保留底部提交按钮可见。 */
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.import-dialog > * {
+  flex: 0 0 auto;
+}
+.rule-list {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+.import-submit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.import-file-name,
+.import-waiting {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+  word-break: break-all;
+}
+.file-input {
+  display: block;
+  margin: 0;
+  max-width: 100%;
+}
+.import-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.import-error-table {
+  width: 100%;
 }
 @media (max-width: 768px) {
   .branches-page.page-container {
