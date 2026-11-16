@@ -13,6 +13,7 @@
     "test:members": "node --test scripts/member-management-regressions.test.mjs",
     "test:my-development": "node --test scripts/my-development-regressions.test.mjs",
     "test:statistics": "node --test scripts/statistics-distribution-regressions.test.mjs",
+    "test:branch-members": "node --test scripts/branch-member-regressions.test.mjs",
     "test:system": "node --test scripts/system-roles-regressions.test.mjs scripts/system-logs-regressions.test.mjs",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
