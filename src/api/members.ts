@@ -79,6 +79,41 @@ export const pageIdentityMembers = (params: IdentityMemberFilters & { page: numb
   get<{ records: UserVo[]; total: number }>("/v4/members/page", params);
 export const exportMembers = (params: IdentityMemberFilters) =>
   get<Blob>("/v4/members/export", params, { responseType: "blob" });
+
+/**
+ * 支委工作台（`/members/branch`）使用的范围接口。
+ *
+ * 后端 `ScopedMemberServiceImpl` 只按操作者范围过滤，不查支部表与身份表，
+ * 因此 `branchName`、`identityName` 恒为 null，页面需自行降级展示。
+ * `status` 缺省等于「仅启用」，显式传 2 才查询停用成员。
+ */
+export interface BranchMemberFilters {
+  keyword?: string;
+  status?: 1 | 2;
+}
+
+/** 部分更新语义：字段省略表示不动，空串表示清空；不能用 null 表示清空。 */
+export interface ContactUpdateRequest {
+  phone?: string;
+  email?: string;
+  remark?: string;
+}
+
+export const getScopedMember = (id: number) => get<UserVo>(`/v4/members/${id}`);
+export const updateScopedContact = (id: number, data: ContactUpdateRequest) =>
+  put<void>(`/v4/members/${id}/contact`, data);
+/**
+ * 支委工作台的成员分页。
+ *
+ * 复用 `pageIdentityMembers` 的 URL 与响应形状，只把 `status` 放宽为可选：
+ * 身份查询必须显式给 1/2，支委工作台不传即表示「仅启用」。
+ */
+export const pageBranchMembers = (
+  params: Omit<IdentityMemberFilters, "status"> & BranchMemberFilters & { page: number; size: number },
+) => pageIdentityMembers(params as IdentityMemberFilters & { page: number; size: number });
+/** 支委工作台导出；同样只放宽 `status` 可选性，不复制 URL 与 responseType。 */
+export const exportBranchMembers = (params: Omit<IdentityMemberFilters, "status"> & BranchMemberFilters) =>
+  exportMembers(params as IdentityMemberFilters);
 export const pageIdentities = (page: number, size: number) =>
   get<{ records: IdentityOption[]; total: number }>("/v2/content/identities/page", { page, size });
 export const batchMemberStatus = (ids: number[], status: 1 | 2) =>
