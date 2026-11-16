@@ -31,12 +31,11 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/members/branch",
     name: "BranchMembers",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    component: () => import("@/views/branch-members.vue"),
     meta: {
       title: "成员与支部 - 党建云平台",
       permission: "member:manage",
       roles: ["party_secretary"],
-      placeholder: "branch",
     },
   },
   {
