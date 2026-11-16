@@ -49,7 +49,7 @@ Nav items live in the Pinia store (`navItems` in `src/stores/app.ts`); the highl
 
 `src/stores/app.ts` is the only Pinia store; session state lives in `src/utils/session.ts`. The store exposes role/nav/layout state and retains Mock data. Homepage news/notices now come from `src/api/content.ts`; statistics and to-dos remain examples.
 
-接口接入和模块盘点前阅读 `docs/前后端接入现状.md`。以 `src/router/index.ts` 判断实际页面：我的培养（`/my-development`）已接本人只读档案，数据统计（`/statistics`）已接政治身份分布；党员发展（管理侧）、支委成员和资源中心仍为占位路由；仓库中保留的旧 Mock 原型不代表已开放。后端已有报名、二维码签到、培养和统计接口，不能继续笼统写成“后端尚无接口”。
+接口接入和模块盘点前阅读 `docs/前后端接入现状.md`。以 `src/router/index.ts` 判断实际页面：我的培养（`/my-development`）已接本人只读档案，数据统计（`/statistics`）已接政治身份分布，支委成员工作台（`/members/branch`）已接本支部 scoped 成员接口；党员发展（管理侧）和资源中心仍为占位路由；仓库中保留的旧 Mock 原型不代表已开放。后端已有报名、二维码签到、培养和统计接口，不能继续笼统写成“后端尚无接口”。
 
 ### Role permissions
 
