@@ -11,7 +11,7 @@ let baseURL;
 before(async () => {
   server = await createServer({
     cacheDir: `.cache/branch-import-regressions-vite-${process.pid}`,
-    server: { host: "127.0.0.1", port: 5201, strictPort: false },
+    server: { host: "127.0.0.1", port: 5192, strictPort: false },
     logLevel: "error",
   });
   await server.listen();
@@ -91,6 +91,8 @@ async function fixture(t, options = {}) {
     templates: 0,
     templatePayload: "zip",
     templateBody: ZIP_BYTES,
+    templateGate: null,
+    templateStarted: false,
     imports: [],
     importGate: null,
     importStarted: false,
@@ -120,6 +122,12 @@ async function fixture(t, options = {}) {
     }
     if (path === "/api/v4/admin/branches/template") {
       state.templates++;
+      if (state.templateGate) {
+        state.templateStarted = true;
+        const gate = state.templateGate;
+        state.templateGate = null;
+        await gate.promise;
+      }
       if (state.templatePayload === "json") {
         return route.fulfill({
           status: 500,
@@ -312,6 +320,63 @@ test("同一事件循环内双击开始导入只发送一次请求", async (t) =
   assert.equal(state.imports.length, 1, "双击只应产生一次导入请求");
   gate.resolve();
   await eventually(async () => (await dialog.innerText()).includes("部分导入成功"), "解锁后应展示结果");
+});
+
+test("服务端 4xx 明确拒绝时说明未执行，5xx 不声称未写入", async (t) => {
+  const { page, state } = await fixture(t, { branches: defaultBranches });
+  // 真实后端对「表头与模板不一致」「Excel 解析失败」返回 HTTP 400 + 业务原因。
+  state.importStatus = 400;
+  state.importMessage = "Excel 解析失败：表头与模板不一致";
+  const dialog = await openImport(page);
+  await selectFile(dialog, "表头不对.xlsx");
+  await dialog.getByRole("button", { name: "开始导入", exact: true }).click();
+  await eventually(async () => (await dialog.innerText()).includes("导入未执行"), "确定性拒绝应说明未执行");
+  const rejected = await dialog.innerText();
+  assert.ok(rejected.includes("Excel 解析失败"), "应原样转达服务端原因");
+  assert.ok(!rejected.includes("尚未确认处理结果"), "确定性拒绝不得说成结果未知");
+  assert.equal(await dialog.locator('[data-testid="branch-import-result-summary"]').count(), 0, "不得伪造计数");
+});
+
+test("换号后模板下载 loading 复位，不会永久禁用按钮", async (t) => {
+  const { page, state } = await fixture(t, { branches: defaultBranches });
+  const gate = deferred();
+  state.templateGate = gate;
+  t.after(() => gate.resolve());
+  const button = page.getByRole("button", { name: "下载模板", exact: true });
+  await button.click();
+  await eventually(() => state.templateStarted, "模板请求应在途");
+  await page.evaluate(async () => {
+    (await import("/src/utils/session.ts")).applySession({
+      accessToken: "download-switched-access",
+      refreshToken: "download-switched-refresh",
+      role: "super_admin",
+      realName: "管理员",
+    });
+  });
+  gate.resolve();
+  // 旧响应不得触发下载，新会话也不能继承旧会话的 loading 状态。
+  await page.waitForTimeout(600);
+  assert.deepEqual(await downloadedTexts(page), [], "换号后旧 Blob 不得落盘");
+  const fresh = page.getByRole("button", { name: "下载模板", exact: true });
+  await eventually(async () => !(await fresh.isDisabled()), "新会话下载按钮应可用");
+  await fresh.click();
+  await eventually(async () => (await downloadedTexts(page)).length === 1, "新会话应能重新下载模板");
+  assert.equal(state.templates, 2, "新会话应发出自己的模板请求");
+});
+
+test("计数不自洽时不编造失败结论", async (t) => {
+  const { page, state } = await fixture(t, { branches: defaultBranches });
+  state.importResult = { total: 2, successCount: 0, failCount: 0, errors: [] };
+  const dialog = await openImport(page);
+  await selectFile(dialog, "异常结果.xlsx");
+  await dialog.getByRole("button", { name: "开始导入", exact: true }).click();
+  await eventually(
+    async () => (await dialog.innerText()).includes("导入结果未包含成功或失败计数"),
+    "计数不自洽时应有兵底文案",
+  );
+  const text = await dialog.innerText();
+  assert.ok(!text.includes("全部导入失败"), "success=0 且 fail=0 不得说成全部失败");
+  assert.equal(await page.locator(".el-message--success").count(), 0, "不得提示成功");
 });
 
 test("超过 10 MB 与非 .xlsx 文件零请求即被拒绝", async (t) => {

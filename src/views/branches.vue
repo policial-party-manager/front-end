@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { Download, Plus, Upload } from "@element-plus/icons-vue";
@@ -505,8 +505,8 @@ function saveFile(blob: Blob, name: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** xlsx 是 ZIP；拒绝误标 MIME 的 JSON/HTML 错误页，避免伪装成 Excel 保存。只检查文件头，不声称已验证工作簿内容。 */
-async function xlsxFailure(blob: Blob, fallback: string): Promise<string | null> {
+/** xlsx 是 ZIP；返回错误文案（文件头不符）或 null（合法 xlsx）。拒绝误标 MIME 的 JSON/HTML 错误页，避免伪装成 Excel 保存。只检查文件头，不声称已验证工作簿内容。 */
+async function xlsxHeaderError(blob: Blob, fallback: string): Promise<string | null> {
   const signature = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
   if (signature[0] === 0x50 && signature[1] === 0x4b && signature[2] === 0x03 && signature[3] === 0x04) return null;
   try {
@@ -528,7 +528,7 @@ async function downloadTemplate() {
     const blob = await downloadBranchTemplate();
     if (!isSessionIdentityCurrent(snapshot) || !canManage.value) return;
     // HTTP/JSON 错误页由请求层提示；这里只补文件类型校验失败这一种，避免重复弹错。
-    const failure = await xlsxFailure(blob, "模板下载失败：返回内容不是 Excel 文件，请重试");
+    const failure = await xlsxHeaderError(blob, "模板下载失败：返回内容不是 Excel 文件，请重试");
     if (failure) {
       ElMessage.error(failure);
       return;
@@ -537,11 +537,13 @@ async function downloadTemplate() {
   } catch {
     /* 请求层提示错误 */
   } finally {
+    // 换号后旧会话不得改写新会话状态；新会话的 downloading 已在 watch 里复位。
     if (isSessionIdentityCurrent(snapshot)) downloading.value = false;
   }
 }
 
 const importVisible = ref(false);
+const importOutcomeAnchor = ref<HTMLElement>();
 const importFileInput = ref<HTMLInputElement>();
 const importFile = ref<File | null>(null);
 const importing = ref(false);
@@ -560,6 +562,12 @@ function isImportActive(epoch: number): boolean {
     isSessionIdentityCurrent(importSession) &&
     canManage.value
   );
+}
+/** 结果出现后滚到结果区，避免窄屏下需要手动滚动才能看到反馈。 */
+function scrollImportResultIntoView() {
+  void nextTick(() => {
+    importOutcomeAnchor.value?.scrollIntoView({ block: "nearest" });
+  });
 }
 function resetImportFileInput() {
   if (importFileInput.value) importFileInput.value.value = "";
@@ -616,7 +624,8 @@ function classifyImportResult(result: ImportResult): ImportOutcome {
   if (result.total === 0) return { type: "info", title: "文件中没有数据行" };
   if (result.failCount === 0 && result.successCount > 0) return { type: "success", title: "全部导入成功" };
   if (result.successCount > 0) return { type: "warning", title: "部分导入成功" };
-  return { type: "error", title: "全部导入失败" };
+  if (result.failCount > 0) return { type: "error", title: "全部导入失败" };
+  return { type: "info", title: "导入结果未包含成功或失败计数" };
 }
 const importOutcome = computed(() => (importResult.value ? classifyImportResult(importResult.value) : null));
 const importSummary = computed(() => {
@@ -673,30 +682,55 @@ async function submitImport() {
     if (!result) {
       importFailure.value =
         "服务端返回的导入结果不完整，无法确认成功与失败行数。请先核对支部列表，再决定是否重新导入。";
+      scrollImportResultIntoView();
       return;
     }
     importResult.value = result;
     importProgress.value = 100;
     notifyImportResult(result);
+    scrollImportResultIntoView();
     if (result.successCount > 0) {
       // 只回读服务端列表；回读失败不得篡改已获得的导入报告。
       await loadBranches();
     }
   } catch (error) {
     if (!isImportActive(epoch)) return;
-    // 失败保留已选文件，便于修正后重新上传。
-    importFailure.value = `导入未完成：${getApiErrorMessage(error, "导入失败，请核对文件后重试")}`;
+    // 4xx 是服务端明确拒绝（未写入任何行），5xx/超时/断网可能发生在写入过程中，两者不能混为一谈。
+    const status = readHttpStatus(error);
+    if (isDefiniteRejection(status)) {
+      const message = getApiErrorMessage(error, "");
+      importFailure.value = message
+        ? `导入未执行：${message}`
+        : `导入未执行：服务端拒绝了本次请求（HTTP ${status}），未写入任何支部。`;
+    } else if (isTimeoutError(error)) {
+      importFailure.value =
+        "导入请求超时，尚未确认处理结果。请先核对支部列表确认是否已写入，再决定是否重新导入；请勿重复提交。";
+    } else {
+      importFailure.value = `导入未完成：${getApiErrorMessage(error, "请求失败，请核对网络或权限后重试")}。已保留所选文件，请核对支部列表后再决定是否重试。`;
+    }
+    scrollImportResultIntoView();
   } finally {
     // 换号或关闭重开会推进 importEpoch，旧操作不得清除新操作的状态。
     if (epoch === importEpoch) importing.value = false;
   }
 }
+/** 该状态码是否足以断言服务端未执行导入（4xx 确定拒绝；401/408/429 仍可能已到达或已节流）。 */
+function isDefiniteRejection(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429;
+}
+function readHttpStatus(error: unknown): number {
+  if (typeof error !== "object" || error === null) return 0;
+  const response = (error as { response?: { status?: unknown } }).response;
+  return typeof response?.status === "number" ? response.status : 0;
+}
 function notifyImportResult(result: ImportResult) {
-  if (result.total === 0) ElMessage.info("文件中没有数据行");
-  else if (result.failCount === 0) ElMessage.success(`导入完成：共 ${result.total} 行，全部成功`);
-  else if (result.successCount > 0)
+  const outcome = classifyImportResult(result);
+  if (outcome.type === "success") ElMessage.success(`导入完成：共 ${result.total} 行，全部成功`);
+  else if (outcome.type === "warning")
     ElMessage.warning(`导入部分成功：成功 ${result.successCount} 行，失败 ${result.failCount} 行，请核对失败原因`);
-  else ElMessage.error(`导入失败：共 ${result.total} 行，全部失败，请核对失败原因`);
+  else if (outcome.type === "error") ElMessage.error(`导入失败：共 ${result.total} 行，全部失败，请核对失败原因`);
+  else if (result.total === 0) ElMessage.info(outcome.title);
+  else ElMessage.warning("导入结果未包含成功或失败行，请核对支部列表确认实际写入情况");
 }
 function downloadErrors() {
   if (!importResult.value) return;
@@ -715,6 +749,8 @@ watch([canManage, sessionIdentity], () => {
   // 退出、重新登录或角色变化后，旧请求不得回写新会话页面。
   invalidateFormRequests();
   invalidateImport();
+  // 下载可能因换号而失去回写时机（finally 里的会话校验会拦住），这里显式复位。
+  downloading.value = false;
   importVisible.value = false;
   formVisible.value = false;
   saving.value = false;
@@ -751,7 +787,7 @@ onBeforeUnmount(() => {
   <div class="branches-page page-container">
     <div class="page-header">
       <h2 class="section-title">支部管理</h2>
-      <p>维护党支部基础信息，支持新增、编辑与删除。</p>
+      <p>维护党支部基础信息，支持新增、编辑、删除，以及模板下载与 Excel 批量导入。</p>
     </div>
     <el-alert v-if="!sessionHasAccessToken" title="支部管理需要登录" type="warning" show-icon :closable="false">
       <template #default>
@@ -1026,7 +1062,7 @@ onBeforeUnmount(() => {
           }}
         </p>
 
-        <div v-if="importFailure || (importResult && importOutcome)" class="import-outcome">
+        <div v-if="importFailure || (importResult && importOutcome)" ref="importOutcomeAnchor" class="import-outcome">
           <el-alert v-if="importFailure" :title="importFailure" type="error" show-icon :closable="false" />
           <template v-else-if="importResult && importOutcome">
             <el-alert
