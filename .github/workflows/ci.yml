@@ -279,6 +279,28 @@ jobs:
       - name: 回归脚本与 CI 格式
         run: npx prettier scripts/profile-edit-regressions.test.mjs .github/workflows/ci.yml --check
 
+  identity-change-regressions:
+    name: 身份变更回归
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: 安装依赖
+        run: npm ci
+      - name: 安装 Chromium
+        run: npx playwright-core install --with-deps chromium
+      - name: 浏览器回归
+        run: npm run test:identity-change
+      - name: 权限与预览策略
+        run: npm run check:permissions
+      - name: 回归脚本与 CI 格式
+        run: npx prettier scripts/identity-change-regressions.test.mjs .github/workflows/ci.yml --check
+
   build:
     name: 生产构建
     needs:
@@ -296,6 +318,7 @@ jobs:
         statistics-regressions,
         development-profile-regressions,
         profile-edit-regressions,
+        identity-change-regressions,
       ]
     runs-on: ubuntu-latest
     steps:
