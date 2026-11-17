@@ -89,6 +89,11 @@ function statusLabel(status: number | null | undefined): string {
   return status == null ? "状态未标注" : `未知状态（${status}）`;
 }
 
+/** 只有服务端明确的启用才是成功语义；未知取值用中性色，避免看起来像正常。 */
+function statusTagType(status: number | null | undefined): "success" | "info" {
+  return status === 1 ? "success" : "info";
+}
+
 // ============ 请求隔离：请求序号 + 会话快照 ============
 let disposed = false;
 
@@ -188,7 +193,9 @@ function search(): void {
   const keyword = filters.keyword.trim();
   if (keyword && filters.identityId != null) {
     // 后端用户名命中会绕过身份过滤，组合查询会返回不符合条件的成员，因此不发请求。
-    ElMessage.warning("关键词与政治身份暂不支持组合查询，请清空其中一项后搜索；已应用条件未改变。");
+    ElMessage.warning(
+      "关键词与政治身份暂不支持组合查询：后端在关键词命中用户名时不再叠加身份条件，结果会混入不符合身份的成员。请清空其中一项。",
+    );
     return;
   }
   applied.value = {
@@ -201,11 +208,8 @@ function search(): void {
 }
 
 function changeStatus(): void {
-  if (!canView.value) return;
-  // 状态切换立即生效，但只用已应用的其它条件，不带上未提交的关键词输入。
-  applied.value = { ...applied.value, status: statusChoice.value === "disabled" ? 2 : 1 };
-  page.value = 1;
-  void loadMembers();
+  // 状态切换立即生效，并使用界面上当前可见的条件，避免输入框里的关键词与请求不一致。
+  search();
 }
 
 function resetFilters(): void {
@@ -274,6 +278,19 @@ onBeforeUnmount(() => {
     >
       <template #default>
         <p>当前是开发预览身份，没有后端登录令牌，因此不会请求真实成员数据。请使用管理员或支部书记账号登录后再访问。</p>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-else-if="!ALLOWED_ROLES.includes(store.currentRole)"
+      data-testid="dev-list-no-permission"
+      title="当前身份无权查看党员发展档案"
+      type="warning"
+      show-icon
+      :closable="false"
+    >
+      <template #default>
+        <p>管理侧培养档案仅面向超级管理员与党支部书记；普通成员请在“我的培养”查看本人档案。</p>
       </template>
     </el-alert>
 
@@ -360,7 +377,7 @@ onBeforeUnmount(() => {
             <div class="row-main">
               <div class="row-line">
                 <span class="row-title">{{ memberName(row) }}</span>
-                <el-tag :type="row.status === 2 ? 'info' : 'success'" size="small" effect="plain">
+                <el-tag :type="statusTagType(row.status)" size="small" effect="plain">
                   {{ statusLabel(row.status) }}
                 </el-tag>
               </div>

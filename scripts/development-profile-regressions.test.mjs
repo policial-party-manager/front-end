@@ -10,7 +10,7 @@ import { createServer } from "vite";
  * 列表只请求 `/v4/members/page` 与身份字典（零 `/v4/admin/**`）、`status` 永远显式 1/2、
  * 关键词与政治身份互斥且组合提交零请求、`branchName`/`identityName` 为 null 时的确定降级、
  * 身份字典失败列表仍可用、四态与分页 `total` 取服务端值、
- * 详情只请求一次 `/{userId}` 且不带查询参数、八区块独立空态、摘要缺失与服务端 0 区分、
+ * 详情只请求一次 `/{userId}` 且不带查询参数、九个 section 与七区块独立空态、摘要缺失与服务端 0 区分、
  * 未知枚举不兜底成成功语义、服务端文本纯文本渲染、内部路径不下发也不成链接、
  * 切换成员/换号/退出/离页后迟到响应不写回、401 刷新恰好重放一次、
  * 无令牌预览零业务请求、普通成员被守卫拦截、非法编号零请求、390px 无整页横向溢出。
@@ -523,13 +523,45 @@ test("换号后旧会话的迟到列表响应不写回，且筛选回到默认",
 });
 
 test("无令牌的开发预览态显示需要登录且零业务请求", async (t) => {
-  const { page, state } = await fixture(t, { withToken: false, previewRole: "super_admin" });
-  await eventually(async () => (await page.locator(".el-alert").count()) > 0);
-  assert.match(await page.locator(".el-alert").first().innerText(), /党员发展档案需要登录/);
-  assert.match(await page.locator(".el-alert").first().innerText(), /不会请求真实成员数据/);
-  await page.waitForTimeout(300);
-  assert.deepEqual(state.requests, []);
-  assert.equal(await section(page, "dev-list-table").count(), 0);
+  // 两条新路由都必须自己拦住无令牌预览：列表页与详情页各验证一次。
+  for (const path of ["/development", "/development/member/12"]) {
+    const { page, state } = await fixture(t, { withToken: false, previewRole: "super_admin", path });
+    await eventually(async () => (await page.locator(".el-alert").count()) > 0);
+    const alertText = await page.locator(".el-alert").first().innerText();
+    assert.match(alertText, /需要登录/);
+    await page.waitForTimeout(300);
+    assert.deepEqual(state.requests, [], `${path} 不得发出任何业务请求`);
+    assert.equal(await section(page, "dev-list-table").count(), 0);
+    assert.equal(await section(page, "dev-profile-basic").count(), 0);
+  }
+});
+
+test("列表无数据且有令牌时不会停留在空白页", async (t) => {
+  // 页面自身的 canView=false 分支在路由守卫存在时无法通过导航到达（守卫先拦回首页），
+  // 因此这里锁定可观察的兜底：任何非成功路径都必须渲染确定提示，而不是只剩页头。
+  const { page } = await fixture(t, { state: { failPageCalls: 1 } });
+  await eventually(async () => (await section(page, "dev-list-error").count()) === 1);
+  const headings = await page
+    .locator("main")
+    .allInnerTexts()
+    .then((texts) => texts.join(" "));
+  assert.match(headings, /成员列表暂时无法加载/);
+  assert.match(headings, /重新加载/);
+});
+
+test("成员状态标签只在启用时使用成功语义", async (t) => {
+  const { page } = await fixture(t, {
+    state: { rows: [member(101, { status: 1 }), member(102, { status: 2 }), member(103, { status: 9 })], total: 3 },
+  });
+  await waitList(page);
+  const rows = listRows(page);
+  await eventually(async () => (await rows.count()) === 3);
+  const tagOf = async (index) => rows.nth(index).locator(".el-tag").first().getAttribute("class");
+  assert.match(await tagOf(0), /el-tag--success/);
+  assert.doesNotMatch(await tagOf(1), /el-tag--success/);
+  // 未知状态不得看起来像正常成员。
+  assert.doesNotMatch(await tagOf(2), /el-tag--success/);
+  assert.match(await rows.nth(2).innerText(), /未知状态（9）/);
 });
 
 test("普通成员直访列表被路由守卫拦回首页且零业务请求", async (t) => {
@@ -628,7 +660,7 @@ test("详情内容：基本信息降级、服务端摘要、各区块记录", as
   assert.match(await section(page, "dev-profile-materials").innerText(), /入党申请书\.pdf/);
 });
 
-test("空档案：七区块独立空态，摘要是服务端 0 而不是未统计", async (t) => {
+test("空档案：七个列表区块独立空态，摘要是服务端 0 而不是未统计", async (t) => {
   const { page } = await fixture(t, {
     path: "/development/member/12",
     state: {

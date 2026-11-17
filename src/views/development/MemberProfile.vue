@@ -236,15 +236,8 @@ watch([canView, sessionIdentity], () => {
   if (canView.value) void loadProfile();
 });
 
-watch(
-  () => route.params.id,
-  () => {
-    if (!canView.value) return;
-    // 切换成员必须丢弃上一份档案与在途响应，避免串数据。
-    invalidate();
-    void loadProfile();
-  },
-);
+// 切换成员不需要额外的 id 监听：App.vue 用 `path + role` 作 router-view 的 key，
+// `/development/member/:id` 的 id 属于 path，切号会重建本组件并重新 onMounted。
 
 onBeforeUnmount(() => {
   disposed = true;
@@ -256,14 +249,9 @@ onBeforeUnmount(() => {
   <main class="dev-profile page-container" data-testid="dev-profile">
     <header class="page-heading">
       <div class="heading-main">
-        <el-link
-          class="back-link"
-          data-testid="dev-profile-back"
-          :underline="false"
-          @click="$router.push('/development')"
-        >
+        <button class="back-link" type="button" data-testid="dev-profile-back" @click="$router.push('/development')">
           ← 返回成员列表
-        </el-link>
+        </button>
         <h1>{{ profile ? memberName : "成员培养档案" }}</h1>
         <p>管理侧只读档案：范围由服务端按登录身份判定（{{ scopeLabel }}），页面不发送任何范围参数。</p>
       </div>
@@ -618,6 +606,16 @@ onBeforeUnmount(() => {
         </template>
       </section>
     </template>
+
+    <el-empty
+      v-else-if="canView"
+      class="state-card content-card"
+      data-testid="dev-profile-missing"
+      description="暂未获取到该成员培养档案"
+      :image-size="72"
+    >
+      <el-button type="primary" plain data-testid="dev-profile-retry" @click="retry">重新加载</el-button>
+    </el-empty>
   </main>
 </template>
 
@@ -645,6 +643,14 @@ onBeforeUnmount(() => {
   .back-link {
     font-size: 13px;
     color: var(--party-red);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .back-link:hover {
+    text-decoration: underline;
   }
 
   h1 {
