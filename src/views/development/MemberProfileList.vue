@@ -33,6 +33,9 @@ import {
  * - 后端 `filterDetailIds` 在关键词命中 `tb_user.username` 时只按支部额外校验一次，
  *   不再叠加 `identityId` 等条件，所以关键词与政治身份不能组合；
  *   界面互斥禁用，组合提交直接拦截且不发请求。
+ *
+ * 身份变更的两个入口都不在主导航里（避免导航膨胀）：发起在 `/development/member/:id` 的
+ * 「发起身份变更」按钮，审批在 `/development/identity-changes`（由本页页头链接进入）。
  */
 const store = useAppStore();
 const router = useRouter();
@@ -265,7 +268,16 @@ onBeforeUnmount(() => {
           按关键词或政治身份查找成员，进入其电子培养档案查看培养过程记录。成员范围由服务端按登录身份判定：超级管理员为全院，党支部书记为本支部。
         </p>
       </div>
-      <el-tag class="scope-tag" effect="plain" type="danger">管理侧 · 只读</el-tag>
+      <div class="heading-actions">
+        <el-button
+          plain
+          data-testid="dev-list-identity-review-link"
+          @click="router.push('/development/identity-changes')"
+        >
+          身份变更审批
+        </el-button>
+        <el-tag class="scope-tag" effect="plain" type="danger">管理侧 · 只读</el-tag>
+      </div>
     </header>
 
     <el-alert
@@ -449,6 +461,13 @@ onBeforeUnmount(() => {
 
   .scope-tag {
     flex: 0 0 auto;
+  }
+
+  .heading-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
   }
 }
 

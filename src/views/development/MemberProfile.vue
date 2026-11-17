@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { ElMessage } from "element-plus";
 import { useAppStore } from "@/stores/app";
 import { getApiErrorMessage } from "@/utils/apiError";
 import {
@@ -20,6 +21,7 @@ import {
   signTypeTagType,
 } from "@/views/activity/participationDisplay";
 import LocalPager from "@/components/development/LocalPager.vue";
+import IdentityChangeDialog from "@/components/development/IdentityChangeDialog.vue";
 import {
   countLabel,
   formatStudyDuration,
@@ -47,6 +49,11 @@ import {
  * 档案记录只带外键，`basic` 走 `ScopedMemberServiceImpl.buildVos`，`branchName`/`identityName` 不填充，
  * 因此支部按编号降级、政治身份显示「未登记政治身份」。服务端文本一律纯文本插值，
  * 材料 `file:`、汇报附件 `file`、学习证书 `url` 都是内部路径，不渲染其值、不生成链接。
+ *
+ * 页头的「发起身份变更」只负责 `POST /v4/identity-changes` 生成待审批单：
+ * 提交成功**不刷新档案**（此时身份尚未生效，重新请求也拿不到新身份），
+ * 也绝不本地改写 `identityName` 制造已变更的假象；生效由超管审批后再次请求档案体现。
+ * 身份变更不联动登录角色，页面不会因此改动 `currentRole` 或导航。
  */
 const store = useAppStore();
 const route = useRoute();
@@ -214,12 +221,29 @@ function branchText(value: { branchId: number | null; branchName: string | null 
   return value.branchId == null ? "未分配支部" : `支部名称不可用（编号 ${relationLabel(value.branchId)}）`;
 }
 
+// ============ 发起身份变更（仅生成待审批单，不刷新档案） ============
+const identityDialogVisible = ref(false);
+
+function openIdentityDialog(): void {
+  if (!canView.value || !profile.value) return;
+  identityDialogVisible.value = true;
+}
+
+/**
+ * 提交成功后的处理：只提示需要回读，不主动重新请求档案。
+ * 变更单此刻仍是待审批，档案里的身份按契约不变；用户审批后可点页头「重新读取」。
+ */
+function onIdentityChangeSubmitted(): void {
+  ElMessage.info("变更单已提交，审批通过后请重新读取档案确认身份");
+}
+
 function invalidate(): void {
   requestSequence++;
   profile.value = null;
   loading.value = false;
   loadError.value = "";
   resetPages();
+  identityDialogVisible.value = false;
   Object.keys(expandedReports).forEach((key) => {
     delete expandedReports[Number(key)];
   });
@@ -256,6 +280,16 @@ onBeforeUnmount(() => {
         <p>管理侧只读档案：范围由服务端按登录身份判定（{{ scopeLabel }}），页面不发送任何范围参数。</p>
       </div>
       <el-tag class="readonly-tag" effect="plain" type="info">管理侧档案 · 只读</el-tag>
+      <div class="heading-actions">
+        <el-button
+          v-if="canView && profile"
+          type="primary"
+          data-testid="identity-change-open"
+          @click="openIdentityDialog"
+        >
+          发起身份变更
+        </el-button>
+      </div>
     </header>
 
     <el-alert
@@ -616,6 +650,16 @@ onBeforeUnmount(() => {
     >
       <el-button type="primary" plain data-testid="dev-profile-retry" @click="retry">重新加载</el-button>
     </el-empty>
+    <!-- 发起身份变更：只生成待审批单，不修改档案也不本地改写身份名。 -->
+    <IdentityChangeDialog
+      v-if="canView && profile && basic"
+      v-model:visible="identityDialogVisible"
+      :user-id="userId"
+      :member-name="memberName"
+      :current-identity-id="basic.identityId"
+      :current-identity-name="basic.identityName"
+      @submitted="onIdentityChangeSubmitted"
+    />
   </main>
 </template>
 
@@ -668,6 +712,13 @@ onBeforeUnmount(() => {
 
   .readonly-tag {
     flex: 0 0 auto;
+  }
+
+  .heading-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
   }
 }
 

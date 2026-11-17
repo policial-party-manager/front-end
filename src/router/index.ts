@@ -65,15 +65,18 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
-    path: "/development/batch",
-    name: "BatchAdjust",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
+    path: "/development/identity-changes",
+    name: "IdentityChangeReview",
+    component: () => import("@/views/development/IdentityChangeReview.vue"),
     meta: {
-      title: "批量调整身份 - 党建云平台",
+      title: "身份变更审批 - 党建云平台",
       permission: "development:manage",
       roles: ["super_admin", "party_secretary"],
     },
   },
+  // `/development/batch`（批量调整身份）已移除：后端没有批量身份调整端点，
+  // 保留一个通往空占位页的活跃入口比移除更误导。逐条发起与审批改由
+  // `/development/member/:id` 的发起弹窗与 `/development/identity-changes` 承载。
   {
     path: "/my-development",
     name: "MyDevelopment",
