@@ -1,5 +1,9 @@
 <script setup lang="ts">
 /**
+ * 未挂载的旧 Mock 原型：当前 `/development/member/:id` 由 MemberProfile.vue 提供，
+ * 真实数据来自 `GET /v4/cultivation-profiles/{userId}`。本文件仅供设计参考，
+ * 勿据此判断功能已开放，其中的身份调整与材料操作属于后续写操作任务。
+ *
  * MemberDetail.vue - 党员发展模块 - 成员培养主页
  *
  * 页面路径：/development/member/:id
