@@ -25,12 +25,7 @@ const isSuperAdmin = computed(() => store.currentRole === "super_admin");
 // 支委所属支部（Mock 模拟）
 const branchOfSecretary = "计算机学院学生第一党支部";
 
-// ============================================================
-// 可调整身份的角色
-// ============================================================
-const canAdjust = computed(() => {
-  return store.currentRole === "super_admin" || store.currentRole === "party_secretary";
-});
+// 可调整身份的角色判断（`canAdjust`）随批量调整入口一并移除（#58）。
 
 // ============================================================
 // Mock 数据：全部成员（20+ 条，覆盖 4 个支部、5 种身份）
@@ -465,9 +460,7 @@ function goDetail(id: number): void {
         <!-- 卡片标题 -->
         <div class="card-header">
           <span class="card-title">培养成员列表</span>
-          <el-button v-if="canAdjust" type="primary" size="small" @click="router.push('/development/batch')">
-            批量调整
-          </el-button>
+          <!-- 批量身份调整入口已于 #58 移除：后端无批量端点，对应路由已删除。 -->
         </div>
 
         <!-- ==================== 搜索筛选栏 ==================== -->

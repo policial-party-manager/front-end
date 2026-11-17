@@ -12,7 +12,8 @@ import {
   type SessionIdentitySnapshot,
 } from "@/utils/session";
 import {
-  pageIdentities,
+  IDENTITY_DICTIONARY_MAX_PAGES,
+  loadAllIdentities,
   pageIdentityMembers,
   type IdentityMemberFilters,
   type IdentityOption,
@@ -46,8 +47,6 @@ const ALLOWED_ROLES: readonly string[] = ["super_admin", "party_secretary"];
 const canView = computed(() => ALLOWED_ROLES.includes(store.currentRole) && sessionHasAccessToken.value);
 
 const PAGE_SIZE = 10;
-/** 身份字典最多翻 20 页 × 100 条；超过时明确降级为「身份 #编号」。 */
-const IDENTITY_MAX_PAGES = 20;
 
 const rows = ref<UserVo[]>([]);
 const total = ref(0);
@@ -148,20 +147,11 @@ async function loadIdentities(): Promise<void> {
   const sequence = ++identitySequence;
   identityState.value = "loading";
   try {
-    const values: IdentityOption[] = [];
-    let truncated = false;
-    for (let next = 1; next <= IDENTITY_MAX_PAGES; next++) {
-      const result = await pageIdentities(next, 100);
-      if (sequence !== identitySequence || !sessionOk(snapshot)) return;
-      if (!Array.isArray(result.records) || !Number.isSafeInteger(result.total) || result.total < 0)
-        throw new Error("身份字典响应异常");
-      values.push(...result.records);
-      if (!result.records.length) break;
-      if (values.length >= result.total) break;
-      if (next === IDENTITY_MAX_PAGES) truncated = true;
-    }
-    identities.value = values;
-    identityTruncated.value = truncated;
+    // 分页拉全与降级口径与发起弹窗共用同一个 helper，避免两处边界行为漂移。
+    const result = await loadAllIdentities(() => sequence !== identitySequence || !sessionOk(snapshot));
+    if (sequence !== identitySequence || !sessionOk(snapshot) || result.cancelled) return;
+    identities.value = result.records;
+    identityTruncated.value = result.truncated;
     identityState.value = "ready";
   } catch {
     if (sequence === identitySequence && sessionOk(snapshot)) {
@@ -347,8 +337,8 @@ onBeforeUnmount(() => {
           政治身份字典加载失败，身份列将按编号显示，成员列表仍可使用；重试请刷新页面。
         </p>
         <p v-else-if="identityTruncated" class="toolbar-hint" data-testid="dev-list-identity-truncated">
-          身份字典超过 {{ IDENTITY_MAX_PAGES * 100 }} 条，仅加载了前
-          {{ IDENTITY_MAX_PAGES * 100 }} 条；未覆盖到的成员将按「身份 #编号」显示。
+          身份字典超过 {{ IDENTITY_DICTIONARY_MAX_PAGES * 100 }} 条，仅加载了前
+          {{ IDENTITY_DICTIONARY_MAX_PAGES * 100 }} 条；未覆盖到的成员将按「身份 #编号」显示。
         </p>
       </section>
 

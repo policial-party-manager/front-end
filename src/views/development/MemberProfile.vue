@@ -230,11 +230,18 @@ function openIdentityDialog(): void {
 }
 
 /**
- * 提交成功后的处理：只提示需要回读，不主动重新请求档案。
- * 变更单此刻仍是待审批，档案里的身份按契约不变；用户审批后可点页头「重新读取」。
+ * 提交成功后的处理：不主动重新请求档案。
+ * 变更单此刻仍是待审批，按契约档案里的身份不会变；审批完成后由用户点页头「重新读取」回读，
+ * 不在提交时静默多发一次请求，也不在本地改写 `identityName`。
  */
 function onIdentityChangeSubmitted(): void {
-  ElMessage.info("变更单已提交，审批通过后请重新读取档案确认身份");
+  ElMessage.info("变更单已提交，审批通过后请点页头「重新读取」回读档案身份");
+}
+
+/** 审批完成后的回读入口：重新请求服务端，身份名以服务端为准。 */
+function reloadProfile(): void {
+  if (!canView.value || loading.value) return;
+  void loadProfile();
 }
 
 function invalidate(): void {
@@ -281,6 +288,15 @@ onBeforeUnmount(() => {
       </div>
       <el-tag class="readonly-tag" effect="plain" type="info">管理侧档案 · 只读</el-tag>
       <div class="heading-actions">
+        <el-button
+          v-if="canView && profile"
+          plain
+          :loading="loading"
+          data-testid="dev-profile-reload"
+          @click="reloadProfile"
+        >
+          重新读取
+        </el-button>
         <el-button
           v-if="canView && profile"
           type="primary"

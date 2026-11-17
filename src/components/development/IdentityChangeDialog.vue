@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormItemRule } from "element-plus";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -9,7 +9,12 @@ import {
   sessionHasAccessToken,
   type SessionIdentitySnapshot,
 } from "@/utils/session";
-import { loadAllIdentities, type IdentityOption } from "@/api/members";
+import {
+  IDENTITY_DICTIONARY_MAX_PAGES,
+  IDENTITY_DICTIONARY_PAGE_SIZE,
+  loadAllIdentities,
+  type IdentityOption,
+} from "@/api/members";
 import {
   applyIdentityChange,
   IDENTITY_CHANGE_REASON_MAX,
@@ -136,23 +141,25 @@ function resetForm(): void {
   identities.value = [];
   identityTruncated.value = false;
   identityState.value = "idle";
+  // 上一轮提交如果因换号/换成员而中断，`finally` 会被序号拦住；这里无条件清除，
+  // 否则重新打开弹窗会一直是禁用状态与转圈。
+  submitting.value = false;
   formRef.value?.clearValidate();
 }
 
 async function confirmSubmit(): Promise<boolean> {
+  // 二次确认只展示纯文本：原因由用户自由输入，不能拼进 HTML。
+  // ElMessageBox 把 message 当普通文本放进 <p>，`\n` 会被折叠，所以用「；」分隔而不是换行。
   const message = [
     `成员：${props.memberName || "未登记姓名"}`,
-    `当前身份：${currentIdentityText.value}`,
-    `目标身份：${targetIdentityText.value}`,
+    `当前身份 → 目标身份：${currentIdentityText.value} → ${targetIdentityText.value}`,
     `变更原因：${form.value.reason.trim() || "未填写"}`,
-  ].join("\n");
+  ].join("；");
   try {
     await ElMessageBox.confirm(message, "确认发起身份变更", {
       confirmButtonText: "确认提交",
       cancelButtonText: "再检查一下",
       type: "warning",
-      // 纯文本确认框：原因由用户自由输入，不能拼进 HTML。
-      customClass: "identity-change-confirm",
     });
     return true;
   } catch {
@@ -228,6 +235,12 @@ watch(
     if (visible.value) void loadIdentities();
   },
 );
+
+onBeforeUnmount(() => {
+  // 卸载后旧字典响应不得再写回：`disposed` 与 `sequence` 双重失效。
+  disposed = true;
+  cancelInFlight();
+});
 </script>
 
 <template>
@@ -291,7 +304,8 @@ watch(
         </template>
       </el-alert>
       <p v-else-if="identityTruncated" class="form-hint" data-testid="identity-change-dictionary-truncated">
-        身份字典条目过多，仅加载了前 2000 条，可能未覆盖全部身份。
+        身份字典条目过多，仅加载了前
+        {{ IDENTITY_DICTIONARY_MAX_PAGES * IDENTITY_DICTIONARY_PAGE_SIZE }} 条，可能未覆盖全部身份。
       </p>
 
       <el-form

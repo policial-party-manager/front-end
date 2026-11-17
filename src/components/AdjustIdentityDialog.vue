@@ -1,6 +1,5 @@
 <script setup lang="ts">
 /**
- /**
  * ⚠️ 已被 `src/components/development/IdentityChangeDialog.vue` 取代，请勿在新代码中使用。
  *
  * 本组件是历史 Mock：身份选项硬编码为「入党申请人 / 积极分子 / 发展对象 / 预备党员 / 正式党员」
@@ -11,8 +10,9 @@
  *
  * 保留本文件仅为历史参考（仍被未挂载的 `src/views/development/MemberDetail.vue` 引用）；
  * 不删除是为了不牵连那个原型页，不代表它可以被新页面复用——否则仓库会出现第二套身份变更 UI。
- *
- * AdjustIdentityDialog.vue - 调整身份弹窗组件（历史 Mock，已停用）
+ */
+
+/** AdjustIdentityDialog.vue - 调整身份弹窗组件（历史 Mock，已停用）。
  *
  * 在成员培养主页点击【调整身份】按钮时弹出。
  * 支持选择目标身份、填写调整原因。

@@ -465,8 +465,8 @@ test("二次确认展示当前身份与目标身份，未登记时显示「未�
   await section(page, "identity-change-submit").click();
   let box = await waitMessageBox(page);
   let text = await box.locator(".el-message-box__message").innerText();
-  assert.match(text, /当前身份：入党积极分子/);
-  assert.match(text, /目标身份：发展对象/);
+  // 文案为「当前身份 → 目标身份：X → Y」，箭头与两端都要在。
+  assert.match(text, /当前身份 → 目标身份：入党积极分子 → 发展对象/);
   assert.match(text, /成员：张同学/);
   assert.doesNotMatch(text, /\bnull\b|undefined/);
   await box.locator(".el-message-box__btns button").first().click();
@@ -478,8 +478,8 @@ test("二次确认展示当前身份与目标身份，未登记时显示「未�
   await section(second.page, "identity-change-submit").click();
   box = await waitMessageBox(second.page);
   text = await box.locator(".el-message-box__message").innerText();
-  assert.match(text, /当前身份：未登记/);
-  assert.doesNotMatch(text, /当前身份：null|当前身份：身份/);
+  assert.match(text, /当前身份 → 目标身份：未登记 → 发展对象/);
+  assert.doesNotMatch(text, /当前身份 → 目标身份：null|→ 身份 #/);
 });
 
 test("重复待审批时服务端 400 原文可见，且不出现成功提示", async (t) => {
@@ -513,7 +513,26 @@ test("发起成功后不刷新档案、不本地改写身份名", async (t) => {
   assert.equal(state.profileCalls, 1, "发起成功不得触发第二次档案请求");
   const basicText = await section(page, "dev-profile-basic").innerText();
   assert.match(basicText, /未登记政治身份/);
-  assert.match(await page.locator(".el-message--info").last().innerText(), /审批通过后请重新读取档案/);
+  assert.match(await page.locator(".el-message--info").last().innerText(), /审批通过后请点页头「重新读取」/);
+  // 提示里说的「重新读取」必须真的存在，否则用户找不到入口。
+  assert.equal(await section(page, "dev-profile-reload").count(), 1, "页头必须有「重新读取」按钮");
+});
+
+test("「重新读取」重新请求档案，审批后身份名来自服务端", async (t) => {
+  const { page, state } = await fixture(t);
+  // 审批前：档案里 identityName 恒为 null（buildVos 不填充），页面显示「未登记政治身份」。
+  await waitProfile(page);
+  assert.match(await section(page, "dev-profile-basic").innerText(), /未登记政治身份/);
+  assert.equal(state.profileCalls, 1);
+  // 服务端现在返回已生效的身份名。
+  state.defaultProfile = profile({ basic: basic({ identityId: 6, identityName: "中共正式党员" }) });
+  await section(page, "dev-profile-reload").click();
+  await eventually(() => state.profileCalls === 2);
+  await eventually(async () => (await section(page, "dev-profile-basic").innerText()).includes("中共正式党员"));
+  // 身份名只能来自新响应，不是本地拼接。
+  const basicText = await section(page, "dev-profile-basic").innerText();
+  assert.match(basicText, /中共正式党员/);
+  assert.doesNotMatch(basicText, /未登记政治身份/);
 });
 
 test("双击发起只提交一次：只弹一个二次确认框、只发一次请求", async (t) => {
@@ -635,6 +654,29 @@ test("审批通过后重拉当前页，筛选与页码保持不变", async (t) =
   // 审批请求体只有 pass/remark，不带任何身份或角色字段。
   assert.deepEqual(Object.keys(state.reviewCalls[0].body).sort(), ["pass", "remark"]);
   assert.equal(state.reviewCalls[0].body.pass, true);
+});
+
+test("审批意见超 50 字前端拦截并给出字段级提示，零请求", async (t) => {
+  const { page, state } = await fixture(t, { path: "/development/identity-changes" });
+  await waitReviewPage(page);
+  await section(page, "identity-review-pass-1").click();
+  // 绕过 maxlength（粘贴/脚本可以做到），验证提交层拦截。
+  await page.evaluate(() => {
+    const field = document.querySelector('[data-testid="identity-review-remark-1"]');
+    const textarea = field?.tagName === "TEXTAREA" ? field : field?.querySelector("textarea");
+    textarea?.removeAttribute("maxlength");
+  });
+  await section(page, "identity-review-remark-1").fill("长".repeat(51));
+  await section(page, "identity-review-confirm-1").click();
+  await eventually(async () => (await section(page, "identity-review-remark-error-1").count()) === 1);
+  assert.match(await section(page, "identity-review-remark-error-1").innerText(), /不能超过 50 字/);
+  await page.waitForTimeout(300);
+  assert.equal(reviewRequests(state).length, 0, "超长意见不得发出审批请求");
+  // 字段级提示要定位到输入框，而不是只在顶部报警。
+  assert.equal(
+    await page.evaluate(() => document.activeElement?.getAttribute("data-testid")),
+    "identity-review-remark-1",
+  );
 });
 
 test("审批驳回发送 pass=false，提示中不宣称身份已变更", async (t) => {
@@ -867,6 +909,27 @@ test("列表页页头链接进入审批页，且不新增顶级导航", async (t
   await section(page, "dev-list-identity-review-link").click();
   await waitReviewPage(page);
   assert.equal(new URL(page.url()).pathname, "/development/identity-changes");
+});
+
+test("/development/batch 路由已移除，无指向占位页的活跃入口", async (t) => {
+  const { page, state } = await fixture(t, { path: "/development/batch" });
+  // 路由不存在：vue-router 不匹配任何记录，页面不会渲染占位组件。
+  await page.waitForTimeout(800);
+  assert.equal(await section(page, "dev-list").count(), 0);
+  assert.equal(await section(page, "dev-profile").count(), 0);
+  assert.doesNotMatch(await page.locator("#app").innerText(), /批量调整身份/);
+  // 也不得因此发出身份变更业务请求。
+  assert.equal(listRequests(state).length, 0);
+  assert.equal(applyRequests(state).length, 0);
+});
+
+test("不受权角色进入审批页时显示无权提示，且不谎称是支部书记", async (t) => {
+  // 路由守卫会先把 party_member 拦回首页；这里验证页面自身的兜底：标注真实角色而不是统一叫支部书记。
+  const { page } = await fixture(t, { path: "/development/identity-changes" });
+  await waitReviewPage(page);
+  const heading = await page.locator(".page-heading").innerText();
+  assert.match(heading, /超级管理员 · 可审批/);
+  assert.doesNotMatch(heading, /支部书记 · 本支部只读/);
 });
 
 test("390px 窄屏下审批页与发起弹窗都不出现整页横向溢出", async (t) => {

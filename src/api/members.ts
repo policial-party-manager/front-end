@@ -129,7 +129,13 @@ export const IDENTITY_DICTIONARY_MAX_PAGES = 20;
  *
  * `isCancelled` 在每次响应后检查：换号、换目标成员或关闭弹窗后旧响应不写回调用方，
  * 此时返回 `cancelled: true`，调用方直接放弃本次结果。
- * 响应形状异常（`records` 非数组、`total` 非自然数）直接抛错，不用本地兜底列表冒充字典。
+ * 响应形状异常（`records` 非数组、`total` 非自然数）直接抛错，不用本地兜底列表冒充字典；
+ * 未取满 `total` 却提前翻空也当异常，不把不完整字典当成「就这么多」。
+ *
+ * 使用方：`IdentityChangeDialog.vue` 与 `MemberProfileList.vue`（同为 `/development` 家族，
+ * 降级要求一致）。`src/views/members.vue` 与 `src/views/branch-members.vue` 仍在用各自的
+ * 分页循环，它们的失败降级（列表仍可用、只禁用筛选）与本次组件不同，属于 #19 / #48 的范围，
+ * 本任务未一并修改；看到第二份实现时不要以为本函数覆盖了全部调用方。
  */
 export async function loadAllIdentities(
   isCancelled?: () => boolean,
@@ -151,10 +157,15 @@ export async function loadAllIdentities(
   return { records: sorted, truncated, cancelled: false };
 }
 
-/** 阶段未知的条目排在最后，不假设默认阶段。 */
+/** 阶段值：非数字（缺失/异常）排在最后，不假设默认阶段。 */
+function identityLevel(value: IdentityOption): number {
+  return typeof value.level === "number" && Number.isFinite(value.level) ? value.level : Number.MAX_SAFE_INTEGER;
+}
+
+/** 阶段未知的条目排在最后，同阶段按编号稳定排序。 */
 function compareIdentityLevel(a: IdentityOption, b: IdentityOption): number {
-  const left = Number.isFinite(a.level as number) ? (a.level as number) : Number.MAX_SAFE_INTEGER;
-  const right = Number.isFinite(b.level as number) ? (b.level as number) : Number.MAX_SAFE_INTEGER;
+  const left = identityLevel(a);
+  const right = identityLevel(b);
   return left === right ? a.id - b.id : left - right;
 }
 export const batchMemberStatus = (ids: number[], status: 1 | 2) =>

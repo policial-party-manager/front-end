@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { useAppStore } from "@/stores/app";
@@ -51,6 +51,20 @@ const canReview = computed(() => store.currentRole === "super_admin" && sessionH
 
 const PAGE_SIZE = 10;
 
+/** 三态取值集中一处：既给筛选项，也给「是否待审批」的判断。 */
+const STATUS_VALUES: IdentityChangeStatus[] = [1, 2, 3];
+const STATUS_PENDING: IdentityChangeStatus = 1;
+/** 三态筛选项的文案直接取自共享映射，避免在页面里再手写一份「待审批/已生效/驳回」。 */
+const STATUS_OPTIONS = STATUS_VALUES.map((value) => ({ value, label: identityChangeStatusLabel(value) }));
+
+/** 页头标签：只描述真实角色，不把非超管一律叫作支部书记。 */
+const roleLabel = computed(() => {
+  if (!sessionHasAccessToken.value) return "开发预览 · 无登录令牌";
+  if (canReview.value) return "超级管理员 · 可审批";
+  if (store.currentRole === "party_secretary") return "支部书记 · 本支部只读";
+  return "当前角色无审批权限";
+});
+
 /** 状态筛选：超管可选三态，默认待审批；支委不传该参数。 */
 const statusFilter = ref<IdentityChangeStatus | null>(1);
 /** 已应用的筛选快照：重试与翻页只用这份，不读尚未提交的输入。 */
@@ -63,12 +77,6 @@ const total = ref(0);
 const page = ref(1);
 const loading = ref(false);
 const loadError = ref("");
-
-const STATUS_OPTIONS: { value: IdentityChangeStatus; label: string }[] = [
-  { value: 1, label: "待审批" },
-  { value: 2, label: "已生效" },
-  { value: 3, label: "驳回" },
-];
 
 let disposed = false;
 let requestSequence = 0;
@@ -96,11 +104,7 @@ function toIdentityText(row: IdentityChangeVo): string {
 
 /** 只有服务端明确的待审批才可操作，未知状态一律不可审。 */
 function isPending(row: IdentityChangeVo): boolean {
-  return row.status === 1;
-}
-
-interface ListQuery extends IdentityChangeQuery {
-  userId?: number;
+  return row.status === STATUS_PENDING;
 }
 
 async function loadRows(): Promise<void> {
@@ -111,7 +115,7 @@ async function loadRows(): Promise<void> {
   loadError.value = "";
   // 先清空旧结果：切筛选或翻页时不能把上一批数据当成当前条件的结果。
   rows.value = [];
-  const query: ListQuery = { page: page.value, size: PAGE_SIZE };
+  const query: IdentityChangeQuery = { page: page.value, size: PAGE_SIZE };
   // 支委侧后端会丢弃这两个参数，因此只有超管才发送，界面与请求保持一致。
   if (canReview.value) {
     if (applied.value.status != null) query.status = applied.value.status;
@@ -167,8 +171,8 @@ function changeStatus(value: IdentityChangeStatus): void {
 /** el-radio-group 的 change 参数是宽松类型，这里收窄成三态枚举再交给业务逻辑。 */
 function onStatusChange(value: string | number | boolean | undefined): void {
   const parsed = typeof value === "number" ? value : Number(value);
-  if (parsed !== 1 && parsed !== 2 && parsed !== 3) return;
-  changeStatus(parsed);
+  if (!STATUS_VALUES.includes(parsed as IdentityChangeStatus)) return;
+  changeStatus(parsed as IdentityChangeStatus);
 }
 
 function resetFilters(): void {
@@ -190,6 +194,8 @@ const reviewingId = ref<number | null>(null);
 /** 审批失败原文按单据保留，不弹在全局提示里被关掉就找不回。 */
 const reviewErrors = reactive<Record<number, string>>({});
 const remarkDrafts = reactive<Record<number, string>>({});
+/** 审批意见的长度校验错误（字段级），与接口错误 `reviewErrors` 分开。 */
+const remarkFieldErrors = reactive<Record<number, string>>({});
 /** 展开审批表单的单据编号。 */
 const activeId = ref<number | null>(null);
 const activePass = ref<boolean>(true);
@@ -199,6 +205,7 @@ function openReview(row: IdentityChangeVo, pass: boolean): void {
   activeId.value = row.id;
   activePass.value = pass;
   delete reviewErrors[row.id];
+  delete remarkFieldErrors[row.id];
 }
 
 function cancelReview(): void {
@@ -206,14 +213,27 @@ function cancelReview(): void {
   activeId.value = null;
 }
 
+/** 意见超长时给出字段级提示并聚焦到输入框，而不是只在顶部报警。 */
+function remarkTooLong(id: number): boolean {
+  const length = (remarkDrafts[id] ?? "").trim().length;
+  if (length <= IDENTITY_REVIEW_REMARK_MAX) {
+    delete remarkFieldErrors[id];
+    return false;
+  }
+  remarkFieldErrors[id] = `审批意见不能超过 ${IDENTITY_REVIEW_REMARK_MAX} 字，当前 ${length} 字`;
+  void nextTick(() => {
+    const field = document.querySelector<HTMLTextAreaElement>(`[data-testid="identity-review-remark-${id}"]`);
+    field?.focus();
+    field?.scrollIntoView({ block: "nearest" });
+  });
+  return true;
+}
+
 async function confirmReview(row: IdentityChangeVo): Promise<void> {
   // 同步置位后再进入异步流程，双击不会产生第二次审批请求。
   if (reviewingId.value != null || !canReview.value || !isPending(row)) return;
+  if (remarkTooLong(row.id)) return;
   const remark = (remarkDrafts[row.id] ?? "").trim();
-  if (remark.length > IDENTITY_REVIEW_REMARK_MAX) {
-    reviewErrors[row.id] = `审批意见不能超过 ${IDENTITY_REVIEW_REMARK_MAX} 字，当前 ${remark.length} 字`;
-    return;
-  }
   const id = row.id;
   reviewingId.value = id;
   delete reviewErrors[id];
@@ -224,6 +244,7 @@ async function confirmReview(row: IdentityChangeVo): Promise<void> {
     ElMessage.success(activePass.value ? "审批通过，身份已按变更单生效" : "已驳回，该成员身份保持不变");
     activeId.value = null;
     delete remarkDrafts[id];
+    delete remarkFieldErrors[id];
     // 只重拉当前页：筛选与页码保持不变，行内容全部来自服务端的新响应。
     void loadRows();
   } catch (error) {
@@ -318,7 +339,7 @@ onBeforeUnmount(() => {
         </p>
       </div>
       <el-tag class="scope-tag" effect="plain" type="danger">
-        {{ canReview ? "超级管理员 · 可审批" : "支部书记 · 本支部只读" }}
+        {{ roleLabel }}
       </el-tag>
     </header>
 
@@ -332,6 +353,19 @@ onBeforeUnmount(() => {
     >
       <template #default>
         <p>当前是开发预览身份，没有后端登录令牌，因此不会请求真实变更单。请使用管理员或支部书记账号登录后再访问。</p>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-else-if="!canView"
+      data-testid="identity-review-no-permission"
+      title="当前身份无权查看身份变更审批"
+      type="warning"
+      show-icon
+      :closable="false"
+    >
+      <template #default>
+        <p>身份变更审批仅面向超级管理员与党支部书记；普通成员请在「我的培养」查看本人档案。</p>
       </template>
     </el-alert>
 
@@ -444,7 +478,16 @@ onBeforeUnmount(() => {
                   :disabled="reviewingId === row.id"
                   :data-testid="`identity-review-remark-${row.id}`"
                   placeholder="审批意见（可不填，最多 50 字）"
+                  @input="remarkTooLong(row.id)"
                 />
+                <p
+                  v-if="remarkFieldErrors[row.id]"
+                  class="field-error"
+                  role="alert"
+                  :data-testid="`identity-review-remark-error-${row.id}`"
+                >
+                  {{ remarkFieldErrors[row.id] }}
+                </p>
                 <div class="review-actions">
                   <el-button
                     size="small"
@@ -823,6 +866,12 @@ onBeforeUnmount(() => {
 
   .remark-input {
     margin-bottom: 8px;
+  }
+
+  .field-error {
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--el-color-danger, #f56c6c);
   }
 
   .review-actions {
