@@ -17,17 +17,18 @@ npm run dev
 
 开发地址默认是 `http://localhost:5173`。API 前缀由 `VITE_API_BASE_URL` 配置，请求模块中的路径不重复包含 `/api`。开发代理见 `vite.config.ts` 的 `server.proxy`；按实际联调环境配置目标地址，勿将凭据提交到仓库。
 
-| 命令                                | 用途                       |
-| ----------------------------------- | -------------------------- |
-| `npm run dev`                       | 启动开发服务器             |
-| `npm run build`                     | 生产构建至 `dist/`         |
-| `npm run preview`                   | 预览生产构建               |
-| `npm run typecheck`                 | Vue 与 TypeScript 类型检查 |
-| `npm run check:permissions`         | 权限矩阵及开发预览策略检查 |
-| `npx eslint src --ext .vue,.ts,.js` | 只读 ESLint 检查           |
-| `npm run lint`                      | ESLint 检查并自动修复      |
-| `npm run format:check`              | 检查 `src` 格式            |
-| `npm run format`                    | 格式化 `src`               |
+| 命令                                | 用途                         |
+| ----------------------------------- | ---------------------------- |
+| `npm run dev`                       | 启动开发服务器               |
+| `npm run build`                     | 生产构建至 `dist/`           |
+| `npm run preview`                   | 预览生产构建                 |
+| `npm run typecheck`                 | Vue 与 TypeScript 类型检查   |
+| `npm run check:permissions`         | 权限矩阵及开发预览策略检查   |
+| `npx eslint src --ext .vue,.ts,.js` | 只读 ESLint 检查             |
+| `npm run lint`                      | ESLint 检查并自动修复        |
+| `npm run format:check`              | 检查 `src` 格式              |
+| `npm run format`                    | 格式化 `src`                 |
+| `npm run test:identity-change`      | 身份变更发起与审批浏览器回归 |
 
 项目没有配置通用单元测试或端到端测试框架；`check:permissions` 是独立的断言脚本，不能替代业务联调。
 
@@ -44,6 +45,7 @@ npm run test:system
 npm run test:my-development
 npm run test:development-profile
 npm run test:profile-edit
+npm run test:identity-change
 npm run test:statistics
 npm run test:branch-members
 ```
@@ -60,9 +62,10 @@ npm run test:branch-members
 - `test:development-profile`：34 项党员发展（管理侧培养档案）回归，验证列表只请求 `/v4/members/page` 与身份字典且零 `/v4/admin/**`、`status` 永远显式发送 1/2 且无「全部状态」、关键词与政治身份互斥（输入互禁与提交层拦截零请求）、`branchName`/`identityName` 为 null 时的确定降级、身份字典失败列表仍可用、四态与 `total` 取服务端值、分页只换页码不换 `total`、详情只请求一次 `/{userId}` 且不带查询参数、九个 section 与七个列表区块独立空态、摘要缺失与服务端 0 区分、未知枚举不兜底成成功语义、服务端文本纯文本渲染、内部路径不下发也不成链接、跨支部原样转达「用户不存在」、非法编号零请求、切换成员/换号/退出后迟到响应不写回、401 刷新恰好重放一次、无令牌预览零请求、普通成员被守卫拦截、两条路由都高亮导航、390px 不整页溢出。
 - `test:branch-members`：30 项支委成员工作台回归，验证只命中 `/v4/members/**` 与身份字典（零 `/v4/admin/**` 请求）、默认不发送 `status` 即“仅启用”且不发送 `branchId`、切换到“停用”显式发送 `status=2` 且无“全部状态”选项、`total` 取服务端值、`branchName`/`identityName` 恒为 null 时按契约降级显示、详情只请求 `/{id}` 且权威字段只读、联系方式只提交变更字段且空串表示清空、无变更不发请求与保存中重复点击只提交一次、保存成功但回读失败分别提示、DTO 边界校验允许空串、导出使用已应用条件且无 `page`/`size`/`branchId`、非 ZIP 内容报错不下载、换号/退出后迟到响应与旧 Blob 不写回、401 刷新恰好重放一次、空列表展示空态与未归属支部时原样转达服务端 400 原因、身份字典失败时降级为「身份 #id」且列表仍可用、未经搜索的输入不进入导出参数、保存失败保留输入且不误报成功、390px 下筛选控件可键盘聚焦、换号后筛选条件回到默认、无令牌预览零请求、普通成员被守卫拦截、390px 不整页溢出。
 - `test:profile-edit`：19 项个人中心回归，验证只读字段齐全且无任何输入控件、政治身份/所属支部/身份证号的确定兜底、编辑抽屉只含手机号/邮箱/紧急联系人/备注 4 个控件、只提交实际变化字段（请求体精确为 `{ phone }`）、无变化时保存禁用且零请求、4 个字段「有值改空串」均字段级提示且零请求、手机号/邮箱/备注/紧急联系人校验与后端一致且零请求、保存成功后重新 `GET` 回读且以回读值为准、保存失败（500 与业务 400）保留输入并展示服务端原因、保存成功但回读失败分别提示、双击保存只发一次 `PUT`、换号后迟到响应不写回、无令牌预览零业务请求、390px 不整页溢出。
+- `test:identity-change`：32 项政治身份变更（发起 + 超管审批）回归，验证身份字典分页拉全并按 `level` 排序、字典失败禁用提交且无本地兜底身份名、发起请求体精确为 `{ userId, toIdentity, reason }`（不含 `fromIdentity`）、原因超 500 字前端拦截且零请求、二次确认展示「当前身份 → 目标身份」且未登记显示「未登记」而非 `null`、服务端 400（含「该用户已有待审批的身份变更单」）原文可见且不误报成功、发起成功不触发第二次档案请求也不本地改写身份名、「重新读取」回读服务端身份、双击只弹一个二次确认框且只发一次请求、审批页默认 `status=1`、切「已生效」精确发送 `status=2`、`total` 取服务端值、成员过滤只按编号精确匹配且非法编号零请求、审批意见超 50 字字段级拦截且零请求、审批后重拉当前页并保持筛选与页码、已处理单按钮禁用且「该变更单已处理」原文可展示、超管可见通过/驳回而支委不可见、支委视图不发送 `status`/`userId`、越权读单原样显示「变更单不存在」、未知状态显示「未知状态（x）」、`/development/batch` 路由已移除且无活跃入口、快速切换筛选/换号/退出后迟到响应不写回、无令牌预览零请求、普通成员被守卫拦截、生效后前端角色与导航项不变、列表页页头入口不新增顶级导航、390px 不整页溢出。
 - `test:statistics`：20 项数据统计回归，验证默认只请求一次 `college` 且不发送任何范围参数、五个维度发送精确枚举、`total=3` 而身份计数之和为 2 时原样展示总人数且不虚构身份、身份列按响应动态生成且缺列显示「—」与真实 0 区分、服务端回显维度不一致时提示实际维度、空分组与 `null` 集合分别呈现、失败可重试且重试用当前维度、业务 `code!=200` 同样进错误态、维度快速切换与换号/退出/离页后迟到响应不写回、401 刷新恰好重放一次、无令牌预览零请求、普通成员被守卫拦截、支委标注本支部范围、390px 不整页溢出。
 
-各脚本的 HTTP 拦截只证明前端交互与反馈语义，不代表真实 Excel 内容、后端持久化或生产验收。CI 会安装 Chromium 并运行这些回归脚本，任一失败都会阻止 `build`；成员管理、支委成员、我的培养、党员发展档案、个人中心、数据统计与支部导入作业同时检查权限，活动参与、支委成员、我的培养、党员发展档案、个人中心、数据统计与支部导入作业同时检查新增脚本与 CI 格式。数据统计页、支委成员工作台与支部导入尚未做真实后端联调，其口径、降级显示、维度回退与导入反馈行为只在拦截层验证。
+各脚本的 HTTP 拦截只证明前端交互与反馈语义，不代表真实 Excel 内容、后端持久化或生产验收。CI 会安装 Chromium 并运行这些回归脚本，任一失败都会阻止 `build`；成员管理、支委成员、我的培养、党员发展档案、个人中心、身份变更、数据统计与支部导入作业同时检查权限，活动参与、支委成员、我的培养、党员发展档案、个人中心、身份变更、数据统计与支部导入作业同时检查新增脚本与 CI 格式。数据统计页、支委成员工作台与支部导入尚未做真实后端联调，其口径、降级显示、维度回退与导入反馈行为只在拦截层验证。
 
 活动参与管理除上述模拟回归外，还做过一轮本机真实后端联调（脚本在仓库外 `E:/党建云平台/verify/live-activity-participation.mjs`，62 项断言全通过）：真实建支部/支委/成员/活动后由成员走真实报名与签到、真实录入请假，核对分页与 `total`、`userId` 过滤、签到类型、跨支部与越权拒绝、真实 xlsx 导出的表头/行序/行数与前端下载内容；测试数据带 `L50` 前缀并已全部清理，残留计数为 0。范围与边界见[前后端接入现状](docs/前后端接入现状.md)。
 
@@ -79,7 +82,7 @@ npm run test:branch-members
 | `/members/branch`                        | 支委（`party_secretary`）本支部成员工作台：分页查询（关键词与启用/停用）、详情、手机号/邮箱/备注维护、按已应用条件导出 xlsx；只用 `/v4/members/**` 范围接口与身份字典    |
 | `/development`                           | 超管与支委的成员培养档案列表：关键词或政治身份查询、启用/停用切换、分页取服务端 `total`，每行可进入只读档案；只用 `/v4/members/page` 与身份字典，零 `/v4/admin/**`       |
 | `/development/member/:id`                | 成员培养档案只读详情：基本信息、服务端摘要、联系人、身份历史、思想汇报、签到、请假、学习、材料；仅请求 `/v4/cultivation-profiles/{userId}`，无写操作，内部文件路径不渲染 |
-| `/development/batch`                     | 批量调整身份占位页（后端无批量身份调整端点）                                                                                                                             |
+| `/development/identity-changes`          | 超管与支委的身份变更审批：超管按待审批/已生效/驳回筛选并可按成员编号精确过滤、通过或驳回并填写意见（≤50 字）；支委固定看本支部全部单据且不发送筛选参数、无审批按钮       |
 | `/my-development`                        | 普通成员（及 `activist` 预览）本人电子培养档案只读页：基本信息、联系人、身份历史、思想汇报、签到、请假、学习、材料与服务端摘要；仅请求本人聚合端点                       |
 | `/content`、`/news`、`/notice`           | 真实资讯聚合、关键词搜索及分页列表                                                                                                                                       |
 | `/news/:id`、`/notice/:id`               | 共享 `content/ContentArticle.vue`，正文转纯文本展示；公告支持文件链接                                                                                                    |
@@ -231,14 +234,14 @@ npm run test:branch-members
 - `src/stores/app.ts`：导航、当前角色、布局状态和部分 Mock；会话状态由 `src/utils/session.ts` 管理。
 - `src/router/index.ts`：页面清单、登录与角色门禁、导航高亮。新增导航时同步 Store 的菜单和守卫的 `pathKeyMap`。
 - `src/views/content/`：当前资讯阅读及管理页面；旧新闻、公告列表和 `ContentDetail.vue` 已不由当前资讯路由使用。
-- `src/views/WorkspacePlaceholder.vue`：未接入模块的实际入口；`/development/batch` 与 `/resources` 仍是占位入口，`src/views/development/MemberDetail.vue` 与 `statistics.vue` 等原型不是当前业务入口。
+- `src/views/WorkspacePlaceholder.vue`：未接入模块的实际入口；`/resources` 仍是占位入口（`/development/batch` 已因后端无批量身份调整端点移除路由），`src/views/development/MemberDetail.vue` 与 `statistics.vue` 等原型不是当前业务入口。
 - `src/views/statistics/index.vue`：数据统计真实页面；`src/views/statistics.vue` 是未被路由引用的历史 Mock 原型，不作为业务入口。
 - `src/main.ts`：全局注册 Element Plus 及图标。Vue API 仍需显式导入，`ElMessage`、`ElMessageBox` 等命令式 API 也需显式导入。
 - `src/styles/global.scss`：主题与公共布局；优先使用 CSS 变量。Vite 注入 SCSS 主题变量，`@` 映射到 `src`。
 
 ## CI 与交付
 
-`.github/workflows/ci.yml` 对 `main`、`feature/**`、`fix/**` 的 push，以及面向 `main` 的 PR 执行格式、ESLint、类型检查、支部表单回归、支部导入回归、活动参与管理回归、成员导入回归、成员管理回归、支委成员回归、系统管理回归、我的培养回归、党员发展档案回归、数据统计回归和构建；各浏览器回归均为 `build` 的前置检查。成员管理、支委成员、我的培养、党员发展档案、数据统计与支部导入作业包含 `check:permissions`。
+`.github/workflows/ci.yml` 对 `main`、`feature/**`、`fix/**` 的 push，以及面向 `main` 的 PR 执行格式、ESLint、类型检查、支部表单回归、支部导入回归、活动参与管理回归、成员导入回归、成员管理回归、支委成员回归、系统管理回归、我的培养回归、党员发展档案回归、身份变更回归、数据统计回归和构建；各浏览器回归均为 `build` 的前置检查。成员管理、支委成员、我的培养、党员发展档案、身份变更、数据统计与支部导入作业包含 `check:permissions`。
 
 工作流对同仓库非草稿 PR 配置了检查通过后请求 Auto-merge；实际合并还受仓库设置和分支保护约束。创建 PR 前需留意这一自动行为。`main` push 构建上传 Pages 产物，工作流本身没有部署步骤。
 
