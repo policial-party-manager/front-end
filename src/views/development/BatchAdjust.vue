@@ -1,9 +1,15 @@
 <script setup lang="ts">
 /**
- * BatchAdjust.vue - 批量身份调整页面
+ * BatchAdjust.vue - 批量身份调整页面（历史设计参考，路由已移除）
  *
- * 路由：/development/batch
- * 功能：管理员/支委批量调整多名成员的身份状态
+ * ⚠️ 后端没有批量身份调整端点，`/development/batch` 路由已从 `src/router/index.ts` 移除；
+ * 保留一个通往空占位页的活跃入口比移除更误导。批量调整能力**当前不存在，也没有替代品**：
+ * 逐条发起（`/development/member/:id`）与超管逐条审批（`/development/identity-changes`）
+ * 只是单条流程，不能批量。若将来后端提供批量端点，再评估是否接入。
+ *
+ * 本文件仅供设计参考，不得挂回路由；它内部的身份选项与提交都是 Mock，不是可用实现。
+ *
+ * 功能（设计意图）：管理员/支委批量调整多名成员的身份状态
  *
  * 权限说明：
  *   - super_admin（超级管理员）：查看全院成员

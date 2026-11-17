@@ -68,6 +68,8 @@ export interface IdentityMemberFilters {
 export interface IdentityOption {
   id: number;
   identityName: string;
+  /** 发展阶段（1–6），后端 `tb_identity.level`；字典按它升序，展示层需要时据此排序。 */
+  level?: number | null;
 }
 export interface BatchResult {
   total: number;
@@ -116,6 +118,56 @@ export const exportBranchMembers = (params: Omit<IdentityMemberFilters, "status"
   exportMembers(params as IdentityMemberFilters);
 export const pageIdentities = (page: number, size: number) =>
   get<{ records: IdentityOption[]; total: number }>("/v2/content/identities/page", { page, size });
+
+/** 身份字典单页上限；`/v2/content/identities/page` 只有 `page`/`size`，没有关键词过滤。 */
+export const IDENTITY_DICTIONARY_PAGE_SIZE = 100;
+/** 字典最多翻 20 页 × 100 条；真要超出时明确降级，不静默截断成“字典就这么多”。 */
+export const IDENTITY_DICTIONARY_MAX_PAGES = 20;
+
+/**
+ * 拉全政治身份字典（分页循环），按 `level` 升序、同 `level` 按编号升序，保证下拉顺序稳定。
+ *
+ * `isCancelled` 在每次响应后检查：换号、换目标成员或关闭弹窗后旧响应不写回调用方，
+ * 此时返回 `cancelled: true`，调用方直接放弃本次结果。
+ * 响应形状异常（`records` 非数组、`total` 非自然数）直接抛错，不用本地兜底列表冒充字典；
+ * 未取满 `total` 却提前翻空也当异常，不把不完整字典当成「就这么多」。
+ *
+ * 使用方：`IdentityChangeDialog.vue` 与 `MemberProfileList.vue`（同为 `/development` 家族，
+ * 降级要求一致）。`src/views/members.vue` 与 `src/views/branch-members.vue` 仍在用各自的
+ * 分页循环，它们的失败降级（列表仍可用、只禁用筛选）与本次组件不同，属于 #19 / #48 的范围，
+ * 本任务未一并修改；看到第二份实现时不要以为本函数覆盖了全部调用方。
+ */
+export async function loadAllIdentities(
+  isCancelled?: () => boolean,
+): Promise<{ records: IdentityOption[]; truncated: boolean; cancelled: boolean }> {
+  const values: IdentityOption[] = [];
+  let truncated = false;
+  for (let next = 1; next <= IDENTITY_DICTIONARY_MAX_PAGES; next++) {
+    const result = await pageIdentities(next, IDENTITY_DICTIONARY_PAGE_SIZE);
+    if (isCancelled?.()) return { records: [], truncated: false, cancelled: true };
+    if (!Array.isArray(result?.records) || !Number.isSafeInteger(result.total) || result.total < 0)
+      throw new Error("身份字典响应异常");
+    values.push(...result.records);
+    if (values.length >= result.total) break;
+    // 服务端提前翻空但 total 还没取满：说明字典不可信，按异常处理而不是当成拉全了。
+    if (!result.records.length) throw new Error("身份字典分页不完整");
+    if (next === IDENTITY_DICTIONARY_MAX_PAGES) truncated = true;
+  }
+  const sorted = [...values].sort(compareIdentityLevel);
+  return { records: sorted, truncated, cancelled: false };
+}
+
+/** 阶段值：非数字（缺失/异常）排在最后，不假设默认阶段。 */
+function identityLevel(value: IdentityOption): number {
+  return typeof value.level === "number" && Number.isFinite(value.level) ? value.level : Number.MAX_SAFE_INTEGER;
+}
+
+/** 阶段未知的条目排在最后，同阶段按编号稳定排序。 */
+function compareIdentityLevel(a: IdentityOption, b: IdentityOption): number {
+  const left = identityLevel(a);
+  const right = identityLevel(b);
+  return left === right ? a.id - b.id : left - right;
+}
 export const batchMemberStatus = (ids: number[], status: 1 | 2) =>
   post<BatchResult>("/v4/admin/users/batch/status", { ids, status });
 export const batchMemberBranch = (ids: number[], branchId: number) =>

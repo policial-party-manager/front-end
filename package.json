@@ -15,6 +15,7 @@
     "test:my-development": "node --test scripts/my-development-regressions.test.mjs",
     "test:development-profile": "node --test scripts/development-profile-regressions.test.mjs",
     "test:profile-edit": "node --test scripts/profile-edit-regressions.test.mjs",
+    "test:identity-change": "node --test scripts/identity-change-regressions.test.mjs",
     "test:statistics": "node --test scripts/statistics-distribution-regressions.test.mjs",
     "test:branch-members": "node --test scripts/branch-member-regressions.test.mjs",
     "test:system": "node --test scripts/system-roles-regressions.test.mjs scripts/system-logs-regressions.test.mjs",

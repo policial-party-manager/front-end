@@ -15,14 +15,13 @@
  *   - party_member / activist（普通成员）：不可调整身份
  */
 import { ref, computed, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import { ElMessage } from "element-plus";
 import AdjustIdentityDialog from "@/components/AdjustIdentityDialog.vue";
 import IdentityTimeline from "@/components/development/IdentityTimeline.vue";
 
 const route = useRoute();
-const router = useRouter();
 const userStore = useAppStore();
 
 // ============================================================
@@ -263,11 +262,10 @@ function handleAdjustSuccess(): void {
 }
 
 // ============================================================
-// 方法：批量调整 → 跳转到批量调整页面
+// 方法：批量调整（已移除入口）
 // ============================================================
-function handleBatchAdjust(): void {
-  router.push("/development/batch");
-}
+// 后端没有批量身份调整端点，`/development/batch` 路由已删除（#58）。本原型页不再提供批量入口，
+// 也不保留指向已删除路由的跳转（那会成为静默无效的点击）。
 
 // ============================================================
 // 方法：上传材料（预留，本次仅弹窗占位）
@@ -367,7 +365,7 @@ onMounted(() => {
               canAdjustIdentity 在 script 中通过 userStore.currentRole 计算
             -->
             <el-button v-if="canAdjustIdentity" type="primary" @click="handleAdjustIdentity"> 调整身份 </el-button>
-            <el-button v-if="canAdjustIdentity" type="warning" @click="handleBatchAdjust"> 批量调整 </el-button>
+            <!-- 批量调整按钮已于 #58 移除：后端无批量端点，对应路由已删除。 -->
           </div>
         </div>
 

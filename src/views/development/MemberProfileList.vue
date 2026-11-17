@@ -12,7 +12,8 @@ import {
   type SessionIdentitySnapshot,
 } from "@/utils/session";
 import {
-  pageIdentities,
+  IDENTITY_DICTIONARY_MAX_PAGES,
+  loadAllIdentities,
   pageIdentityMembers,
   type IdentityMemberFilters,
   type IdentityOption,
@@ -33,6 +34,9 @@ import {
  * - 后端 `filterDetailIds` 在关键词命中 `tb_user.username` 时只按支部额外校验一次，
  *   不再叠加 `identityId` 等条件，所以关键词与政治身份不能组合；
  *   界面互斥禁用，组合提交直接拦截且不发请求。
+ *
+ * 身份变更的两个入口都不在主导航里（避免导航膨胀）：发起在 `/development/member/:id` 的
+ * 「发起身份变更」按钮，审批在 `/development/identity-changes`（由本页页头链接进入）。
  */
 const store = useAppStore();
 const router = useRouter();
@@ -43,8 +47,6 @@ const ALLOWED_ROLES: readonly string[] = ["super_admin", "party_secretary"];
 const canView = computed(() => ALLOWED_ROLES.includes(store.currentRole) && sessionHasAccessToken.value);
 
 const PAGE_SIZE = 10;
-/** 身份字典最多翻 20 页 × 100 条；超过时明确降级为「身份 #编号」。 */
-const IDENTITY_MAX_PAGES = 20;
 
 const rows = ref<UserVo[]>([]);
 const total = ref(0);
@@ -145,20 +147,11 @@ async function loadIdentities(): Promise<void> {
   const sequence = ++identitySequence;
   identityState.value = "loading";
   try {
-    const values: IdentityOption[] = [];
-    let truncated = false;
-    for (let next = 1; next <= IDENTITY_MAX_PAGES; next++) {
-      const result = await pageIdentities(next, 100);
-      if (sequence !== identitySequence || !sessionOk(snapshot)) return;
-      if (!Array.isArray(result.records) || !Number.isSafeInteger(result.total) || result.total < 0)
-        throw new Error("身份字典响应异常");
-      values.push(...result.records);
-      if (!result.records.length) break;
-      if (values.length >= result.total) break;
-      if (next === IDENTITY_MAX_PAGES) truncated = true;
-    }
-    identities.value = values;
-    identityTruncated.value = truncated;
+    // 分页拉全与降级口径与发起弹窗共用同一个 helper，避免两处边界行为漂移。
+    const result = await loadAllIdentities(() => sequence !== identitySequence || !sessionOk(snapshot));
+    if (sequence !== identitySequence || !sessionOk(snapshot) || result.cancelled) return;
+    identities.value = result.records;
+    identityTruncated.value = result.truncated;
     identityState.value = "ready";
   } catch {
     if (sequence === identitySequence && sessionOk(snapshot)) {
@@ -265,7 +258,16 @@ onBeforeUnmount(() => {
           按关键词或政治身份查找成员，进入其电子培养档案查看培养过程记录。成员范围由服务端按登录身份判定：超级管理员为全院，党支部书记为本支部。
         </p>
       </div>
-      <el-tag class="scope-tag" effect="plain" type="danger">管理侧 · 只读</el-tag>
+      <div class="heading-actions">
+        <el-button
+          plain
+          data-testid="dev-list-identity-review-link"
+          @click="router.push('/development/identity-changes')"
+        >
+          身份变更审批
+        </el-button>
+        <el-tag class="scope-tag" effect="plain" type="danger">管理侧 · 只读</el-tag>
+      </div>
     </header>
 
     <el-alert
@@ -335,8 +337,8 @@ onBeforeUnmount(() => {
           政治身份字典加载失败，身份列将按编号显示，成员列表仍可使用；重试请刷新页面。
         </p>
         <p v-else-if="identityTruncated" class="toolbar-hint" data-testid="dev-list-identity-truncated">
-          身份字典超过 {{ IDENTITY_MAX_PAGES * 100 }} 条，仅加载了前
-          {{ IDENTITY_MAX_PAGES * 100 }} 条；未覆盖到的成员将按「身份 #编号」显示。
+          身份字典超过 {{ IDENTITY_DICTIONARY_MAX_PAGES * 100 }} 条，仅加载了前
+          {{ IDENTITY_DICTIONARY_MAX_PAGES * 100 }} 条；未覆盖到的成员将按「身份 #编号」显示。
         </p>
       </section>
 
@@ -449,6 +451,13 @@ onBeforeUnmount(() => {
 
   .scope-tag {
     flex: 0 0 auto;
+  }
+
+  .heading-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
   }
 }
 
