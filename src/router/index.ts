@@ -47,20 +47,32 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/development",
     name: "Development",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
-    meta: { title: "党员发展 - 党建云平台", permission: "development:manage" },
+    component: () => import("@/views/development/MemberProfileList.vue"),
+    meta: {
+      title: "党员发展 - 党建云平台",
+      permission: "development:manage",
+      roles: ["super_admin", "party_secretary"],
+    },
   },
   {
     path: "/development/member/:id",
     name: "MemberDetail",
-    component: () => import("@/views/WorkspacePlaceholder.vue"),
-    meta: { title: "成员培养详情 - 党建云平台", permission: "development:manage" },
+    component: () => import("@/views/development/MemberProfile.vue"),
+    meta: {
+      title: "成员培养详情 - 党建云平台",
+      permission: "development:manage",
+      roles: ["super_admin", "party_secretary"],
+    },
   },
   {
     path: "/development/batch",
     name: "BatchAdjust",
     component: () => import("@/views/WorkspacePlaceholder.vue"),
-    meta: { title: "批量调整身份 - 党建云平台", permission: "development:manage" },
+    meta: {
+      title: "批量调整身份 - 党建云平台",
+      permission: "development:manage",
+      roles: ["super_admin", "party_secretary"],
+    },
   },
   {
     path: "/my-development",
