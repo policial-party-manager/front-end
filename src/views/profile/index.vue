@@ -129,7 +129,24 @@ const editableRows = computed(() =>
 const drawerVisible = ref(false);
 const submitting = ref(false);
 const editFormRef = ref<FormInstance>();
-const editForm = reactive<Record<EditableKey, string>>({ phone: "", email: "", contactPerson: "", remark: "" });
+/** 4 个输入控件实例；拦截提交时把焦点移到第一个出错字段。 */
+const editFieldRefs: Partial<Record<EditableKey, { focus: () => void }>> = {};
+const editForm = reactive<Record<EditableKey, string>>(
+  EDITABLE_KEYS.reduce((form, key) => ({ ...form, [key]: "" }), {} as Record<EditableKey, string>),
+);
+
+/** 记录输入控件实例，供拦截提交时把焦点移到第一个出错字段。 */
+function registerEditField(key: EditableKey, instance: unknown): void {
+  const target = instance as { focus?: unknown } | null;
+  if (target && typeof target.focus === "function") editFieldRefs[key] = target as { focus: () => void };
+  else delete editFieldRefs[key];
+}
+
+/** 预先建好每字段的 ref 回调，避免模板里写内联函数触发重复挂载。 */
+const editFieldSetters = EDITABLE_KEYS.reduce(
+  (setters, key) => ({ ...setters, [key]: (instance: unknown) => registerEditField(key, instance) }),
+  {} as Record<EditableKey, (instance: unknown) => void>,
+);
 /** 打开抽屉时的字段快照：既用于「只发变化字段」，也用于识别「有值改空」。 */
 const initialSnapshot = ref<Record<EditableKey, string> | null>(null);
 
@@ -145,7 +162,8 @@ function clearsExisting(key: EditableKey): boolean {
 }
 
 function clearBlockedMessage(key: EditableKey): string {
-  return `当前接口不支持清空${EDITABLE_LABELS[key]}，请联系管理员更新`;
+  // 不承诺「管理员能清空」：同一处后端缺陷也影响管理侧入口，能力由管理侧流程决定。
+  return `当前接口不支持清空${EDITABLE_LABELS[key]}，如需清空请由管理侧另行处理`;
 }
 
 /** 逐字段校验，返回空串代表通过；约束逐条对齐后端。 */
@@ -174,12 +192,8 @@ function ruleFor(key: EditableKey): FormItemRule {
   };
 }
 
-const editRules: FormRules = {
-  phone: [ruleFor("phone")],
-  email: [ruleFor("email")],
-  contactPerson: [ruleFor("contactPerson")],
-  remark: [ruleFor("remark")],
-};
+/** 校验规则由 EDITABLE_KEYS 派生，新增可编辑字段不必在两处各写一遍。 */
+const editRules: FormRules = Object.fromEntries(EDITABLE_KEYS.map((key) => [key, [ruleFor(key)]]));
 
 function resetEditState(): void {
   initialSnapshot.value = null;
@@ -193,12 +207,7 @@ function openEditor(): void {
   if (!canView.value || disposed || !profile.value) return;
   const value = profile.value;
   // 打开即用当前资料预填，并记录初始快照作为「是否变化」的基准。
-  const snapshot: Record<EditableKey, string> = {
-    phone: value.phone ?? "",
-    email: value.email ?? "",
-    contactPerson: value.contactPerson ?? "",
-    remark: value.remark ?? "",
-  };
+  const snapshot = editableSnapshotFrom(value);
   initialSnapshot.value = snapshot;
   EDITABLE_KEYS.forEach((key) => {
     editForm[key] = snapshot[key];
@@ -210,6 +219,14 @@ function openEditor(): void {
 function onDrawerClosed(): void {
   submitting.value = false;
   resetEditState();
+}
+
+/** 打开抽屉时的字段快照；与 editForm 同源，避免两处各自列举字段。 */
+function editableSnapshotFrom(value: ProfileResponse): Record<EditableKey, string> {
+  return EDITABLE_KEYS.reduce(
+    (snapshot, key) => ({ ...snapshot, [key]: value[key] ?? "" }),
+    {} as Record<EditableKey, string>,
+  );
 }
 
 const changedKeys = computed<EditableKey[]>(() => {
@@ -238,9 +255,12 @@ function onFieldInput(key: EditableKey): void {
   editFormRef.value?.clearValidate(key);
 }
 
-/** 让字段级错误显形并聚焦到该字段。 */
+/** 让字段级错误显形并带着焦点定位到第一个出错字段。 */
 async function highlightFields(keys: readonly EditableKey[]): Promise<void> {
+  if (keys.length === 0) return;
   await Promise.all(keys.map((key) => editFormRef.value?.validateField(key).catch(() => undefined) ?? undefined));
+  const first = keys[0];
+  editFieldRefs[first]?.focus();
 }
 
 async function submit(): Promise<void> {
@@ -442,7 +462,7 @@ onBeforeUnmount(() => {
 
     <el-drawer v-model="drawerVisible" title="编辑联系方式" size="420px" @closed="onDrawerClosed">
       <p class="edit-note">
-        只提交实际修改的字段。当前接口按「未传即不改」处理，空值会被忽略，因此已填写的内容无法在此清空；如需清空请联系管理员。
+        只提交实际修改的字段。当前接口按「未传即不改」处理，空值会被忽略，因此已填写的内容无法在此清空；如需清空需由管理侧另行处理。
       </p>
       <el-form
         ref="editFormRef"
@@ -452,35 +472,37 @@ onBeforeUnmount(() => {
         class="edit-form"
         data-testid="profile-edit-form"
       >
+        <!-- 不提供 clearable：一键清空会引导用户做接口不支持的操作。 -->
         <el-form-item label="手机号码" prop="phone">
           <el-input
+            :ref="editFieldSetters.phone"
             v-model="editForm.phone"
             data-testid="profile-edit-phone"
-            placeholder="11 位手机号，可留空"
-            clearable
+            placeholder="11 位手机号"
             @input="onFieldInput('phone')"
           />
         </el-form-item>
         <el-form-item label="电子邮箱" prop="email">
           <el-input
+            :ref="editFieldSetters.email"
             v-model="editForm.email"
             data-testid="profile-edit-email"
-            placeholder="不超过 25 个字符"
-            clearable
+            placeholder="合法邮箱，不超过 25 个字符"
             @input="onFieldInput('email')"
           />
         </el-form-item>
         <el-form-item label="紧急联系人" prop="contactPerson">
           <el-input
+            :ref="editFieldSetters.contactPerson"
             v-model="editForm.contactPerson"
             data-testid="profile-edit-contactPerson"
             placeholder="姓名与联系方式，不超过 50 个字符"
-            clearable
             @input="onFieldInput('contactPerson')"
           />
         </el-form-item>
         <el-form-item label="备注" prop="remark">
           <el-input
+            :ref="editFieldSetters.remark"
             v-model="editForm.remark"
             data-testid="profile-edit-remark"
             type="textarea"
@@ -499,7 +521,7 @@ onBeforeUnmount(() => {
           :title="'当前接口不支持清空：' + blockedClearKeys.map((key) => EDITABLE_LABELS[key]).join('、')"
         >
           <template #default>
-            <p>保存时会跳过空值，接口返回成功但库中数据不变。请填写新的非空内容，或联系管理员清空。</p>
+            <p>保存时会跳过空值，接口返回成功但库中数据不变。请填写新的非空内容；确需清空请由管理侧另行处理。</p>
           </template>
         </el-alert>
       </el-form>
@@ -682,7 +704,7 @@ onBeforeUnmount(() => {
   margin-bottom: 14px;
   padding: 10px 12px;
   border-left: 3px solid var(--party-red);
-  background: rgba(193, 44, 31, 0.06);
+  background: var(--party-red-bg);
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.7;

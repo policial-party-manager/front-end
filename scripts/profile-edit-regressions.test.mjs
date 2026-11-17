@@ -159,6 +159,13 @@ async function switchAccount(page, role = "party_member") {
   }, role);
 }
 
+async function signOut(page) {
+  await page.evaluate(async () => {
+    const s = await import("/src/utils/session.ts");
+    s.clearSession();
+  });
+}
+
 async function openDrawer(page) {
   await eventually(async () => (await page.getByTestId("profile-edit-open").count()) === 1);
   await page.getByTestId("profile-edit-open").click();
@@ -445,6 +452,59 @@ test("双击保存只发一次 PUT", async (t) => {
   await page.waitForTimeout(400);
   assert.equal(state.putCalls, 1, "双击不得产生第二次提交");
   await eventually(() => state.getCalls === 2);
+});
+
+test("清空一个字段同时改另一个字段时整单不提交", async (t) => {
+  const { page, state } = await fixture(t);
+  await openDrawer(page);
+  // 合法变化 + 被拦截的清空并存：接口无法表达清空，因此整单不发，避免只写入一半。
+  await drawerInput(page, "phone").fill("");
+  await drawerInput(page, "remark").fill("只提交一半是错的");
+  await submitButton(page).click();
+  await eventually(async () => (await fieldError(page, "phone").count()) === 1);
+  await page.waitForTimeout(300);
+  assert.equal(state.putCalls, 0, JSON.stringify(state.requests.filter((r) => r.method === "PUT")));
+  assert.equal(await drawerInput(page, "remark").inputValue(), "只提交一半是错的");
+});
+
+test("退出登录后立即清除已渲染资料并停止请求", async (t) => {
+  const gate = delay();
+  const { page, state } = await fixture(t, { state: { freezeFirstGet: true, firstGate: gate } });
+  await eventually(() => state.getCalls === 1);
+  await signOut(page);
+  // 退出后不得残留上一账号的姓名、手机号等个人信息。
+  await eventually(async () => (await page.getByText("张同学").count()) === 0);
+  await eventually(async () => (await page.getByTestId("profile-readonly").count()) === 0);
+  await eventually(async () => (await page.getByTestId("profile-login-tip").count()) === 1);
+  gate.resolve();
+  await page.waitForTimeout(300);
+  assert.equal(await page.getByText("张同学").count(), 0);
+  assert.equal(await page.getByTestId("profile-editable").count(), 0);
+  assert.equal(state.getCalls, 1, "退出后不得再拉取资料");
+});
+
+test("离开页面后重新进入会自己重新拉取，在途旧响应不覆盖新实例", async (t) => {
+  const gate = delay();
+  const { page, state } = await fixture(t, { state: { freezeFirstGet: true, firstGate: gate } });
+  await eventually(() => state.getCalls === 1);
+  await page.evaluate(async () => {
+    const { default: router } = await import("/src/router/index.ts");
+    // /resources 是未接接口的占位页，用它验证卸载而不引入其它业务请求。
+    await router.push("/resources");
+  });
+  await eventually(async () => new URL(page.url()).pathname === "/resources");
+  state.freezeFirstGet = false;
+  state.profile = profile({ realName: "重新进入成员", phone: "13500135000" });
+  await page.evaluate(async () => {
+    const { default: router } = await import("/src/router/index.ts");
+    await router.push("/profile");
+  });
+  await eventually(async () => (await page.getByText("重新进入成员").count()) === 1);
+  assert.equal(state.getCalls, 2, "重新进入必须重新拉取资料");
+  gate.resolve();
+  await page.waitForTimeout(300);
+  assert.equal(await page.getByTestId("profile-value-phone").innerText(), "13500135000");
+  assert.equal(await page.getByText("张同学").count(), 0);
 });
 
 test("换号后旧会话的迟到响应不写回", async (t) => {
