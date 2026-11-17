@@ -32,11 +32,12 @@ npm is the package manager (CI uses `npm ci`). Scripts from `package.json`:
 | `npm run test:branch-members`      | 支委成员工作台浏览器回归（同上）                                                           |
 | `npm run test:my-development`      | 我的培养（本人培养档案）浏览器回归（同上）                                                 |
 | `npm run test:development-profile` | 党员发展（管理侧培养档案列表与只读详情）浏览器回归（同上）                                 |
+| `npm run test:profile-edit`        | 个人中心（本人资料查询 + 联系方式编辑）浏览器回归（同上）                                  |
 | `npm run test:system`              | 系统管理（角色 + 操作日志）浏览器回归，同时运行两个脚本                                    |
 
 No general unit/e2e framework is configured. Browser regression scripts live in `scripts/` and follow one pattern: they start their own Vite server, intercept business HTTP inside an isolated browser context, and never reach the real backend. Install Chromium first (`npx playwright-core install chromium`) or pass `PLAYWRIGHT_CHROMIUM_EXECUTABLE` with an existing binary path.
 
-CI (`.github/workflows/ci.yml`) runs `format:check` → eslint → `typecheck` → `branch-regressions` → `branch-import-regressions` → `activity-participation-regressions` → `member-import-regressions` → `member-management-regressions` → `branch-members-regressions` → `system-management-regressions` → `my-development-regressions` → `statistics-regressions` → `development-profile-regressions` → `build` on push/PR to `main`; the build job needs every regression job to pass.
+CI (`.github/workflows/ci.yml`) runs `format:check` → eslint → `typecheck` → `branch-regressions` → `branch-import-regressions` → `activity-participation-regressions` → `member-import-regressions` → `member-management-regressions` → `branch-members-regressions` → `system-management-regressions` → `my-development-regressions` → `statistics-regressions` → `development-profile-regressions` → `profile-edit-regressions` → `build` on push/PR to `main`; the build job needs every regression job to pass.
 
 ## Architecture
 
