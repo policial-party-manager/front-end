@@ -22,7 +22,7 @@ import {
   type IdentityCount,
   type StudySummaryVo,
 } from "@/api/statistics";
-import { studyMinutesHint } from "@/views/development/myDevelopmentDisplay";
+import { formatStudyMinutes, studyMinutesHint } from "@/views/development/myDevelopmentDisplay";
 
 /**
  * 数据统计：政治身份分布、管理待办与本人学习汇总三个板块。
@@ -91,10 +91,10 @@ function identityKeyOf(item: IdentityCount): string {
   return `name:${item.identityName ?? ""}`;
 }
 
-function identityLabelOf(item: IdentityCount): string {
+function identityLabelOf(item: IdentityCount, fallback = "未命名身份"): string {
   if (item.identityName) return item.identityName;
-  if (item.identityId !== null) return `身份 ${item.identityId}`;
-  return "未命名身份";
+  if (item.identityId !== null) return `身份 #${item.identityId}`;
+  return fallback;
 }
 
 const identityColumns = computed<IdentityColumn[]>(() => {
@@ -167,11 +167,9 @@ const studySummaryError = ref("");
 let dashboardSequence = 0;
 let studySummarySequence = 0;
 
-/** 身份计数行的名称：优先服务端名称，其次编号，两者都为空才显示「未登记」。 */
+/** 身份计数行的名称：与分布板块共用同一套降级，仅「两者都为空」的文案不同。 */
 function dashboardIdentityLabel(item: IdentityCount): string {
-  if (item.identityName) return item.identityName;
-  if (item.identityId !== null) return `身份 ${item.identityId}`;
-  return "未登记";
+  return identityLabelOf(item, "未登记");
 }
 
 async function loadDashboard(): Promise<void> {
@@ -231,7 +229,7 @@ function invalidate(): void {
 }
 
 /** 三个板块一次发出，互不等待：任何一个失败或变慢都不阻断其它两个。 */
-function loadAll(): void {
+function loadPanels(): void {
   if (!canView.value) return;
   void loadDistribution();
   void loadDashboard();
@@ -239,13 +237,13 @@ function loadAll(): void {
 }
 
 onMounted(() => {
-  loadAll();
+  loadPanels();
 });
 
 watch([canView, sessionIdentity], () => {
   // 退出、换号或权限变化：丢弃旧会话已渲染的数据与在途响应，再按新会话重新拉取。
   invalidate();
-  loadAll();
+  loadPanels();
 });
 
 onBeforeUnmount(() => {
@@ -346,9 +344,6 @@ onBeforeUnmount(() => {
                   <span class="group-key">{{ dashboardIdentityLabel(row) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="level" label="层级" min-width="88" align="right">
-                <template #default="{ row }">{{ row.level ?? "—" }}</template>
-              </el-table-column>
               <el-table-column prop="count" label="人数" min-width="96" align="right">
                 <template #default="{ row }">
                   <strong class="group-total">{{ row.count }}</strong>
@@ -368,7 +363,9 @@ onBeforeUnmount(() => {
                 下方「政治身份分布」按维度分组，各身份人数之和不含未登记成员，因此<strong>可能小于该分组总人数</strong>；
                 两者是不同口径，页面既不合并也不互相换算。
               </li>
-              <li>两套数字都<strong>未按成员启用/停用过滤</strong>，停用成员同样计入，故都不能称为「启用成员数」。</li>
+              <li>
+                两套数字都<strong>未按成员启用/停用过滤</strong>，停用成员同样计入，故都不能称为「启用成员数」；两个待办计数同样不按启停区分。
+              </li>
               <li>{{ scopeLabel }}范围由服务端按登录身份判定：超级管理员为全院，党支部书记为本人所属支部。</li>
             </ul>
           </div>
@@ -412,15 +409,16 @@ onBeforeUnmount(() => {
           </div>
           <div class="metric-card" data-testid="stat-study-total-minutes">
             <span class="metric-label">累计学时</span>
-            <strong class="metric-value">{{ studySummary.totalMinutes }}</strong>
-            <span class="metric-unit">分钟</span>
+            <strong class="metric-value">{{ formatStudyMinutes(studySummary.totalMinutes) }}</strong>
             <span v-if="studyMinutesHint(studySummary.totalMinutes)" class="metric-sub">
               {{ studyMinutesHint(studySummary.totalMinutes) }}
             </span>
           </div>
           <div class="metric-card" data-testid="stat-study-avg-score">
             <span class="metric-label">平均分</span>
-            <strong v-if="studySummary.avgScore !== null" class="metric-value">{{ studySummary.avgScore }}</strong>
+            <strong v-if="studySummary.avgScore !== null" class="metric-value">
+              {{ studySummary.avgScore.toFixed(2) }}
+            </strong>
             <strong v-else class="metric-value metric-value-muted">无记录</strong>
             <span class="metric-unit">{{ studySummary.avgScore !== null ? "分" : "" }}</span>
           </div>

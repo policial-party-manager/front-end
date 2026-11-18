@@ -637,34 +637,12 @@ test("待办计数为负数或非整数时同样进错误态", async (t) => {
     { pendingThoughtReports: 0, pendingIdentityChanges: "3", identityDistribution: [] },
   ];
   for (const payload of cases) {
-    await t.test(JSON.stringify(payload), async () => {
-      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-      await context.addInitScript(() => {
-        if (location.protocol !== "http:") return;
-        localStorage.setItem("party_access_token", "test-access");
-        localStorage.setItem("party_refresh_token", "test-refresh");
-        localStorage.setItem("party_user_session", JSON.stringify({ name: "管理员", avatar: "", role: "super_admin" }));
-      });
-      const page = await context.newPage();
-      page.setDefaultTimeout(8000);
-      await context.route(`${baseURL}/api/**`, (route) => {
-        const path = new URL(route.request().url()).pathname;
-        if (path === "/api/v4/statistics/dashboard")
-          return route.fulfill({ json: { code: 200, message: "ok", data: payload } });
-        if (path === "/api/v4/statistics/distribution")
-          return route.fulfill({ json: { code: 200, message: "ok", data: distributionFixture() } });
-        if (path === "/api/v4/user/study-records/mine/summary")
-          return route.fulfill({ json: { code: 200, message: "ok", data: studySummaryFixture() } });
-        if (path === "/api/v2/content/news/page" || path === "/api/v2/content/notices/page")
-          return route.fulfill({ json: { code: 200, message: "ok", data: { records: [], total: 0 } } });
-        return route.abort();
-      });
-      await page.goto(`${baseURL}/statistics`);
+    await t.test(JSON.stringify(payload), async (sub) => {
+      const { page } = await fixture(sub, { state: { dashboardPayload: payload } });
       await page.getByTestId("stat-dashboard-error").waitFor();
       // 非法值绝不能渲染成 0 或个人数。
       assert.equal(await page.getByTestId("stat-pending-thought-reports").count(), 0);
       assert.equal(await page.getByTestId("stat-pending-identity-changes").count(), 0);
-      await context.close();
     });
   }
 });
@@ -712,7 +690,7 @@ test("身份计数行保留服务端顺序，null 名称显示「未登记」、
   assert.match(rows[0], /中共预备党员/);
   assert.match(rows[1], /未登记/);
   assert.match(rows[2], /未登记/);
-  assert.match(rows[3], /身份 9/);
+  assert.match(rows[3], /身份 #9/);
   for (let i = 0; i < rows.length; i++)
     assert.ok(rows[i].includes(["3", "1", "2", "1"][i]), `第 ${i + 1} 行应展示服务端 count`);
 });
@@ -757,6 +735,28 @@ test("支委未归属支部：待办板块展示服务端 400 原文，分布板
   assert.equal(await page.getByTestId("stat-error").count(), 0);
 });
 
+// 真实后端 resolveScope 对两个统计端点都会抛同一句 400，因此完整场景是两个错误卡片各自独立：
+// 这里验证互不遮蔽、各自可重试，而不是声称分布一定会成功。
+test("支委未归属支部的两个端点都 400 时，两个板块各自展示原文并各自可重试", async (t) => {
+  const { page, state } = await fixture(t, {
+    role: "party_secretary",
+    state: {
+      dashboardFailure: { status: 400, message: "您尚未归属任何党支部，请联系管理员" },
+      failCalls: 1,
+    },
+  });
+  await page.getByTestId("stat-dashboard-error").waitFor();
+  await page.getByTestId("stat-error").waitFor();
+  assert.equal(await page.getByTestId("stat-dashboard-table").count(), 0);
+  assert.equal(await page.locator('[data-testid="stat-table"]').count(), 0);
+  // 只重试分布，不惊动待办板块。
+  const before = dashboardRequests(state).length;
+  await page.getByTestId("stat-retry").click();
+  await panel(page).waitFor();
+  assert.equal(dashboardRequests(state).length, before);
+  assert.match(await page.getByTestId("stat-dashboard-error").innerText(), /您尚未归属任何党支部/);
+});
+
 test("本人学习汇总标注「本人数据」，按分钟展示并给出小时提示", async (t) => {
   const { page } = await fixture(t);
   const section = summarySection(page);
@@ -765,23 +765,28 @@ test("本人学习汇总标注「本人数据」，按分钟展示并给出小�
   assert.match(heading, /本人数据/);
   assert.match(heading, /本人学习汇总（当前登录账号）/);
   const minutes = await page.getByTestId("stat-study-total-minutes").innerText();
-  assert.match(minutes, /95/);
-  assert.match(minutes, /分钟/);
+  assert.match(minutes, /95 分钟/);
   assert.match(minutes, /约 1 小时 35 分钟/);
   assert.match(await section.innerText(), /4/);
 });
 
-test("avgScore 为字符串时解析为数字，为 null 时显示「无记录」而非 0", async (t) => {
+test("avgScore 为字符串时按两位小数展示，为 null 时显示「无记录」而非 0", async (t) => {
   const { page } = await fixture(t);
   await page.getByTestId("stat-study-avg-score").waitFor();
-  // 后端 BigDecimal 序列化成 "85.50"，页面应展示为数字 85.5。
-  assert.match(await page.getByTestId("stat-study-avg-score").innerText(), /85\.5/);
+  // 后端 BigDecimal 序列化成 "85.50"：保留服务端两位小数口径，不丢尾零。
+  assert.match(await page.getByTestId("stat-study-avg-score").innerText(), /85\.50/);
   const { page: emptyPage } = await fixture(t, {
     state: { summaryPayload: { recordCount: 0, totalMinutes: 0, avgScore: null } },
   });
   await emptyPage.getByTestId("stat-study-avg-score").waitFor();
   assert.match(await emptyPage.getByTestId("stat-study-avg-score").innerText(), /无记录/);
   assert.doesNotMatch(await emptyPage.getByTestId("stat-study-avg-score").innerText(), /\b0\b/);
+  // BigDecimal 也可能是数字形态；缺失字段同样按无记录处理。
+  const { page: numberPage } = await fixture(t, {
+    state: { summaryPayload: { recordCount: 1, totalMinutes: 30, avgScore: 90 } },
+  });
+  await numberPage.getByTestId("stat-study-avg-score").waitFor();
+  assert.match(await numberPage.getByTestId("stat-study-avg-score").innerText(), /90\.00/);
 });
 
 test("本人学习汇总请求失败时不影响其它两个板块", async (t) => {
