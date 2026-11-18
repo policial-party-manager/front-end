@@ -187,6 +187,8 @@ async function fixture(t, options = {}) {
     /** 上传与登记。 */
     uploadCalls: [],
     uploadError: null,
+    /** 上传响应闸门：置上后上传停在原地，用于观察进度条与「上传中」态。 */
+    uploadGate: null,
     registerCalls: [],
     registerError: null,
     removeMaterialCalls: [],
@@ -249,6 +251,7 @@ async function fixture(t, options = {}) {
 
     if (path === "/api/v4/uploads" && method === "POST") {
       state.uploadCalls.push({ path, method, body: req.postData() ?? "" });
+      if (state.uploadGate) await state.uploadGate.promise;
       if (state.uploadError) return fail(route, 400, state.uploadError);
       return ok(route, {
         url: "file:material/2026/11/uploaded.pdf",
@@ -373,6 +376,50 @@ test("档案页只请求一次档案，03/09 数据来自该响应而非列表�
   assert.match(await section(page, "dev-profile-materials").innerText(), /入党申请书\.pdf/);
 });
 
+test("联系人与材料空态：各自独立提示，入口仍可用", async (t) => {
+  const { page } = await fixture(t, { state: { defaultProfile: profile({ mentors: [], materials: [] }) } });
+  await waitProfile(page);
+  assert.match(await section(page, "dev-profile-mentors").innerText(), /尚未设置培养联系人/);
+  assert.match(await section(page, "dev-profile-materials").innerText(), /暂无培养材料/);
+  // 空态不得连带隐藏写入口。
+  assert.equal(await section(page, "mentor-assign-open").isDisabled(), false);
+  assert.equal(await section(page, "material-upload-open").count(), 1);
+});
+
+test("跨支部返回「用户不存在」时原样转达", async (t) => {
+  for (const state of [
+    { assignError: "用户不存在" },
+    { removeMentorError: "用户不存在" },
+    { removeMaterialError: "用户不存在" },
+  ]) {
+    const { page } = await fixture(t, { role: "party_secretary", state });
+    await waitProfile(page);
+    if (state.assignError) {
+      await openMentorDialog(page);
+      await pickCandidate(page, "候选乙");
+      await section(page, "mentor-assign-submit").click();
+      await eventually(async () => (await section(page, "mentor-assign-submit-error").count()) === 1);
+      assert.match(await section(page, "mentor-assign-submit-error").innerText(), /用户不存在/);
+      assert.doesNotMatch(await section(page, "mentor-assign-submit-error").innerText(), /无权限|403/);
+      continue;
+    }
+    const testId = state.removeMentorError ? "mentor-remove-21" : "material-remove-71";
+    await section(page, testId).click();
+    const box = await waitMessageBox(page);
+    await box.locator(".el-button--primary").click();
+    await eventually(async () => (await page.locator(".el-message--error").count()) > 0);
+    const texts = await page.locator(".el-message--error").allInnerTexts();
+    assert.ok(
+      texts.some((item) => item.includes("用户不存在")),
+      texts.join(" | "),
+    );
+    assert.ok(
+      texts.every((item) => !/无权限|403/.test(item)),
+      texts.join(" | "),
+    );
+  }
+});
+
 // ============================ 指派 ============================
 
 test("指派候选来自真实分页接口，不支持手输成员编号", async (t) => {
@@ -403,16 +450,34 @@ test("指派请求体精确为 mentorId，路径含当前成员编号", async (t
   assert.equal(call.search, "", "指派请求不得带查询参数");
 });
 
-test("「每位成员最多设置 2 名培养联系人」原文可见且不误报成功", async (t) => {
+test("已满 2 名时入口按钮置灰并提示上限，点击零请求", async (t) => {
   const { page, state } = await fixture(t, {
-    state: {
-      defaultProfile: profile({ mentors: [mentor(21), mentor(22)] }),
-      assignError: "每位成员最多设置 2 名培养联系人",
-    },
+    state: { defaultProfile: profile({ mentors: [mentor(21), mentor(22)] }) },
   });
+  await waitProfile(page);
+  assert.match(await section(page, "mentor-limit-hint").innerText(), /每位成员最多设置 2 名培养联系人/);
+  assert.match(await section(page, "mentor-limit-hint").innerText(), /需先移除一名/);
+  // 置灰而非「可点但必然失败」：上限由档案里已有的联系人数确定，不涉候选人资格预判。
+  assert.equal(await section(page, "mentor-assign-open").isDisabled(), true);
+  await section(page, "mentor-assign-open").click({ force: true });
+  await page.waitForTimeout(300);
+  assert.equal(await section(page, "mentor-assign-select").count(), 0, "已满时不得打开指派弹窗");
+  assert.equal(candidateRequests(state).length, 0);
+  assert.equal(assigns(state).length, 0);
+  // 移除一名后恢复可用。
+  state.defaultProfile = profile({ mentors: [mentor(21)] });
+  await section(page, "mentor-remove-22").click();
+  const box = await waitMessageBox(page);
+  await box.locator(".el-button--primary").click();
+  await eventually(async () => (await section(page, "mentor-assign-open").isDisabled()) === false);
+  assert.equal(await section(page, "mentor-limit-hint").count(), 0);
+});
+
+test("「每位成员最多设置 2 名培养联系人」原文可见且不误报成功", async (t) => {
+  // 本地看到 1 名、服务端已满（其他操作者刚加人）：上限只能由服务端裁决。
+  const { page, state } = await fixture(t, { state: { assignError: "每位成员最多设置 2 名培养联系人" } });
   await openMentorDialog(page);
-  // 已满 2 名时给出上限说明，但仍允许提交（由服务端裁决）。
-  assert.match(await section(page, "mentor-assign-full").innerText(), /每位成员最多设置 2 名培养联系人/);
+  assert.equal(await section(page, "mentor-assign-full").count(), 0);
   await pickCandidate(page, "候选乙");
   await section(page, "mentor-assign-submit").click();
   await eventually(async () => (await section(page, "mentor-assign-submit-error").count()) === 1);
@@ -422,7 +487,6 @@ test("「每位成员最多设置 2 名培养联系人」原文可见且不误�
   assert.match(await section(page, "mentor-assign-selected").innerText(), /候选乙/);
   assert.equal(state.profileCalls, 1, "失败不得重新拉取档案");
 });
-
 test("「培养联系人须为党员（预备党员或正式党员）」原文可见", async (t) => {
   const { page } = await fixture(t, {
     state: { assignError: "培养联系人须为党员（预备党员或正式党员）" },
@@ -462,6 +526,23 @@ test("指派成功后重新请求档案，列表以服务端数据为准（不�
   assert.equal(state.profileCalls, 2);
   assert.equal(await section(page, "dev-profile-mentors").locator(".row-card").count(), 2);
   assert.equal(await section(page, "mentor-assign-select").count(), 0, "成功后弹窗关闭");
+});
+
+test("重复指派同一人：界面只提示不禁用，幂等成功后列表仍为服务端数据", async (t) => {
+  // 档案里已有 31；再指派同一人，服务端幂等返回 200，列表不得多出一条。
+  const { page, state } = await fixture(t, { state: { defaultProfile: profile({ mentors: [mentor(31)] }) } });
+  await openMentorDialog(page);
+  await section(page, "mentor-assign-select").click();
+  const option = page.locator(".el-select-dropdown__item", { hasText: "候选31" }).first();
+  await option.waitFor({ state: "visible" });
+  assert.match(await option.innerText(), /已是当前培养联系人/);
+  await option.click();
+  await section(page, "mentor-assign-submit").click();
+  await eventually(() => state.profileCalls === 2);
+  assert.equal(assigns(state).length, 1);
+  assert.equal(await page.locator(".el-message--success").count(), 1);
+  // 幂等：服务端列表仍只有 1 条，页面按服务端数据展示，不本地追加。
+  assert.equal(await section(page, "dev-profile-mentors").locator(".row-card").count(), 1);
 });
 
 test("移除联系人：确认文案说明当前关系语义，走 DELETE .../mentors/{mentorId}", async (t) => {
@@ -580,6 +661,26 @@ test("白名单外扩展名与超 10 MB 零业务请求并给字段级提示", a
   await page.waitForTimeout(300);
   assert.equal(uploads(state).length, 0, "预检失败不得上传");
   assert.equal(registers(state).length, 0, "预检失败不得登记");
+});
+
+test("上传过程中显示进度且按钮置 loading，完成后才显示成功", async (t) => {
+  const gate = delay();
+  const { page, state } = await fixture(t, { state: { uploadGate: gate } });
+  await openMaterialDialog(page);
+  await selectMaterialType(page, "思想汇报");
+  await chooseMaterialFile(page, "汇报.pdf");
+  await section(page, "material-upload-submit").click();
+  await eventually(() => uploads(state).length === 1);
+  // 上传未完成时：进度条存在、提交按钮处于 loading、尚未发起登记。
+  assert.equal(await section(page, "material-upload-progress").count(), 1);
+  await eventually(async () =>
+    (await section(page, "material-upload-submit").getAttribute("class"))?.includes("is-loading"),
+  );
+  assert.equal(registers(state).length, 0, "上传未完成不得先登记");
+  assert.equal(await page.locator(".el-message--success").count(), 0);
+  gate.resolve();
+  await eventually(() => registers(state).length === 1);
+  assert.equal(uploads(state).length, 1);
 });
 
 test("材料类型下拉固定五项与固定顺序，不依赖后端文案", async (t) => {

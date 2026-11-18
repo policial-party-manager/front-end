@@ -46,6 +46,13 @@ export const MATERIAL_TYPES = ["入党申请书", "思想汇报", "政审材料"
 /** 备注长度上限，与后端 `@Size(max = 200)` 一致。 */
 export const MATERIAL_REMARK_MAX = 200;
 
+/**
+ * 同一被培养人最多在职培养联系人数（后端 `MentorServiceImpl.MAX_MENTORS`）。
+ * 界面据档案里已有的联系人数置灰入口与提交，属于「已满则不可新增」的确定性判定，
+ * 不是对候选人资格的预判；服务端仍会独立校验。
+ */
+export const MAX_MENTORS = 2;
+
 /** 培养材料（后端 `CultivationMaterial`）：`file` 是 `file:` 前缀内部路径，只展示不下载。 */
 export interface MaterialView {
   id: number;

@@ -9,7 +9,7 @@ import {
   type SessionIdentitySnapshot,
 } from "@/utils/session";
 import { pageIdentityMembers, type IdentityMemberFilters, type UserVo } from "@/api/members";
-import { assignMemberMentor, type MentorView } from "@/api/cultivation-contacts";
+import { assignMemberMentor, MAX_MENTORS, type MentorView } from "@/api/cultivation-contacts";
 
 /**
  * 指派培养联系人（档案页 03 区块的写入口）。
@@ -39,8 +39,6 @@ const emit = defineEmits<{ assigned: [] }>();
 const visible = defineModel<boolean>("visible", { required: true });
 
 const CANDIDATE_PAGE_SIZE = 20;
-/** 与后端 `MentorServiceImpl.MAX_MENTORS` 一致，仅用于提示，不用于拦截提交。 */
-const MAX_MENTORS = 2;
 
 const keyword = ref("");
 const options = ref<UserVo[]>([]);
@@ -49,11 +47,12 @@ const selectedId = ref<number | null>(null);
 const submitting = ref(false);
 const submitError = ref("");
 
-const canSubmit = computed(() => sessionHasAccessToken.value && !submitting.value);
+/** 已满 2 名时不允许新增，必须先移除一名；上限由档案里已有的联系人数确定。 */
+const full = computed(() => props.mentors.length >= MAX_MENTORS);
+
+const canSubmit = computed(() => sessionHasAccessToken.value && !submitting.value && !full.value);
 
 const selected = computed(() => options.value.find((item) => item.id === selectedId.value) ?? null);
-
-const full = computed(() => props.mentors.length >= MAX_MENTORS);
 const assignedIds = computed(() => new Set(props.mentors.map((mentor) => mentor.mentorId)));
 
 let disposed = false;
@@ -71,11 +70,11 @@ function memberLabel(member: UserVo): string {
   return member.realName?.trim() || member.username?.trim() || `成员 #${member.id}`;
 }
 
-/** 只在服务端确实没给 `identityId` 时提示；不给 `level` 就不猜党员身份。 */
+/** 只陈述响应里确定的事实；能不能指派由服务端判定，前端不代为结论。 */
 function candidateNote(member: UserVo): string {
   if (member.id === props.userId) return "本人，不能作为培养联系人";
   if (assignedIds.value.has(member.id)) return "已是当前培养联系人";
-  if (member.identityId == null) return "尚未登记政治身份，服务端会拒绝指派";
+  if (member.identityId == null) return "尚未登记政治身份";
   return "政治身份是否达到党员由服务端校验";
 }
 
@@ -222,7 +221,6 @@ onBeforeUnmount(() => {
           <p>每位成员最多设置 2 名培养联系人。请先在档案中移除一名，再指派新的联系人。</p>
         </template>
       </el-alert>
-
       <el-alert
         v-if="candidateState === 'error'"
         data-testid="mentor-assign-candidate-error"
@@ -279,7 +277,8 @@ onBeforeUnmount(() => {
       />
 
       <p class="form-hint">
-        培养联系人须为党员（预备党员或正式党员）。是否满足党员身份、是否已达上限、是否为本人都由服务端判定，页面不预先拦截。
+        培养联系人须为党员（预备党员或正式党员）。是否满足党员身份与是否为本人都由服务端判定，页面不预先拦截；已满
+        {{ MAX_MENTORS }} 名时需先移除一名。
       </p>
     </template>
 

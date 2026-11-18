@@ -13,7 +13,7 @@ import {
 } from "@/utils/session";
 import { getMemberCultivationProfile } from "@/api/cultivation";
 import type { CultivationProfile } from "@/api/cultivation-profiles";
-import { removeMemberMaterial, removeMemberMentor } from "@/api/cultivation-contacts";
+import { MAX_MENTORS, removeMemberMaterial, removeMemberMentor } from "@/api/cultivation-contacts";
 import {
   formatOptionalText,
   formatRecordTime,
@@ -267,7 +267,7 @@ const mentorDialogVisible = ref(false);
 const busyMentorId = ref<number | null>(null);
 
 function openMentorDialog(): void {
-  if (!canView.value || !profile.value) return;
+  if (!canView.value || !profile.value || mentors.value.length >= MAX_MENTORS) return;
   mentorDialogVisible.value = true;
 }
 
@@ -550,6 +550,7 @@ onBeforeUnmount(() => {
               v-if="canView && profile"
               type="primary"
               plain
+              :disabled="mentors.length >= MAX_MENTORS"
               data-testid="mentor-assign-open"
               @click="openMentorDialog"
             >
@@ -559,6 +560,10 @@ onBeforeUnmount(() => {
         </div>
         <el-empty v-if="mentors.length === 0" description="尚未设置培养联系人" :image-size="64" />
         <template v-else>
+          <!-- 已达上限：入口置灰 + 说明；列表本身不得因此消失（仍需能够移除）。 -->
+          <p v-if="mentors.length >= MAX_MENTORS" class="limit-hint" data-testid="mentor-limit-hint">
+            已达上限：每位成员最多设置 {{ MAX_MENTORS }} 名培养联系人，需先移除一名才能指派新的联系人。
+          </p>
           <ul class="list-rows">
             <li
               v-for="mentor in pagedSlice('mentors', mentors)"
@@ -957,6 +962,14 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+/* 已达联系人上限时的说明，与入口按钮置灰配套。 */
+.limit-hint {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
 
 .state-card {
