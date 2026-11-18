@@ -12,19 +12,33 @@ import { getApiErrorMessage } from "@/utils/apiError";
 import {
   DISTRIBUTION_DIMENSION_LABELS,
   DISTRIBUTION_DIMENSIONS,
+  getDashboard,
   getDistribution,
+  getMyStudySummary,
+  type DashboardVo,
   type DistributionDimension,
   type DistributionGroup,
   type DistributionVo,
   type IdentityCount,
+  type StudySummaryVo,
 } from "@/api/statistics";
+import { formatStudyMinutes, studyMinutesHint } from "@/views/development/myDevelopmentDisplay";
 
 /**
- * 数据统计：按维度分组的政治身份分布。
+ * 数据统计：政治身份分布、管理待办与本人学习汇总三个板块。
  *
- * 数据来源只有 `GET /v4/statistics/distribution`，范围（全院 / 本支部）由服务端按登录态判定，
- * 页面不传任何范围参数。`total` 是该组全部成员数，包含身份未登记的人；`identities` 只列身份字典，
- * 因此各身份人数之和可能小于 `total`——页面原样展示服务端数字，不补齐、不归一化、不虚拟身份项。
+ * 三个端点各发一次、互不阻塞，各自的加载 / 错误 / 重试状态独立——一个板块失败不得影响
+ * 其它已经成功的板块。范围（全院 / 本支部）全部由服务端按登录态判定，页面不传任何范围参数。
+ *
+ * 两套身份口径必须分开呈现，不合并、不互相换算：
+ * - 分布板块的 `total` 是该组全部成员数（含身份未登记），`identities` 只列身份字典，
+ *   因此各身份之和可能小于 `total`；
+ * - 待办板块的 `identityDistribution` 由服务端按身份直接计数并额外带一行未登记，
+ *   但它是单一汇总、不分组。
+ * 两者都未按成员启用/停用过滤，都不能称为「启用成员数」。
+ *
+ * 本人学习汇总查的是**当前登录账号自己**的记录（`mine/summary`）：本页只对管理角色开放，
+ * 所以它不是被统计成员的数据，页面标题必须写明「本人数据」。
  */
 const store = useAppStore();
 
@@ -77,10 +91,10 @@ function identityKeyOf(item: IdentityCount): string {
   return `name:${item.identityName ?? ""}`;
 }
 
-function identityLabelOf(item: IdentityCount): string {
+function identityLabelOf(item: IdentityCount, fallback = "未命名身份"): string {
   if (item.identityName) return item.identityName;
-  if (item.identityId !== null) return `身份 ${item.identityId}`;
-  return "未命名身份";
+  if (item.identityId !== null) return `身份 #${item.identityId}`;
+  return fallback;
 }
 
 const identityColumns = computed<IdentityColumn[]>(() => {
@@ -142,22 +156,94 @@ function retry(): void {
   void loadDistribution();
 }
 
+// ============ 管理待办与本人学习汇总：各自独立的序号与状态 ============
+const dashboard = ref<DashboardVo | null>(null);
+const dashboardLoading = ref(false);
+const dashboardError = ref("");
+const studySummary = ref<StudySummaryVo | null>(null);
+const studySummaryLoading = ref(false);
+const studySummaryError = ref("");
+
+let dashboardSequence = 0;
+let studySummarySequence = 0;
+
+/** 身份计数行的名称：与分布板块共用同一套降级，仅「两者都为空」的文案不同。 */
+function dashboardIdentityLabel(item: IdentityCount): string {
+  return identityLabelOf(item, "未登记");
+}
+
+async function loadDashboard(): Promise<void> {
+  if (!canView.value || disposed) return;
+  const sequence = ++dashboardSequence;
+  const snapshot = captureSessionIdentity();
+  dashboardLoading.value = true;
+  dashboardError.value = "";
+  dashboard.value = null;
+  try {
+    const result = await getDashboard();
+    if (sequence !== dashboardSequence || !sessionOk(snapshot)) return;
+    dashboard.value = result;
+  } catch (error) {
+    if (sequence !== dashboardSequence || !sessionOk(snapshot)) return;
+    dashboard.value = null;
+    // 支委未归属支部时服务端返回 400，原文直接转达，不改写成「无权限」。
+    dashboardError.value = getApiErrorMessage(error, "暂时无法加载管理待办");
+  } finally {
+    if (sequence === dashboardSequence && isSessionIdentityCurrent(snapshot)) dashboardLoading.value = false;
+  }
+}
+
+async function loadStudySummary(): Promise<void> {
+  if (!canView.value || disposed) return;
+  const sequence = ++studySummarySequence;
+  const snapshot = captureSessionIdentity();
+  studySummaryLoading.value = true;
+  studySummaryError.value = "";
+  studySummary.value = null;
+  try {
+    const result = await getMyStudySummary();
+    if (sequence !== studySummarySequence || !sessionOk(snapshot)) return;
+    studySummary.value = result;
+  } catch (error) {
+    if (sequence !== studySummarySequence || !sessionOk(snapshot)) return;
+    studySummary.value = null;
+    studySummaryError.value = getApiErrorMessage(error, "暂时无法加载本人学习汇总");
+  } finally {
+    if (sequence === studySummarySequence && isSessionIdentityCurrent(snapshot)) studySummaryLoading.value = false;
+  }
+}
+
 function invalidate(): void {
   requestSequence++;
   data.value = null;
   loading.value = false;
   loadError.value = "";
+  dashboardSequence++;
+  dashboard.value = null;
+  dashboardLoading.value = false;
+  dashboardError.value = "";
+  studySummarySequence++;
+  studySummary.value = null;
+  studySummaryLoading.value = false;
+  studySummaryError.value = "";
+}
+
+/** 三个板块一次发出，互不等待：任何一个失败或变慢都不阻断其它两个。 */
+function loadPanels(): void {
+  if (!canView.value) return;
+  void loadDistribution();
+  void loadDashboard();
+  void loadStudySummary();
 }
 
 onMounted(() => {
-  if (!canView.value) return;
-  void loadDistribution();
+  loadPanels();
 });
 
 watch([canView, sessionIdentity], () => {
   // 退出、换号或权限变化：丢弃旧会话已渲染的数据与在途响应，再按新会话重新拉取。
   invalidate();
-  if (canView.value) void loadDistribution();
+  loadPanels();
 });
 
 onBeforeUnmount(() => {
@@ -171,8 +257,8 @@ onBeforeUnmount(() => {
     <header class="page-heading">
       <div>
         <span class="eyebrow">STATISTICS / 数据统计</span>
-        <h1>政治身份分布</h1>
-        <p>按学院、专业、班级、年级或支部切分，查看每个分组的成员总数与各政治身份人数。</p>
+        <h1>数据统计</h1>
+        <p>管理待办与本人学习汇总看总览，政治身份分布按学院、专业、班级、年级或支部切分查看各身份人数。</p>
       </div>
       <el-tag class="scope-tag" effect="plain" type="danger">{{ scopeLabel }}范围</el-tag>
     </header>
@@ -196,6 +282,154 @@ onBeforeUnmount(() => {
     </el-alert>
 
     <template v-else-if="canView">
+      <section
+        class="surface content-card dashboard-card"
+        aria-labelledby="stat-dashboard-title"
+        data-testid="statistics-dashboard"
+      >
+        <div class="section-heading">
+          <div>
+            <span class="section-index">TODO</span>
+            <h2 id="stat-dashboard-title">管理待办</h2>
+          </div>
+          <p>{{ scopeLabel }}范围 · 计数与身份计数均由服务端返回</p>
+        </div>
+
+        <div v-if="dashboardLoading" class="state-card" role="status" aria-live="polite" aria-busy="true">
+          <el-skeleton :rows="3" animated />
+          <span class="state-caption">正在加载管理待办…</span>
+        </div>
+
+        <div v-else-if="dashboardError" class="state-card" role="alert" data-testid="stat-dashboard-error">
+          <el-icon class="state-icon error-icon" aria-hidden="true"><WarningFilled /></el-icon>
+          <div class="state-copy">
+            <h3>管理待办暂时无法加载</h3>
+            <p>{{ dashboardError }}</p>
+          </div>
+          <el-button type="primary" plain data-testid="stat-dashboard-retry" @click="loadDashboard">
+            <el-icon aria-hidden="true"><Refresh /></el-icon>重新加载
+          </el-button>
+        </div>
+
+        <template v-else-if="dashboard">
+          <div class="metric-row">
+            <div class="metric-card" data-testid="stat-pending-thought-reports">
+              <span class="metric-label">待审阅思想汇报</span>
+              <strong class="metric-value">{{ dashboard.pendingThoughtReports }}</strong>
+              <span class="metric-unit">份</span>
+            </div>
+            <div class="metric-card" data-testid="stat-pending-identity-changes">
+              <span class="metric-label">待审批身份变更</span>
+              <strong class="metric-value">{{ dashboard.pendingIdentityChanges }}</strong>
+              <span class="metric-unit">单</span>
+            </div>
+          </div>
+          <p class="metric-hint">
+            两个计数纯展示，暂不可点击跳转：审阅思想汇报与审批身份变更的管理页尚未接入。计数为 0
+            表示服务端确实没有待处理事项。
+          </p>
+
+          <div class="table-wrap dashboard-table-wrap">
+            <el-table
+              :data="dashboard.identityDistribution"
+              class="stat-table"
+              data-testid="stat-dashboard-table"
+              border
+              stripe
+              size="default"
+              empty-text="服务端未返回身份计数"
+            >
+              <el-table-column label="政治身份" min-width="200" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span class="group-key">{{ dashboardIdentityLabel(row) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="count" label="人数" min-width="96" align="right">
+                <template #default="{ row }">
+                  <strong class="group-total">{{ row.count }}</strong>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div class="caliber-note" data-testid="stat-dashboard-caliber">
+            <h3>口径说明（与下方分布不同，不可互相换算）</h3>
+            <ul>
+              <li>
+                本表按身份直接汇总为<strong>单一总量，不按学院/专业/支部等维度分组</strong>；未登记身份的成员由服务端单独成行，
+                行名为空时页面显示「未登记」。
+              </li>
+              <li>
+                下方「政治身份分布」按维度分组，各身份人数之和不含未登记成员，因此<strong>可能小于该分组总人数</strong>；
+                两者是不同口径，页面既不合并也不互相换算。
+              </li>
+              <li>
+                两套数字都<strong>未按成员启用/停用过滤</strong>，停用成员同样计入，故都不能称为「启用成员数」；两个待办计数同样不按启停区分。
+              </li>
+              <li>{{ scopeLabel }}范围由服务端按登录身份判定：超级管理员为全院，党支部书记为本人所属支部。</li>
+            </ul>
+          </div>
+        </template>
+      </section>
+
+      <section
+        class="surface content-card"
+        aria-labelledby="stat-study-summary-title"
+        data-testid="statistics-study-summary"
+      >
+        <div class="section-heading">
+          <div>
+            <span class="section-index">MY STUDY</span>
+            <h2 id="stat-study-summary-title">本人学习汇总（当前登录账号）</h2>
+          </div>
+          <p>本人数据：只统计当前登录账号自己的学习记录，不是被统计成员的数据</p>
+        </div>
+
+        <div v-if="studySummaryLoading" class="state-card" role="status" aria-live="polite" aria-busy="true">
+          <el-skeleton :rows="2" animated />
+          <span class="state-caption">正在加载本人学习汇总…</span>
+        </div>
+
+        <div v-else-if="studySummaryError" class="state-card" role="alert" data-testid="stat-study-summary-error">
+          <el-icon class="state-icon error-icon" aria-hidden="true"><WarningFilled /></el-icon>
+          <div class="state-copy">
+            <h3>本人学习汇总暂时无法加载</h3>
+            <p>{{ studySummaryError }}</p>
+          </div>
+          <el-button type="primary" plain data-testid="stat-study-summary-retry" @click="loadStudySummary">
+            <el-icon aria-hidden="true"><Refresh /></el-icon>重新加载
+          </el-button>
+        </div>
+
+        <div v-else-if="studySummary" class="metric-row" data-testid="stat-study-summary-metrics">
+          <div class="metric-card">
+            <span class="metric-label">学习记录</span>
+            <strong class="metric-value">{{ studySummary.recordCount }}</strong>
+            <span class="metric-unit">条</span>
+          </div>
+          <div class="metric-card" data-testid="stat-study-total-minutes">
+            <span class="metric-label">累计学时</span>
+            <strong class="metric-value">{{ formatStudyMinutes(studySummary.totalMinutes) }}</strong>
+            <span v-if="studyMinutesHint(studySummary.totalMinutes)" class="metric-sub">
+              {{ studyMinutesHint(studySummary.totalMinutes) }}
+            </span>
+          </div>
+          <div class="metric-card" data-testid="stat-study-avg-score">
+            <span class="metric-label">平均分</span>
+            <strong v-if="studySummary.avgScore !== null" class="metric-value">
+              {{ studySummary.avgScore.toFixed(2) }}
+            </strong>
+            <strong v-else class="metric-value metric-value-muted">无记录</strong>
+            <span class="metric-unit">{{ studySummary.avgScore !== null ? "分" : "" }}</span>
+          </div>
+        </div>
+
+        <p v-if="studySummary" class="metric-hint">
+          累计学时单位是分钟（服务端按每条记录的学时累加），与「我的培养」档案里的累计学时是同一量纲。平均分无记录时显示「无记录」，不是
+          0 分。
+        </p>
+      </section>
+
       <section class="surface content-card toolbar" aria-label="统计维度">
         <div class="toolbar-row">
           <span class="toolbar-label">统计维度</span>
@@ -427,6 +661,63 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
+.dashboard-table-wrap {
+  margin-top: 12px;
+}
+
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: var(--radius-base);
+  background: var(--party-red-bg);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.metric-value {
+  font-size: 26px;
+  line-height: 1.2;
+  color: var(--party-red);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-value-muted {
+  font-size: 18px;
+  color: var(--text-secondary);
+}
+
+.metric-unit {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.metric-sub {
+  font-size: 12px;
+  color: var(--text-regular);
+}
+
+.metric-hint {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
 .stat-table {
   width: 100%;
 }
@@ -536,6 +827,10 @@ onBeforeUnmount(() => {
   }
 
   .page-heading h1 {
+    font-size: 22px;
+  }
+
+  .metric-value {
     font-size: 22px;
   }
 }
