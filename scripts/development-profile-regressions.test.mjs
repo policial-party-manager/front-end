@@ -622,7 +622,7 @@ test("详情内容：基本信息降级、服务端摘要、各区块记录", as
   const { page } = await fixture(t, { path: "/development/member/12" });
   await waitProfile(page);
   const heading = await page.locator(".page-heading").innerText();
-  assert.match(heading, /管理侧档案 · 只读/);
+  assert.match(heading, /管理侧档案 · 联系人\/材料可维护/);
   assert.match(heading, /范围由服务端按登录身份判定/);
   assert.match(heading, /全院范围/);
 

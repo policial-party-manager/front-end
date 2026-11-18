@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { useAppStore } from "@/stores/app";
 import { getApiErrorMessage } from "@/utils/apiError";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/utils/session";
 import { getMemberCultivationProfile } from "@/api/cultivation";
 import type { CultivationProfile } from "@/api/cultivation-profiles";
+import { MAX_MENTORS, removeMemberMaterial, removeMemberMentor } from "@/api/cultivation-contacts";
 import {
   formatOptionalText,
   formatRecordTime,
@@ -22,6 +23,8 @@ import {
 } from "@/views/activity/participationDisplay";
 import LocalPager from "@/components/development/LocalPager.vue";
 import IdentityChangeDialog from "@/components/development/IdentityChangeDialog.vue";
+import MentorAssignDialog from "@/components/development/MentorAssignDialog.vue";
+import MaterialUploadDialog from "@/components/development/MaterialUploadDialog.vue";
 import {
   countLabel,
   formatStudyDuration,
@@ -39,7 +42,13 @@ import {
 } from "./myDevelopmentDisplay";
 
 /**
- * 管理侧成员培养档案（`/development/member/:id`，只读）。
+ * 管理侧成员培养档案（`/development/member/:id`）。
+ *
+ * 读路径只请求 `GET /v4/cultivation-profiles/{userId}` 一次；写路径只有两处，都落在本页之外的状态上：
+ * - 03 区块：指派/移除培养联系人（`/v4/members/{userId}/mentors`）；
+ * - 09 区块：上传并登记/软删除培养材料（`/v4/uploads` + `/v4/members/{userId}/materials`）。
+ * 两处写成功后都**重新拉取档案**，不改写本地数组：联系人是当前关系、材料列表由服务端按 `status=1`
+ * 过滤，前端插值会立刻与下一次请求不一致。其余八个区块仍为只读。
  *
  * 只请求 `GET /v4/cultivation-profiles/{userId}` 一次，范围由服务端裁决：
  * 超管全院、支委本支部、其余角色仅本人；越权与真不存在同为 HTTP 400「用户不存在」，
@@ -244,6 +253,92 @@ function reloadProfile(): void {
   void loadProfile();
 }
 
+/**
+ * 写成功后的统一回读：联系人与材料都以服务端重新读取为准，不本地改写数组。
+ * 读失败时页面进错误态（`loadProfile` 负责），不会把旧数据当成新结果展示。
+ */
+function refreshProfile(): void {
+  void loadProfile();
+}
+
+// ============ 03 培养联系人：指派 / 移除 ============
+const mentorDialogVisible = ref(false);
+/** 移除中的联系人编号；**在二次确认前同步置位**，双击只弹一个确认框、只发一次请求。 */
+const busyMentorId = ref<number | null>(null);
+
+function openMentorDialog(): void {
+  if (!canView.value || !profile.value || mentors.value.length >= MAX_MENTORS) return;
+  mentorDialogVisible.value = true;
+}
+
+function removeMentor(mentorId: number, name: string): void {
+  if (busyMentorId.value != null || !canView.value) return;
+  busyMentorId.value = mentorId;
+  const snapshot = captureSessionIdentity();
+  void (async () => {
+    try {
+      try {
+        await ElMessageBox.confirm(
+          `移除后该联系人不再出现在档案中，历史思想汇报的所属联系人随之变化。联系人：${name}。`,
+          "移除培养联系人",
+          { confirmButtonText: "确认移除", cancelButtonText: "取消", type: "warning" },
+        );
+      } catch {
+        return;
+      }
+      await removeMemberMentor(userId.value, mentorId);
+      if (!sessionOk(snapshot)) return;
+      ElMessage.success("培养联系人已移除");
+      await loadProfile();
+    } catch (error) {
+      if (!sessionOk(snapshot)) return;
+      // 原文照转达，例如「培养联系人不存在」。
+      ElMessage.error(getApiErrorMessage(error, "移除培养联系人失败"));
+    } finally {
+      busyMentorId.value = null;
+    }
+  })();
+}
+
+// ============ 09 培养材料：上传登记 / 软删除 ============
+const materialDialogVisible = ref(false);
+/** 删除中的材料编号；同样在二次确认前同步置位。 */
+const busyMaterialId = ref<number | null>(null);
+
+function openMaterialDialog(): void {
+  if (!canView.value || !profile.value) return;
+  materialDialogVisible.value = true;
+}
+
+function removeMaterial(materialId: number, fileName: string): void {
+  if (busyMaterialId.value != null || !canView.value) return;
+  busyMaterialId.value = materialId;
+  const snapshot = captureSessionIdentity();
+  void (async () => {
+    try {
+      try {
+        await ElMessageBox.confirm(
+          `删除后这条材料不再出现在列表中；服务端为软删除，记录与文件都保留。材料：${fileName}。`,
+          "删除培养材料",
+          { confirmButtonText: "确认删除", cancelButtonText: "取消", type: "warning" },
+        );
+      } catch {
+        return;
+      }
+      await removeMemberMaterial(userId.value, materialId);
+      if (!sessionOk(snapshot)) return;
+      ElMessage.success("培养材料已删除");
+      await loadProfile();
+    } catch (error) {
+      if (!sessionOk(snapshot)) return;
+      // 原文照转达，例如「材料不存在」。
+      ElMessage.error(getApiErrorMessage(error, "删除培养材料失败"));
+    } finally {
+      busyMaterialId.value = null;
+    }
+  })();
+}
+
 function invalidate(): void {
   requestSequence++;
   profile.value = null;
@@ -251,6 +346,10 @@ function invalidate(): void {
   loadError.value = "";
   resetPages();
   identityDialogVisible.value = false;
+  mentorDialogVisible.value = false;
+  materialDialogVisible.value = false;
+  busyMentorId.value = null;
+  busyMaterialId.value = null;
   Object.keys(expandedReports).forEach((key) => {
     delete expandedReports[Number(key)];
   });
@@ -284,9 +383,9 @@ onBeforeUnmount(() => {
           ← 返回成员列表
         </button>
         <h1>{{ profile ? memberName : "成员培养档案" }}</h1>
-        <p>管理侧只读档案：范围由服务端按登录身份判定（{{ scopeLabel }}），页面不发送任何范围参数。</p>
+        <p>管理侧档案：范围由服务端按登录身份判定（{{ scopeLabel }}），页面不发送任何范围参数。</p>
       </div>
-      <el-tag class="readonly-tag" effect="plain" type="info">管理侧档案 · 只读</el-tag>
+      <el-tag class="readonly-tag" effect="plain" type="info">管理侧档案 · 联系人/材料可维护</el-tag>
       <div class="heading-actions">
         <el-button
           v-if="canView && profile"
@@ -445,18 +544,53 @@ onBeforeUnmount(() => {
             <span class="section-index">03 / MENTORS</span>
             <h2 id="dev-mentors-title">培养联系人</h2>
           </div>
-          <p>联系人为当前生效关系，不是历史快照；换人后此处随之更新。</p>
+          <div class="heading-tools">
+            <p>联系人为当前生效关系，不是历史快照；换人后此处随之更新。</p>
+            <el-button
+              v-if="canView && profile"
+              type="primary"
+              plain
+              :disabled="mentors.length >= MAX_MENTORS"
+              data-testid="mentor-assign-open"
+              @click="openMentorDialog"
+            >
+              指派培养联系人
+            </el-button>
+          </div>
         </div>
         <el-empty v-if="mentors.length === 0" description="尚未设置培养联系人" :image-size="64" />
         <template v-else>
+          <!-- 已达上限：入口置灰 + 说明；列表本身不得因此消失（仍需能够移除）。 -->
+          <p v-if="mentors.length >= MAX_MENTORS" class="limit-hint" data-testid="mentor-limit-hint">
+            已达上限：每位成员最多设置 {{ MAX_MENTORS }} 名培养联系人，需先移除一名才能指派新的联系人。
+          </p>
           <ul class="list-rows">
-            <li v-for="mentor in pagedSlice('mentors', mentors)" :key="mentor.mentorId" class="row-card">
+            <li
+              v-for="mentor in pagedSlice('mentors', mentors)"
+              :key="mentor.mentorId"
+              class="row-card row-with-action"
+            >
               <div class="row-main">
                 <span class="row-title">{{
                   (mentor.realName ?? "").trim() || (mentor.username ?? "").trim() || "姓名未知"
                 }}</span>
                 <span class="row-meta">联系人编号 {{ relationLabel(mentor.mentorId) }}</span>
               </div>
+              <el-button
+                v-if="canView && profile"
+                text
+                type="danger"
+                :loading="busyMentorId === mentor.mentorId"
+                :data-testid="'mentor-remove-' + mentor.mentorId"
+                @click="
+                  removeMentor(
+                    mentor.mentorId,
+                    (mentor.realName ?? '').trim() || (mentor.username ?? '').trim() || '姓名未知',
+                  )
+                "
+              >
+                移除
+              </el-button>
             </li>
           </ul>
           <LocalPager v-model:page="pages.mentors" :total="mentors.length" :page-size="PAGE_SIZE" />
@@ -632,12 +766,23 @@ onBeforeUnmount(() => {
             <span class="section-index">09 / MATERIALS</span>
             <h2 id="dev-materials-title">培养材料</h2>
           </div>
-          <p>材料文件保存在服务端内部，本页只展示材料信息，不提供下载或预览。</p>
+          <div class="heading-tools">
+            <p>材料文件保存在服务端内部，本页只展示材料信息，不提供下载或预览。</p>
+            <el-button
+              v-if="canView && profile"
+              type="primary"
+              plain
+              data-testid="material-upload-open"
+              @click="openMaterialDialog"
+            >
+              上传培养材料
+            </el-button>
+          </div>
         </div>
         <el-empty v-if="materials.length === 0" description="暂无培养材料" :image-size="64" />
         <template v-else>
           <ul class="list-rows">
-            <li v-for="item in pagedSlice('materials', materials)" :key="item.id" class="row-card">
+            <li v-for="item in pagedSlice('materials', materials)" :key="item.id" class="row-card row-with-action">
               <div class="row-main">
                 <div class="row-line">
                   <span class="row-title">{{ (item.fileName ?? "").trim() || "未命名文件" }}</span>
@@ -650,6 +795,16 @@ onBeforeUnmount(() => {
                 <p v-if="(item.remark ?? '').trim()" class="row-text">备注：{{ item.remark }}</p>
                 <p v-if="(item.file ?? '').trim()" class="row-meta">材料文件保存在服务端内部，需查看请联系支部管理员</p>
               </div>
+              <el-button
+                v-if="canView && profile"
+                text
+                type="danger"
+                :loading="busyMaterialId === item.id"
+                :data-testid="'material-remove-' + item.id"
+                @click="removeMaterial(item.id, (item.fileName ?? '').trim() || '未命名文件')"
+              >
+                删除
+              </el-button>
             </li>
           </ul>
           <LocalPager v-model:page="pages.materials" :total="materials.length" :page-size="PAGE_SIZE" />
@@ -675,6 +830,23 @@ onBeforeUnmount(() => {
       :current-identity-id="basic.identityId"
       :current-identity-name="basic.identityName"
       @submitted="onIdentityChangeSubmitted"
+    />
+    <!-- 03 培养联系人：指派成功后重新读取档案，不做本地数组改写。 -->
+    <MentorAssignDialog
+      v-if="canView && profile"
+      v-model:visible="mentorDialogVisible"
+      :user-id="userId"
+      :member-name="memberName"
+      :mentors="mentors"
+      @assigned="refreshProfile"
+    />
+    <!-- 09 培养材料：先上传后登记，登记成功后重新读取档案。 -->
+    <MaterialUploadDialog
+      v-if="canView && profile"
+      v-model:visible="materialDialogVisible"
+      :user-id="userId"
+      :member-name="memberName"
+      @registered="refreshProfile"
     />
   </main>
 </template>
@@ -773,6 +945,31 @@ onBeforeUnmount(() => {
     color: var(--party-red);
     font-weight: 600;
   }
+
+  .heading-tools {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+}
+
+/* 行内操作按钮靠右，窄屏时回到上一行。 */
+.row-with-action {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 已达联系人上限时的说明，与入口按钮置灰配套。 */
+.limit-hint {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
 
 .state-card {
